@@ -1,2 +1,3 @@
-./venv
-./docker-compose.yaml
+.venv
+.idea
+docker-compose.yaml
