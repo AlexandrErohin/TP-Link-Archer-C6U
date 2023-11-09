@@ -13,7 +13,7 @@ Enter your hostname/IP & credentials used to log in to your router management pa
 
 ```python
 import asyncio
-import tplinkrouterc6u
+from tplinkrouterc6u import TplinkRouter
 
 router = TplinkRouter('hostname', 'password')
 
