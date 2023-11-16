@@ -30,4 +30,10 @@ class Status:
     guest_5g_enable: bool
     wifi_2g_enable: bool
     wifi_5g_enable: bool
+    wan_ipv4_uptime: int
+    mem_usage: float
+    cpu_usage: float
+    cpu1_usage: float
+    cpu2_usage: float
+    cpu3_usage: float
     devices: list[Device]

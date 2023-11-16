@@ -132,10 +132,17 @@ class TplinkRouter:
         return firmware
 
     async def _get_status(self) -> Status:
+
+        def _calc_cpu_usage(data: dict) -> float:
+            return (data['cpu_usage'] + data['cpu1_usage'] + data['cpu2_usage'] + data['cpu3_usage']) / 4
+
         data = await self._get_data('admin/status?form=all')
         status = Status
         status.devices = []
         status.macaddr = data['lan_macaddr']
+        status.wan_ipv4_uptime = data['wan_ipv4_uptime']
+        status.mem_usage = data['mem_usage']
+        status.cpu_usage = _calc_cpu_usage(data)
         status.wired_total = len(data['access_devices_wired']) if data.__contains__('access_devices_wired') else 0
         status.wifi_clients_total = len(data['access_devices_wireless_host']) if (
             data.__contains__('access_devices_wireless_host')) else 0
