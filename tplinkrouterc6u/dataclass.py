@@ -33,7 +33,4 @@ class Status:
     wan_ipv4_uptime: int
     mem_usage: float
     cpu_usage: float
-    cpu1_usage: float
-    cpu2_usage: float
-    cpu3_usage: float
     devices: list[Device]
