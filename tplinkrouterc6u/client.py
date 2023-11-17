@@ -140,7 +140,7 @@ class TplinkRouter:
         status = Status
         status.devices = []
         status.macaddr = data['lan_macaddr']
-        status.wan_ipv4_uptime = data['wan_ipv4_uptime']
+        status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data['mem_usage']
         status.cpu_usage = _calc_cpu_usage(data)
         status.wired_total = len(data['access_devices_wired']) if data.__contains__('access_devices_wired') else 0
