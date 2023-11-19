@@ -1,9 +1,14 @@
 # TP-Link Router API
-Python package for API access and router management of the TP-Link Archer C6U and Archer AX10
+Python package for API access and router management of the TP-Link Archer C6 and Archer AX10
+
+[![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
+[![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
 
 ## Supports
-- Archer C6U
+- Archer C6
 - Archer AX10
+
+Please let me know if you have succeed in using this for other model
 
 ## Installation
 `pip install tplinkrouterc6u`
