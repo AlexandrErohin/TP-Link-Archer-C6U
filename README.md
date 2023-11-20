@@ -94,7 +94,7 @@ asyncio.run(tasks())
 | guest_5g_enable | Is guest wifi 5G enabled | bool |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
 | wifi_5g_enable | Is main wifi 5G enabled | bool |
-| wan_ipv4_uptime | Internet Uptime | int |
+| wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage | float |
 | cpu_usage | CPU usage | float |
 | devices | List of all wifi clients | list[[Device](#device)] |
