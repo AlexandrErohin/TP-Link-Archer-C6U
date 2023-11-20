@@ -127,42 +127,38 @@ class TplinkRouter:
 
     async def _get_firmware(self) -> Firmware:
         data = await self._get_data('admin/firmware?form=upgrade')
-        firmware = Firmware(data['hardware_version'], data['model'], data['firmware_version'])
+        firmware = Firmware(data.get('hardware_version'), data.get('model'), data.get('firmware_version'))
 
         return firmware
 
     async def _get_status(self) -> Status:
 
         def _calc_cpu_usage(data: dict) -> float:
-            return (data['cpu_usage'] + data['cpu1_usage'] + data['cpu2_usage'] + data['cpu3_usage']) / 4
+            return (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0) + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0)) / 4
 
         data = await self._get_data('admin/status?form=all')
         status = Status
         status.devices = []
-        status.macaddr = data['lan_macaddr']
+        status.macaddr = data.get('lan_macaddr')
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
-        status.mem_usage = data['mem_usage']
+        status.mem_usage = data.get('mem_usage')
         status.cpu_usage = _calc_cpu_usage(data)
-        status.wired_total = len(data['access_devices_wired']) if data.__contains__('access_devices_wired') else 0
-        status.wifi_clients_total = len(data['access_devices_wireless_host']) if (
-            data.__contains__('access_devices_wireless_host')) else 0
-        status.guest_clients_total = len(data['access_devices_wireless_guest']) if data.__contains__(
-            'access_devices_wireless_guest') else 0
+        status.wired_total = len(data.get('access_devices_wired', 0))
+        status.wifi_clients_total = len(data.get('access_devices_wireless_host', 0))
+        status.guest_clients_total = len(data.get('access_devices_wireless_guest', 0))
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
-        status.guest_2g_enable = data['guest_2g_enable'] == 'on'
-        status.guest_5g_enable = data['guest_5g_enable'] == 'on'
-        status.wifi_2g_enable = data['wireless_2g_enable'] == 'on'
-        status.wifi_5g_enable = data['wireless_5g_enable'] == 'on'
+        status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
+        status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
+        status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
+        status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
 
-        if data.__contains__('access_devices_wireless_host'):
-            for item in data['access_devices_wireless_host']:
-                type = Wifi.WIFI_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_5G
-                status.devices.append(Device(type, item['macaddr'], item['ipaddr'], item['hostname']))
+        for item in data.get('access_devices_wireless_host', []):
+            type = Wifi.WIFI_2G if '2.4G' == item.get('wire_type') else Wifi.WIFI_5G
+            status.devices.append(Device(type, item.get('macaddr'), item.get('ipaddr'), item.get('hostname')))
 
-        if data.__contains__('access_devices_wireless_guest'):
-            for item in data['access_devices_wireless_guest']:
-                type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
-                status.devices.append(Device(type, item['macaddr'], item['ipaddr'], item['hostname']))
+        for item in data.get('access_devices_wireless_guest', []):
+            type = Wifi.WIFI_GUEST_2G if '2.4G' == item.get('wire_type') else Wifi.WIFI_GUEST_5G
+            status.devices.append(Device(type, item.get('macaddr'), item.get('ipaddr'), item.get('hostname')))
 
         return status
 
