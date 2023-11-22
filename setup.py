@@ -5,10 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tplinkrouterc6u",
-    version="0.1.2",
+    version="0.1.3",
     author="Alex Erohin",
     author_email="alexanderErohin@yandex.ru",
-    description="TP-Link Router API for Archer C6U and Archer AX10",
+    description="TP-Link Router API",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/AlexandrErohin/TP-Link-Archer-C6U",
