@@ -1,14 +1,10 @@
 # TP-Link Router API
-Python package for API access and router management of the TP-Link Archer C6 and Archer AX10
+Python package for API access and management for TP-Link Router
 
 [![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
 
-## Supports
-- Archer C6
-- Archer AX10
-
-Please let me know if you have succeed in using this for other model
+See [Supported routers](#supports)
 
 ## Installation
 `pip install tplinkrouterc6u`
@@ -113,6 +109,40 @@ asyncio.run(tasks())
 - Wifi.WIFI_5G - main wifi 5G
 - Wifi.WIFI_GUEST_2G - guest wifi 2.4G
 - Wifi.WIFI_GUEST_5G - guest wifi 5G
+
+
+## <a id="supports">Supported routers</a>
+### Fully tested
+- Archer AX10
+- Archer C6
+- Archer C6U
+
+### Not fully tested
+- AD7200 V2
+- Archer A6 (V2 and V3)
+- Archer A7 V5
+- Archer A9 V6
+- Archer A10 (V1 and V2)
+- Archer A20 (V1, V3)
+- Archer AX50 V1
+- Archer AX3000 V1 (V2 - should work, but not have been tested)
+- Archer AX6000 V1
+- Archer C6 V4
+- Archer C7 (V4 and V5)
+- Archer C8 (V3 and V4)
+- Archer C9 (V4 and V5)
+- Archer C59 V2
+- Archer C90 V6
+- Archer C900 V1
+- Archer C1200 V3 (V2 - should work, but not have been tested)
+- Archer C1900 V2
+- Archer C2300 (V1, V2)
+- Archer C4000 (V2 and V3)
+- Archer C5400 V2
+- Archer C5400X V1
+- TL-WR1043N V5
+
+Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
