@@ -10,29 +10,28 @@ See [Supported routers](#supports)
 `pip install tplinkrouterc6u`
 
 ## Dependencies
- - [aiohttp](https://pypi.org/project/aiohttp/)
+ - [requests](https://pypi.org/project/requests/)
  - [pycryptodome](https://pypi.org/project/pycryptodome/)
 
 ## Usage
-Enter your hostname/IP & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
+Enter the host & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
 
 ```python
-import asyncio
-from tplinkrouterc6u import TplinkRouter
+from tplinkrouterc6u import TplinkRouter, Wifi
 
-router = TplinkRouter('hostname', 'password')
+router = TplinkRouter('http://192.168.0.1', 'password')
 
 # You may also pass username if it is different and a logger to log errors as
-# TplinkRouter('hostname','password','admin2', _LOGGER)
+# TplinkRouter('http://192.168.0.1','password','admin2', _LOGGER)
 
 # Get firmware info - returns Firmware
-firmware = asyncio.run(router.get_firmware())
+firmware = router.get_firmware()
 
 # Get status info - returns Status
-full_info = asyncio.run(router.get_status())
+full_info = router.get_status()
 
 # Turn ON guest wifi 2.5G
-asyncio.run(router.set_wifi(Wifi.WIFI_GUEST_2G, True))
+router.set_wifi(Wifi.WIFI_GUEST_2G, True)
 ```
 
 The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
@@ -40,23 +39,19 @@ So before action client authorize and after logout
 To reduce authorization requests client allows to make several actions with one authorization
 
 ```python
-import asyncio
 from tplinkrouterc6u import TplinkRouter, Wifi
 
-router = TplinkRouter('hostname', 'password')
+router = TplinkRouter('http://192.168.0.1', 'password')
 router.single_request_mode = False  # make client use single authorization
 
 
-async def tasks():
-    try:
-        if await router.authorize():  # authorizing
-            status = await router.get_status()
-            if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
-                await router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
-    finally:
-        await router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged 
-
-asyncio.run(tasks())
+try:
+    if router.authorize():  # authorizing
+        status = router.get_status()
+        if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
+            router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
+finally:
+    router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
 
 ## Functions
@@ -66,9 +61,9 @@ asyncio.run(tasks())
 | get_status |  | Gets status about the router info including wifi statuses and wifi clients info | [Status](#status) |
 | get_full_info |  | Gets firmware and status info | tuple[[Firmware](#firmware),[Status](#status)] |
 | set_wifi | wifi: [Wifi](#wifi), enable: bool | Allow to turn on/of 4 wifi networks |  |
-| reboot | reboot router |  |
-| authorize | authorize for actions |  |
-| logout | logout after all is done |  |
+| reboot |  | reboot router |
+| authorize |  | authorize for actions |
+| logout |  | logout after all is done |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -112,12 +107,12 @@ asyncio.run(tasks())
 
 
 ## <a id="supports">Supported routers</a>
-### Fully tested
-- Archer AX10
-- Archer C6
-- Archer C6U
+### Fully tested Hardware Versions
+- Archer AX10 v1.0
+- Archer C6 v2.0
+- Archer C6U v1.0
 
-### Not fully tested
+### Not fully tested Hardware Versions
 - AD7200 V2
 - Archer A6 (V2 and V3)
 - Archer A7 V5
@@ -125,7 +120,7 @@ asyncio.run(tasks())
 - Archer A10 (V1 and V2)
 - Archer A20 (V1, V3)
 - Archer AX50 V1
-- Archer AX3000 V1 (V2 - should work, but not have been tested)
+- Archer AX3000 V1
 - Archer AX6000 V1
 - Archer C6 V4
 - Archer C7 (V4 and V5)

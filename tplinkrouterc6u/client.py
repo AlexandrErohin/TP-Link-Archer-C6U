@@ -2,9 +2,7 @@ import hashlib
 import re
 from collections.abc import Callable
 import json
-from aiohttp.hdrs import REFERER
-import aiohttp
-from aiohttp.client import ClientSession, ClientResponse
+import requests
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
@@ -12,10 +10,13 @@ from tplinkrouterc6u.dataclass import Firmware, Status, Device
 
 
 class TplinkRouter:
-    _session: ClientSession | None = None
-
-    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None) -> None:
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True) -> None:
         self.host = host
+        if not (self.host.startswith('http://') or self.host.startswith('https://')):
+            self.host = "http://{}".format(self.host)
+        self._verify_ssl = verify_ssl
+        if self._verify_ssl is False:
+            requests.packages.urllib3.disable_warnings()
         self.username = username
         self.password = password
         self.single_request_mode = True
@@ -24,7 +25,7 @@ class TplinkRouter:
         self._stok = ''
         self._sysauth = ''
 
-        self._login = True
+        self._logged = False
         self._seq = ''
         self._hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
 
@@ -36,61 +37,62 @@ class TplinkRouter:
 
         self._encryption = EncryptionWrapper()
 
-    async def test_connect(self) -> None:
+    def test_connect(self) -> None:
         try:
-            await self.authorize()
+            self.authorize()
+        except Exception as error:
+            if self._logger:
+                self._logger.error(error)
         finally:
-            await self.clear()
+            self.clear()
 
-    async def get_firmware(self) -> Firmware | None:
-        return await self._request(self._get_firmware)
+    def get_firmware(self) -> Firmware | None:
+        return self._request(self._get_firmware)
 
-    async def get_status(self) -> Status | None:
-        return await self._request(self._get_status)
+    def get_status(self) -> Status | None:
+        return self._request(self._get_status)
 
-    async def get_full_info(self) -> tuple[Firmware, Status] | None:
-        async def callback():
-            firmware = await self._get_firmware()
-            status = await self._get_status()
+    def get_full_info(self) -> tuple[Firmware, Status] | None:
+        def callback():
+            firmware = self._get_firmware()
+            status = self._get_status()
 
             return firmware, status
 
-        return await self._request(callback)
+        return self._request(callback)
 
-    async def set_wifi(self, wifi: Wifi, enable: bool) -> None:
-        async def callback():
+    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+        def callback():
             path = f"admin/wireless?&form=guest&form={wifi.value}"
             data = f"operation=write&{wifi.value}_enable={'on' if enable else 'off'}"
-            await self._send_data(path, data)
+            self._send_data(path, data)
 
-        await self._request(callback)
+        self._request(callback)
 
-    async def reboot(self):
-        async def callback():
-            await self._send_data('admin/system?form=reboot', 'operation=write')
+    def reboot(self) ->None:
+        def callback():
+            self._send_data('admin/system?form=reboot', 'operation=write')
 
-        await self._request(callback)
+        self._request(callback)
 
-    async def authorize(self) -> bool:
-        self._session = aiohttp.ClientSession()
-
-        referer = 'http://{}/webpages/login.html?t=1596185370610'.format(self.host)
+    def authorize(self) -> bool:
+        referer = '{}/webpages/login.html?t=1596185370610'.format(self.host)
 
         if self._pwdNN == '':
-            await self._request_pwd(referer)
+            self._request_pwd(referer)
 
         if self._seq == '':
-            await self._request_seq(referer)
+            self._request_seq(referer)
 
-        response = await self._try_login(referer)
+        response = self._try_login(referer)
 
-        if 'text/plain' == response.content_type:
-            await self._request_pwd(referer)
-            await self._request_seq(referer)
-            response = await self._try_login(referer)
+        if 'text/plain' == response.headers.get('Content-Type'):
+            self._request_pwd(referer)
+            self._request_seq(referer)
+            response = self._try_login(referer)
 
         try:
-            jsonData = await response.json()
+            jsonData = response.json()
 
             encryptedResponseData = jsonData['data']
             responseData = self._encryption.aes_decrypt(encryptedResponseData)
@@ -104,7 +106,7 @@ class TplinkRouter:
             regex_result = re.search(
                 'sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
-            self._login = False
+            self._logged = True
             return True
         except (ValueError, KeyError, AttributeError) as e:
             if self._logger:
@@ -112,31 +114,28 @@ class TplinkRouter:
 
         return False
 
-    async def logout(self) -> None:
-        if self._session:
-            await self._send_data('admin/system?form=logout', 'operation=write')
-        await self.clear()
+    def logout(self) -> None:
+        if self._logged:
+            self._send_data('admin/system?form=logout', 'operation=write')
+        self.clear()
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         self._stok = ''
         self._sysauth = ''
-        self._login = True
-        if self._session:
-            await self._session.close()
-            self._session = None
+        self._logged = False
 
-    async def _get_firmware(self) -> Firmware:
-        data = await self._get_data('admin/firmware?form=upgrade')
+    def _get_firmware(self) -> Firmware:
+        data = self._get_data('admin/firmware?form=upgrade')
         firmware = Firmware(data['hardware_version'], data['model'], data['firmware_version'])
 
         return firmware
 
-    async def _get_status(self) -> Status:
+    def _get_status(self) -> Status:
 
         def _calc_cpu_usage(data: dict) -> float:
             return (data['cpu_usage'] + data['cpu1_usage'] + data['cpu2_usage'] + data['cpu3_usage']) / 4
 
-        data = await self._get_data('admin/status?form=all')
+        data = self._get_data('admin/status?form=all')
         status = Status
         status.devices = []
         status.macaddr = data['lan_macaddr']
@@ -166,13 +165,18 @@ class TplinkRouter:
 
         return status
 
-    async def _request_pwd(self, referer: str) -> None:
-        url = 'http://{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
+    def _request_pwd(self, referer: str) -> None:
+        url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
 
         # If possible implement RSA encryption of password here.
-        response = await self._session.post(url, params={'operation': 'read'}, headers={REFERER: referer}, timeout=4)
+        response = requests.post(
+            url, params={'operation': 'read'},
+            headers={'Referer': referer},
+            timeout=4,
+            verify=self._verify_ssl,
+        )
 
-        jsonData = await response.json()
+        jsonData = response.json()
 
         if not jsonData['success']:
             raise Exception('Unkown error: ' + jsonData)
@@ -182,13 +186,19 @@ class TplinkRouter:
         self._pwdNN = args[0]
         self._pwdEE = args[1]
 
-    async def _request_seq(self, referer: str) -> None:
-        url = 'http://{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
+    def _request_seq(self, referer: str) -> None:
+        url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
 
         # If possible implement RSA encryption of password here.
-        response = await self._session.post(url, params={'operation': 'read'}, headers={REFERER: referer}, timeout=4)
+        response = requests.post(
+            url,
+            params={'operation': 'read'},
+            headers={'Referer': referer},
+            timeout=4,
+            verify=self._verify_ssl,
+        )
 
-        jsonData = await response.json()
+        jsonData = response.json()
 
         if not jsonData['success']:
             raise Exception('Unkown error: ' + jsonData)
@@ -199,34 +209,38 @@ class TplinkRouter:
         self.nn = args[0]
         self.ee = args[1]
 
-    async def _try_login(self, referer: str) -> ClientResponse:
-        url = 'http://{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+    def _try_login(self, referer: str) -> requests.Response:
+        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 
         cryptedPwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
         data = 'operation=login&password={}&confirm=true'.format(cryptedPwd)
 
         body = self._prepare_data(data)
 
-        return await self._session.post(
-            url, data=body,
-            headers={REFERER: referer, 'Content-Type': 'application/x-www-form-urlencoded'}, timeout=4)
+        return requests.post(
+            url,
+            data=body,
+            headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=4,
+            verify=self._verify_ssl,
+        )
 
-    def _prepare_data(self, data):
+    def _prepare_data(self, data) -> dict:
         encrypted_data = self._encryption.aes_encrypt(data)
         data_len = len(encrypted_data)
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len, self._login, self._hash, self.nn, self.ee)
+        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn, self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
 
-    async def _request(self, callback: Callable):
+    def _request(self, callback: Callable):
         if not self.single_request_mode:
-            return await callback()
+            return callback()
 
         try:
-            if await self.authorize():
-                data = await callback()
-                await self.logout()
+            if self.authorize():
+                data = callback()
+                self.logout()
                 return data
         except Exception as error:
             self._seq = ''
@@ -234,20 +248,25 @@ class TplinkRouter:
             if self._logger:
                 self._logger.error(error)
         finally:
-            await self.clear()
+            self.clear()
 
-    async def _get_data(self, path: str) -> dict | None:
-        if self._session is None:
+    def _get_data(self, path: str) -> dict | None:
+        if self._logged is False:
             raise Exception('Not authorised')
-        url = 'http://{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = 'http://{}/webpages/index.html'.format(self.host)
+        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
+        referer = '{}/webpages/index.html'.format(self.host)
 
-        response = await self._session.post(
-            url, params={'operation': 'read'}, headers={REFERER: referer},
-            cookies={'sysauth': self._sysauth}, timeout=5)
+        response = requests.post(
+            url,
+            params={'operation': 'read'},
+            headers={'Referer': referer},
+            cookies={'sysauth': self._sysauth},
+            timeout=5,
+            verify=self._verify_ssl,
+        )
 
         try:
-            json_response = await response.json()
+            json_response = response.json()
 
             data = json_response['data']
             data = self._encryption.aes_decrypt(data)
@@ -270,13 +289,18 @@ class TplinkRouter:
 
         return None
 
-    async def _send_data(self, path: str, data: str):
-        if self._session is None:
+    def _send_data(self, path: str, data: str) -> None:
+        if self._logged is False:
             raise Exception('Not authorised')
-        url = 'http://{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = 'http://{}/webpages/index.1596185370610.html'.format(self.host)
+        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
+        referer = '{}/webpages/index.1596185370610.html'.format(self.host)
 
         body = self._prepare_data(data)
-        await self._session.post(
-            url, data=body, headers={REFERER: referer, 'Content-Type': 'application/x-www-form-urlencoded'},
-            cookies={'sysauth': self._sysauth})
+        requests.post(
+            url,
+            data=body,
+            headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
+            cookies={'sysauth': self._sysauth},
+            timeout=5,
+            verify=self._verify_ssl,
+        )
