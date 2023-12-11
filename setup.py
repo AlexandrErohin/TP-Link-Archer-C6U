@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tplinkrouterc6u",
-    version="0.1.3",
+    version="1.0.0",
     author="Alex Erohin",
     author_email="alexanderErohin@yandex.ru",
     description="TP-Link Router API",
@@ -18,6 +18,6 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: OS Independent",
     ],
-    install_requires=['aiohttp', 'pycryptodome'],
+    install_requires=['requests', 'pycryptodome'],
     python_requires='>=3.10',
 )
