@@ -31,6 +31,6 @@ class Status:
     wifi_2g_enable: bool
     wifi_5g_enable: bool
     wan_ipv4_uptime: int | None
-    mem_usage: float
-    cpu_usage: float
+    mem_usage: float | None
+    cpu_usage: float | None
     devices: list[Device]

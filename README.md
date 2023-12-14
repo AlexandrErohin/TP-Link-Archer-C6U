@@ -86,8 +86,8 @@ finally:
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
 | wifi_5g_enable | Is main wifi 5G enabled | bool |
 | wan_ipv4_uptime | Internet Uptime | int, None |
-| mem_usage | Memory usage | float |
-| cpu_usage | CPU usage | float |
+| mem_usage | Memory usage | float, None |
+| cpu_usage | CPU usage | float, None |
 | devices | List of all wifi clients | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
