@@ -37,15 +37,6 @@ class TplinkRouter:
 
         self._encryption = EncryptionWrapper()
 
-    def test_connect(self) -> bool:
-        try:
-            return self.authorize()
-        except Exception as error:
-            if self._logger:
-                self._logger.error('TplinkRouter Integration Exception - {}'.format(error))
-        finally:
-            self.clear()
-
     def get_firmware(self) -> Firmware | None:
         return self._request(self._get_firmware)
 
