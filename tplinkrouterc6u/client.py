@@ -126,26 +126,28 @@ class TplinkRouter:
 
     def _get_status(self) -> Status:
 
-        def _calc_cpu_usage(data: dict) -> float:
-            return (data['cpu_usage'] + data['cpu1_usage'] + data['cpu2_usage'] + data['cpu3_usage']) / 4
+        def _calc_cpu_usage(data: dict) -> float | None:
+            cpu_usage = (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0)
+                         + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
+            return cpu_usage / 4 if cpu_usage != 0 else None
 
         data = self._get_data('admin/status?form=all')
         status = Status
         status.devices = []
         status.macaddr = data['lan_macaddr']
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
-        status.mem_usage = data['mem_usage']
+        status.mem_usage = data.get('mem_usage')
         status.cpu_usage = _calc_cpu_usage(data)
         status.wired_total = len(data['access_devices_wired']) if data.__contains__('access_devices_wired') else 0
-        status.wifi_clients_total = len(data['access_devices_wireless_host']) if (
-            data.__contains__('access_devices_wireless_host')) else 0
+        status.wifi_clients_total = len(data['access_devices_wireless_host']) if data.__contains__(
+            'access_devices_wireless_host') else 0
         status.guest_clients_total = len(data['access_devices_wireless_guest']) if data.__contains__(
             'access_devices_wireless_guest') else 0
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
-        status.guest_2g_enable = data['guest_2g_enable'] == 'on'
-        status.guest_5g_enable = data['guest_5g_enable'] == 'on'
-        status.wifi_2g_enable = data['wireless_2g_enable'] == 'on'
-        status.wifi_5g_enable = data['wireless_5g_enable'] == 'on'
+        status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
+        status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
+        status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
+        status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
 
         if data.__contains__('access_devices_wireless_host'):
             for item in data['access_devices_wireless_host']:
