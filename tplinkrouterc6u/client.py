@@ -37,12 +37,12 @@ class TplinkRouter:
 
         self._encryption = EncryptionWrapper()
 
-    def test_connect(self) -> None:
+    def test_connect(self) -> bool:
         try:
-            self.authorize()
+            return self.authorize()
         except Exception as error:
             if self._logger:
-                self._logger.error(error)
+                self._logger.error('TplinkRouter Integration Exception - {}'.format(error))
         finally:
             self.clear()
 
@@ -94,13 +94,16 @@ class TplinkRouter:
         try:
             jsonData = response.json()
 
+            if 'data' not in jsonData or not jsonData['data']:
+                raise Exception('No data in response: ' + response.text)
+
             encryptedResponseData = jsonData['data']
             responseData = self._encryption.aes_decrypt(encryptedResponseData)
 
             responseDict = json.loads(responseData)
 
-            if not responseDict['success']:
-                raise Exception(responseDict['errorcode'])
+            if 'success' not in responseDict or not responseDict['success']:
+                raise Exception('No data in response: ' + responseData)
 
             self._stok = responseDict['data']['stok']
             regex_result = re.search(
@@ -110,7 +113,7 @@ class TplinkRouter:
             return True
         except (ValueError, KeyError, AttributeError) as e:
             if self._logger:
-                self._logger.error("Couldn't fetch auth tokens! Response was: %s", response.text)
+                self._logger.error("TplinkRouter Integration Exception - Couldn't fetch auth tokens! Response was: %s", response.text)
 
         return False
 
@@ -178,8 +181,8 @@ class TplinkRouter:
 
         jsonData = response.json()
 
-        if not jsonData['success']:
-            raise Exception('Unkown error: ' + jsonData)
+        if 'success' not in jsonData or not jsonData['success']:
+            raise Exception('Unkown error for pwd: ' + response.text)
 
         args = jsonData['data']['password']
 
@@ -200,8 +203,8 @@ class TplinkRouter:
 
         jsonData = response.json()
 
-        if not jsonData['success']:
-            raise Exception('Unkown error: ' + jsonData)
+        if 'success' not in jsonData or not jsonData['success']:
+            raise Exception('Unkown error for seq: ' + response.text)
 
         self._seq = jsonData['data']['seq']
         args = jsonData['data']['key']
@@ -246,7 +249,7 @@ class TplinkRouter:
             self._seq = ''
             self._pwdNN = ''
             if self._logger:
-                self._logger.error(error)
+                self._logger.error('TplinkRouter Integration Exception - {}'.format(error))
         finally:
             self.clear()
 
@@ -265,29 +268,30 @@ class TplinkRouter:
             verify=self._verify_ssl,
         )
 
+        data = response.text
         try:
             json_response = response.json()
-
-            data = json_response['data']
-            data = self._encryption.aes_decrypt(data)
+            if 'data' not in json_response:
+                raise Exception("Router didn't respond with JSON - " + data)
+            data = self._encryption.aes_decrypt(json_response['data'])
 
             json_response = json.loads(data)
 
-            if json_response['success']:
+            if 'success' in json_response and json_response['success']:
                 return json_response['data']
             else:
-                if json_response['errorcode'] == 'timeout':
+                if 'errorcode' in json_response and json_response['errorcode'] == 'timeout':
                     if self._logger:
-                        self._logger.info("Token timed out. Relogging on next scan")
+                        self._logger.info("TplinkRouter Integration Exception - Token timed out. Relogging on next scan")
                     self._stok = ''
                     self._sysauth = ''
                 elif self._logger:
-                    self._logger.error("An unknown error happened while fetching data")
+                    self._logger.error("TplinkRouter Integration Exception - An unknown error happened while fetching data %s", data)
         except ValueError:
             if self._logger:
-                self._logger.error("Router didn't respond with JSON. Check if credentials are correct")
+                self._logger.error("TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
 
-        return None
+        raise Exception('An unknown response - ' + data)
 
     def _send_data(self, path: str, data: str) -> None:
         if self._logged is False:
