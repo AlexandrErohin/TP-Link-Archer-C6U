@@ -120,7 +120,7 @@ class TplinkRouter:
 
     def _get_firmware(self) -> Firmware:
         data = self._get_data('admin/firmware?form=upgrade')
-        firmware = Firmware(data['hardware_version'], data['model'], data['firmware_version'])
+        firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
 
