@@ -1,3 +1,7 @@
-.venv
+__pycache__
 .idea
+.venv
+.vscode
+*.egg-info
+build
 docker-compose.yaml

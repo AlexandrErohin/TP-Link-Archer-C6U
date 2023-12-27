@@ -28,7 +28,7 @@ router = TplinkRouter('http://192.168.0.1', 'password')
 firmware = router.get_firmware()
 
 # Get status info - returns Status
-full_info = router.get_status()
+status = router.get_status()
 
 # Turn ON guest wifi 2.5G
 router.set_wifi(Wifi.WIFI_GUEST_2G, True)
@@ -139,6 +139,13 @@ finally:
 - TL-WR1043N V5
 
 Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
+
+## Local Development
+
+- Download this repository.
+- Run `pip install -e path/to/repo`.
+- Make changes to files within the `tplinkrouter6u` directory.
+- Exercise the changes following the "Usage" section above.
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
