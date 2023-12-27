@@ -52,19 +52,19 @@ class TplinkRouter:
 
         return self._request(callback)
 
-    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+    def set_wifi(self, wifi: Wifi, enable: bool) -> dict | None:
         def callback():
             path = f"admin/wireless?&form=guest&form={wifi.value}"
             data = f"operation=write&{wifi.value}_enable={'on' if enable else 'off'}"
-            self._send_data(path, data)
+            return self._send_data(path, data)
 
-        self._request(callback)
+        return self._request(callback)
 
-    def reboot(self) ->None:
-        def callback():
-            self._send_data('admin/system?form=reboot', 'operation=write')
+    def reboot(self) -> dict | None:
+        def callback() -> dict:
+            return self._send_data('admin/system?form=reboot', 'operation=write')
 
-        self._request(callback)
+        return self._request(callback)
 
     def authorize(self) -> bool:
         referer = '{}/webpages/login.html?t=1596185370610'.format(self.host)
@@ -108,9 +108,9 @@ class TplinkRouter:
 
         return False
 
-    def logout(self) -> None:
+    def logout(self) -> dict | None:
         if self._logged:
-            self._send_data('admin/system?form=logout', 'operation=write')
+            return self._send_data('admin/system?form=logout', 'operation=write')
         self.clear()
 
     def clear(self) -> None:
@@ -225,7 +225,7 @@ class TplinkRouter:
 
         return {'sign': sign, 'data': encrypted_data}
 
-    def _request(self, callback: Callable):
+    def _request(self, callback: Callable) -> None:
         if not self.single_request_mode:
             return callback()
 
@@ -242,21 +242,7 @@ class TplinkRouter:
         finally:
             self.clear()
 
-    def _get_data(self, path: str) -> dict | None:
-        if self._logged is False:
-            raise Exception('Not authorised')
-        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = '{}/webpages/index.html'.format(self.host)
-
-        response = requests.post(
-            url,
-            params={'operation': 'read'},
-            headers={'Referer': referer},
-            cookies={'sysauth': self._sysauth},
-            timeout=5,
-            verify=self._verify_ssl,
-        )
-
+    def _parse_response(self, response: requests.Response) -> dict:
         data = response.text
         try:
             json_response = response.json()
@@ -282,14 +268,30 @@ class TplinkRouter:
 
         raise Exception('An unknown response - ' + data)
 
-    def _send_data(self, path: str, data: str) -> None:
+    def _get_data(self, path: str) -> dict:
+        if self._logged is False:
+            raise Exception('Not authorised')
+        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
+        referer = '{}/webpages/index.html'.format(self.host)
+
+        response = requests.post(
+            url,
+            params={'operation': 'read'},
+            headers={'Referer': referer},
+            cookies={'sysauth': self._sysauth},
+            timeout=5,
+            verify=self._verify_ssl,
+        )
+        return self._parse_response(response)
+
+    def _send_data(self, path: str, data: str) -> dict:
         if self._logged is False:
             raise Exception('Not authorised')
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
         referer = '{}/webpages/index.1596185370610.html'.format(self.host)
 
         body = self._prepare_data(data)
-        requests.post(
+        response = requests.post(
             url,
             data=body,
             headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
@@ -297,3 +299,4 @@ class TplinkRouter:
             timeout=5,
             verify=self._verify_ssl,
         )
+        return self._parse_response(response)
