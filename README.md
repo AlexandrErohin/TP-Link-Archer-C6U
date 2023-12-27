@@ -83,6 +83,8 @@ finally:
 | clients_total | Total amount of all connected clients | int |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool |
 | guest_5g_enable | Is guest wifi 5G enabled | bool |
+| iot_2g_enable | Is IoT wifi 2.4G enabled | bool |
+| iot_5g_enable | Is IoT wifi 5G enabled | bool |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
 | wifi_5g_enable | Is main wifi 5G enabled | bool |
 | wan_ipv4_uptime | Internet Uptime | int, None |
@@ -93,7 +95,7 @@ finally:
 ### <a id="device">Device</a>
 | Field | Description | Type |
 | --- |---|---|
-| type | client connection type (2.4G or 5G, guest wifi of main wifi) | [Wifi](#wifi) |
+| type | client connection type (2.4G or 5G, guest wifi or main wifi) | [Wifi](#wifi) |
 | macaddr | client mac address | str |
 | ipaddr | client ip address | str |
 | hostname | client hostname | str |
@@ -104,6 +106,8 @@ finally:
 - Wifi.WIFI_5G - main wifi 5G
 - Wifi.WIFI_GUEST_2G - guest wifi 2.4G
 - Wifi.WIFI_GUEST_5G - guest wifi 5G
+- Wifi.WIFI_IOT_2G - IoT wifi 2.4g
+- Wifi.WIFI_IOT_5G - IoT wifi 5g
 
 
 ## <a id="supports">Supported routers</a>
