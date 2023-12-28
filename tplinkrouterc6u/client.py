@@ -225,7 +225,7 @@ class TplinkRouter:
 
         return {'sign': sign, 'data': encrypted_data}
 
-    def _request(self, callback: Callable) -> None:
+    def _request(self, callback: Callable) -> dict | None:
         if not self.single_request_mode:
             return callback()
 
