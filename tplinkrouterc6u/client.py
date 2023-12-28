@@ -144,6 +144,8 @@ class TplinkRouter:
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
         status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
         status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
+        status.iot_2g_enable = data.get('iot_2g_enable') == 'on' if data.get('iot_2g_enable') is not None else None
+        status.iot_5g_enable = data.get('iot_5g_enable') == 'on' if data.get('iot_5g_enable') is not None else None
         status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
         status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
 
