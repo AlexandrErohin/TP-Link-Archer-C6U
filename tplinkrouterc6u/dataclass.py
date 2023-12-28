@@ -28,8 +28,8 @@ class Status:
     clients_total: int
     guest_2g_enable: bool
     guest_5g_enable: bool
-    iot_2g_enable: bool
-    iot_5g_enable: bool
+    iot_2g_enable: bool | None
+    iot_5g_enable: bool | None
     wifi_2g_enable: bool
     wifi_5g_enable: bool
     wan_ipv4_uptime: int | None
