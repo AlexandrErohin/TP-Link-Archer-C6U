@@ -170,15 +170,15 @@ class TplinkRouter:
             verify=self._verify_ssl,
         )
 
-        jsonData = response.json()
+        try:
+            data = response.json()
 
-        if 'success' not in jsonData or not jsonData['success']:
-            raise Exception('Unkown error for pwd: ' + response.text)
+            args = data['data']['password']
 
-        args = jsonData['data']['password']
-
-        self._pwdNN = args[0]
-        self._pwdEE = args[1]
+            self._pwdNN = args[0]
+            self._pwdEE = args[1]
+        except Exception as error:
+            raise Exception('Unknown error for pwd - {}; Response - {}'.format(error, response.text))
 
     def _request_seq(self, referer: str) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
@@ -192,16 +192,16 @@ class TplinkRouter:
             verify=self._verify_ssl,
         )
 
-        jsonData = response.json()
+        try:
+            data = response.json()
 
-        if 'success' not in jsonData or not jsonData['success']:
-            raise Exception('Unkown error for seq: ' + response.text)
+            self._seq = data['data']['seq']
+            args = data['data']['key']
 
-        self._seq = jsonData['data']['seq']
-        args = jsonData['data']['key']
-
-        self.nn = args[0]
-        self.ee = args[1]
+            self.nn = args[0]
+            self.ee = args[1]
+        except Exception as error:
+            raise Exception('Unknown error for seq - {}; Response - {}'.format(error, response.text))
 
     def _try_login(self, referer: str) -> requests.Response:
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
