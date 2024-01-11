@@ -131,7 +131,6 @@ finally:
 - Archer A20 (V1, V3)
 - Archer AX50 V1
 - Archer AX6000 V1
-- Archer C6 V4
 - Archer C7 V4
 - Archer C8 (V3 and V4)
 - Archer C9 (V4 and V5)
