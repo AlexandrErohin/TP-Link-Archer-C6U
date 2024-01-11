@@ -77,7 +77,7 @@ class TplinkRouter:
 
         response = self._try_login(referer)
 
-        if 'text/plain' == response.headers.get('Content-Type'):
+        if 'text/plain' in response.headers.get('Content-Type'):
             self._request_pwd(referer)
             self._request_seq(referer)
             response = self._try_login(referer)
@@ -177,6 +177,10 @@ class TplinkRouter:
 
             self._pwdNN = args[0]
             self._pwdEE = args[1]
+        except json.decoder.JSONDecodeError:
+            if self._logger:
+                self._logger.error('TplinkRouter Integration Exception - No pwd response - {}'.format(response.text))
+            raise Exception('Unsupported router!')
         except Exception as error:
             raise Exception('Unknown error for pwd - {}; Response - {}'.format(error, response.text))
 
@@ -200,6 +204,10 @@ class TplinkRouter:
 
             self.nn = args[0]
             self.ee = args[1]
+        except json.decoder.JSONDecodeError:
+            if self._logger:
+                self._logger.error('TplinkRouter Integration Exception - No seq response - {}'.format(response.text))
+            raise Exception('Unsupported router!')
         except Exception as error:
             raise Exception('Unknown error for seq - {}; Response - {}'.format(error, response.text))
 
