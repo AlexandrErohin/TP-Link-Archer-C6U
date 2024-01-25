@@ -18,11 +18,12 @@ Enter the host & credentials used to log in to your router management page. User
 
 ```python
 from tplinkrouterc6u import TplinkRouter, Wifi
+from logging import Logger
 
 router = TplinkRouter('http://192.168.0.1', 'password')
 
 # You may also pass username if it is different and a logger to log errors as
-# TplinkRouter('http://192.168.0.1','password','admin2', _LOGGER)
+# TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
@@ -114,9 +115,12 @@ finally:
 ### Fully tested Hardware Versions
 - Archer A7 V5
 - Archer AX10 v1.0
+- Archer AX20 v1.0
+- Archer AX50 v1.0
 - Archer AX55 V1.60
 - Archer AX73 V1
 - Archer AX3000 V1
+- Archer AX6000 V1
 - Archer AX11000 V1
 - Archer C6 v2.0
 - Archer C6 v3.0
@@ -129,8 +133,6 @@ finally:
 - Archer A9 V6
 - Archer A10 (V1 and V2)
 - Archer A20 (V1, V3)
-- Archer AX50 V1
-- Archer AX6000 V1
 - Archer C7 V4
 - Archer C8 (V3 and V4)
 - Archer C9 (V4 and V5)
