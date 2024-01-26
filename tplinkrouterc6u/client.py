@@ -10,7 +10,7 @@ from tplinkrouterc6u.dataclass import Firmware, Status, Device
 
 
 class TplinkRouter:
-    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True) -> None:
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True, timeout: int = 60) -> None:
         self.host = host
         if not (self.host.startswith('http://') or self.host.startswith('https://')):
             self.host = "http://{}".format(self.host)
@@ -19,6 +19,7 @@ class TplinkRouter:
             requests.packages.urllib3.disable_warnings()
         self.username = username
         self.password = password
+        self.timeout = timeout
         self.single_request_mode = True
         self._logger = logger
 
@@ -166,7 +167,7 @@ class TplinkRouter:
         response = requests.post(
             url, params={'operation': 'read'},
             headers={'Referer': referer},
-            timeout=4,
+            timeout=self.timeout,
             verify=self._verify_ssl,
         )
 
@@ -192,7 +193,7 @@ class TplinkRouter:
             url,
             params={'operation': 'read'},
             headers={'Referer': referer},
-            timeout=4,
+            timeout=self.timeout,
             verify=self._verify_ssl,
         )
 
@@ -223,7 +224,7 @@ class TplinkRouter:
             url,
             data=body,
             headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout=4,
+            timeout=self.timeout,
             verify=self._verify_ssl,
         )
 
@@ -263,7 +264,7 @@ class TplinkRouter:
             params={'operation': 'read'},
             headers={'Referer': referer},
             cookies={'sysauth': self._sysauth},
-            timeout=5,
+            timeout=self.timeout,
             verify=self._verify_ssl,
         )
 
@@ -304,6 +305,6 @@ class TplinkRouter:
             data=body,
             headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
             cookies={'sysauth': self._sysauth},
-            timeout=5,
+            timeout=self.timeout,
             verify=self._verify_ssl,
         )
