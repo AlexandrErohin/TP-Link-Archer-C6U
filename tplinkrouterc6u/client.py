@@ -3,10 +3,12 @@ import re
 from collections.abc import Callable
 import json
 import requests
+import macaddress
+import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
-from tplinkrouterc6u.dataclass import Firmware, Status, Device
+from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, DHCPLease, IPv4Status
 
 
 class TplinkRouter:
@@ -43,7 +45,16 @@ class TplinkRouter:
 
     def get_status(self) -> Status | None:
         return self._request(self._get_status)
-
+    
+    def get_ipv4_status(self) -> IPv4Status | None:
+        return self._request(self._get_ipv4_status)
+    
+    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+        return self._request(self._get_ipv4_reservations)
+    
+    def get_dhcp_leases(self) -> [DHCPLease]:
+        return self._request(self._get_dhcp_leases)
+    
     def get_full_info(self) -> tuple[Firmware, Status] | None:
         def callback():
             firmware = self._get_firmware()
@@ -120,7 +131,7 @@ class TplinkRouter:
         self._logged = False
 
     def _get_firmware(self) -> Firmware:
-        data = self._get_data('admin/firmware?form=upgrade')
+        data = self._get_data('admin/firmware?form=upgrade', 'operation=read')
         firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
@@ -132,10 +143,14 @@ class TplinkRouter:
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
 
-        data = self._get_data('admin/status?form=all')
+        data = self._get_data('admin/status?form=all', 'operation=read')
         status = Status
         status.devices = []
-        status.macaddr = data['lan_macaddr']
+        status.wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
+        status.lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
+        status.wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
+        status.lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
+        status.wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = _calc_cpu_usage(data)
@@ -152,14 +167,56 @@ class TplinkRouter:
 
         for item in data.get('access_devices_wireless_host', []):
             type = Wifi.WIFI_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_5G
-            status.devices.append(Device(type, item['macaddr'], item['ipaddr'], item['hostname']))
+            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['hostname']))
 
         for item in data.get('access_devices_wireless_guest', []):
             type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
-            status.devices.append(Device(type, item['macaddr'], item['ipaddr'], item['hostname']))
+            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['hostname']))
 
         return status
+    
+    def _get_ipv4_status(self) -> IPv4Status:
+        ipv4_status = IPv4Status
+        data = self._get_data('admin/network?form=status_ipv4', 'operation=read')
+        ipv4_status.wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
+        ipv4_status.wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
+        ipv4_status.wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
+        ipv4_status.wan_ipv4_conntype = data['wan_ipv4_conntype']
+        ipv4_status.wan_ipv4_netmask = ipaddress.IPv4Address(data['wan_ipv4_netmask'])
+        ipv4_status.wan_ipv4_pridns = ipaddress.IPv4Address(data['wan_ipv4_pridns'])
+        ipv4_status.wan_ipv4_snddns = ipaddress.IPv4Address(data['wan_ipv4_snddns'])
+        ipv4_status.lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
+        ipv4_status.lan_ipv4_ipaddr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
+        ipv4_status.lan_ipv4_dhcp_enable = self._str2bool(data['lan_ipv4_dhcp_enable'])
+        ipv4_status.lan_ipv4_netmask = ipaddress.IPv4Address(data['lan_ipv4_netmask'])
+        ipv4_status.remote = self._str2bool(data['remote'])
 
+        return ipv4_status
+
+    def _get_ipv4_reservations(self) -> [IPv4Reservation]:
+        ipv4_reservations = []
+        data = self._get_data('admin/dhcps?form=reservation', 'operation=load')
+
+        for item in data:
+            ipv4_reservations.append(IPv4Reservation(macaddress.EUI48(item['mac']), ipaddress.IPv4Address(item['ip']), item['comment'], self._str2bool(item['enable'])))
+            
+        return ipv4_reservations
+    
+    def _get_dhcp_leases(self) -> [DHCPLease]:
+        dhcp_leases = []
+        data = self._get_data('admin/dhcps?form=client', 'operation=load')
+
+        for item in data:
+            dhcp_leases.append(DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
+            
+        return dhcp_leases
+
+# TODO
+#        data2 = self._get_data('admin/dhcps?form=setting', 'operation=read')
+
+    def _str2bool(self, v):
+            return str(v).lower() in ("yes", "true", "on")
+    
     def _request_pwd(self, referer: str) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
 
@@ -253,7 +310,7 @@ class TplinkRouter:
         finally:
             self.clear()
 
-    def _get_data(self, path: str) -> dict | None:
+    def _get_data(self, path: str, data: str = 'operation=read') -> dict | None:
         if self._logged is False:
             raise Exception('Not authorised')
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
@@ -261,7 +318,7 @@ class TplinkRouter:
 
         response = requests.post(
             url,
-            params={'operation': 'read'},
+            data=self._prepare_data(data),
             headers={'Referer': referer},
             cookies={'sysauth': self._sysauth},
             timeout=self.timeout,
