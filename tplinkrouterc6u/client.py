@@ -8,7 +8,7 @@ import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
-from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, DHCPLease, IPv4Status
+from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 
 
 class TplinkRouter:
@@ -52,8 +52,8 @@ class TplinkRouter:
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
         return self._request(self._get_ipv4_reservations)
     
-    def get_dhcp_leases(self) -> [DHCPLease]:
-        return self._request(self._get_dhcp_leases)
+    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+        return self._request(self._get_ipv4_dhcp_leases)
     
     def get_full_info(self) -> tuple[Firmware, Status] | None:
         def callback():
@@ -202,12 +202,12 @@ class TplinkRouter:
             
         return ipv4_reservations
     
-    def _get_dhcp_leases(self) -> [DHCPLease]:
+    def _get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []
         data = self._get_data('admin/dhcps?form=client', 'operation=load')
 
         for item in data:
-            dhcp_leases.append(DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
+            dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
             
         return dhcp_leases
 
