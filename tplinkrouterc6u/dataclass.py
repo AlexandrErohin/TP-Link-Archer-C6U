@@ -52,7 +52,7 @@ class IPv4Reservation:
         self.enabled = enabled
 
 @dataclass
-class DHCPLease:
+class IPv4DHCPLease:
     def __init__(self, macaddr: macaddress, ipaddr: ipaddress, hostname: str, lease_time: str) -> None:
         self.macaddr = macaddr
         self.ipaddr = ipaddr
