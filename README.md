@@ -138,7 +138,7 @@ try:
 | hostname | client hostname | str |
 | lease_time | ip address lease time | str |
 
-### <a id="IPv4Status">IPvStatus</a>
+### <a id="IPv4Status">IPv4Status</a>
 | Field | Description | Type |
 | --- |---|---|
 | wan_macaddr | router mac address | macaddress |
