@@ -5,3 +5,5 @@ __pycache__
 *.egg-info
 build
 docker-compose.yaml
+logs/*
+mac_lookup.txt

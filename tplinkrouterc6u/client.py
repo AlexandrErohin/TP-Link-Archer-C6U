@@ -55,6 +55,12 @@ class TplinkRouter:
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         return self._request(self._get_ipv4_dhcp_leases)
     
+    def query(self, query, operation='operation=read'):
+        def callback():
+            return self._get_data(query, operation)
+            
+        return self._request(callback)
+        
     def get_full_info(self) -> tuple[Firmware, Status] | None:
         def callback():
             firmware = self._get_firmware()
@@ -144,13 +150,13 @@ class TplinkRouter:
             return cpu_usage / 4 if cpu_usage != 0 else None
 
         data = self._get_data('admin/status?form=all', 'operation=read')
-        status = Status
+        status = Status()
         status.devices = []
-        status.wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
-        status.lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
-        status.wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
-        status.lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
-        status.wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
+        status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
+        status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
+        status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
+        status._lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
+        status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = _calc_cpu_usage(data)
@@ -176,19 +182,19 @@ class TplinkRouter:
         return status
     
     def _get_ipv4_status(self) -> IPv4Status:
-        ipv4_status = IPv4Status
+        ipv4_status = IPv4Status()
         data = self._get_data('admin/network?form=status_ipv4', 'operation=read')
-        ipv4_status.wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
-        ipv4_status.wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
-        ipv4_status.wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
+        ipv4_status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
+        ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
+        ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
         ipv4_status.wan_ipv4_conntype = data['wan_ipv4_conntype']
-        ipv4_status.wan_ipv4_netmask = ipaddress.IPv4Address(data['wan_ipv4_netmask'])
-        ipv4_status.wan_ipv4_pridns = ipaddress.IPv4Address(data['wan_ipv4_pridns'])
-        ipv4_status.wan_ipv4_snddns = ipaddress.IPv4Address(data['wan_ipv4_snddns'])
-        ipv4_status.lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
-        ipv4_status.lan_ipv4_ipaddr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
+        ipv4_status._wan_ipv4_netmask = ipaddress.IPv4Address(data['wan_ipv4_netmask'])
+        ipv4_status._wan_ipv4_pridns = ipaddress.IPv4Address(data['wan_ipv4_pridns'])
+        ipv4_status._wan_ipv4_snddns = ipaddress.IPv4Address(data['wan_ipv4_snddns'])
+        ipv4_status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
+        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
         ipv4_status.lan_ipv4_dhcp_enable = self._str2bool(data['lan_ipv4_dhcp_enable'])
-        ipv4_status.lan_ipv4_netmask = ipaddress.IPv4Address(data['lan_ipv4_netmask'])
+        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(data['lan_ipv4_netmask'])
         ipv4_status.remote = self._str2bool(data['remote'])
 
         return ipv4_status
@@ -210,6 +216,14 @@ class TplinkRouter:
             dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
             
         return dhcp_leases
+
+    def _query(self, query, operation):
+        data = self._get_data(query, operation)
+
+        #for item in data:
+        #    dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
+            
+        return data
 
 # TODO
 #        data2 = self._get_data('admin/dhcps?form=setting', 'operation=read')
