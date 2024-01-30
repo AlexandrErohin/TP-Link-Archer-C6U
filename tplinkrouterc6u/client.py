@@ -12,7 +12,7 @@ from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation,
 
 
 class TplinkRouter:
-    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True, timeout: int = 60) -> None:
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True, timeout: int = 10) -> None:
         self.host = host
         if not (self.host.startswith('http://') or self.host.startswith('https://')):
             self.host = "http://{}".format(self.host)
