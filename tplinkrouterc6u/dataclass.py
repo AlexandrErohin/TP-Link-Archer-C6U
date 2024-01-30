@@ -16,60 +16,205 @@ class Firmware:
 class Device:
     def __init__(self, type: Wifi, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
         self.type = type
-        self.macaddr = macaddr
-        self.ipaddr = ipaddr
+        self._macaddr = macaddr
+        self._ipaddr = ipaddr
         self.hostname = hostname
+    
+    @property
+    def macaddr(self):
+        return str(self._macaddr)
+    
+    @property
+    def macaddress(self):
+        return self._macaddr
 
+    @property
+    def ipaddr(self):
+        return str(self._ipaddr)
+    
+    @property
+    def ipaddress(self):
+        return self._ipaddr
 
 @dataclass
 class Status:
-    wan_macaddr: macaddress
-    lan_macaddr: macaddress
-    wan_ipv4_addr: ipaddress
-    lan_ipv4_addr: ipaddress
-    wan_ipv4_gateway: ipaddress
-    wired_total: int
-    wifi_clients_total: int
-    guest_clients_total: int
-    clients_total: int
-    guest_2g_enable: bool
-    guest_5g_enable: bool
-    iot_2g_enable: bool | None
-    iot_5g_enable: bool | None
-    wifi_2g_enable: bool
-    wifi_5g_enable: bool
-    wan_ipv4_uptime: int | None
-    mem_usage: float | None
-    cpu_usage: float | None
-    devices: list[Device]
+    def __init__(self) -> None:
+        self._wan_macaddr: macaddress
+        self._lan_macaddr: macaddress
+        self._wan_ipv4_addr: ipaddress
+        self._lan_ipv4_addr: ipaddress
+        self._wan_ipv4_gateway: ipaddress
+        self.wired_total: int
+        self.wifi_clients_total: int
+        self.guest_clients_total: int
+        self.clients_total: int
+        self.guest_2g_enable: bool
+        self.guest_5g_enable: bool
+        self.iot_2g_enable: bool | None
+        self.iot_5g_enable: bool | None
+        self.wifi_2g_enable: bool
+        self.wifi_5g_enable: bool
+        self.wan_ipv4_uptime: int | None
+        self.mem_usage: float | None
+        self.cpu_usage: float | None
+        self.devices: list[Device]
+
+    @property
+    def wan_macaddr(self):
+        return str(self._wan_macaddr)
+    @property
+    def wan_macaddress(self):
+        return self._wan_macaddr
+    
+    @property
+    def lan_macaddr(self):
+        return str(self._lan_macaddr)
+    @property
+    def lan_macaddress(self):
+        return self._lan_macaddr
+    
+    @property
+    def wan_ipv4_addr(self):
+        return str(self._wan_ipv4_addr)
+    @property
+    def wan_ipv4_address(self):
+        return self._wan_ipv4_addr
+    
+    @property
+    def lan_ipv4_addr(self):
+        return str(self._lan_ipv4_addr)
+    @property
+    def lan_ipv4_address(self):
+        return self._lan_ipv4_addr
+    
+    @property
+    def wan_ipv4_gateway(self):
+        return str(self._wan_ipv4_gateway)
+    @property
+    def wan_ipv4_gateway_address(self):
+        return self._wan_ipv4_gateway
 
 @dataclass
 class IPv4Reservation:
     def __init__(self, macaddr: macaddress, ipaddr: ipaddress, hostname: str, enabled: bool) -> None:
-        self.macaddr = macaddr
-        self.ipaddr = ipaddr
+        self._macaddr = macaddr
+        self._ipaddr = ipaddr
         self.hostname = hostname
         self.enabled = enabled
+
+    @property
+    def macaddr(self):
+        return str(self._macaddr)
+    @property
+    def macaddress(self):
+        return self._macaddr
+    
+    @property
+    def ipaddr(self):
+        return str(self._ipaddr)
+    @property
+    def ipaddress(self):
+        return self._ipaddr
 
 @dataclass
 class IPv4DHCPLease:
     def __init__(self, macaddr: macaddress, ipaddr: ipaddress, hostname: str, lease_time: str) -> None:
-        self.macaddr = macaddr
-        self.ipaddr = ipaddr
+        self._macaddr = macaddr
+        self._ipaddr = ipaddr
         self.hostname = hostname
         self.lease_time = lease_time
 
+    @property
+    def macaddr(self):
+        return str(self._macaddr)
+    @property
+    def macaddress(self):
+        return self._macaddr
+    
+    @property
+    def ipaddr(self):
+        return str(self._ipaddr)
+    @property
+    def ipaddress(self):
+        return self._ipaddr
+    
 @dataclass
 class IPv4Status:
-    wan_macaddr: macaddress
-    wan_ipv4_ipaddr: ipaddress
-    wan_ipv4_gateway: ipaddress
-    wan_ipv4_conntype: str
-    wan_ipv4_netmask: ipaddress
-    wan_ipv4_pridns: ipaddress
-    wan_ipv4_snddns: ipaddress
-    lan_macaddr: macaddress
-    lan_ipv4_ipaddr: ipaddress
-    lan_ipv4_dhcp_enable: bool
-    lan_ipv4_netmask: ipaddress
-    remote: bool
+    def __init__(self) -> None:
+        self._wan_macaddr: macaddress
+        self._wan_ipv4_ipaddr: ipaddress
+        self._wan_ipv4_gateway: ipaddress
+        self.wan_ipv4_conntype: str
+        self._wan_ipv4_netmask: ipaddress
+        self._wan_ipv4_pridns: ipaddress
+        self._wan_ipv4_snddns: ipaddress
+        self._lan_macaddr: macaddress
+        self._lan_ipv4_ipaddr: ipaddress
+        self.lan_ipv4_dhcp_enable: bool
+        self._lan_ipv4_netmask: ipaddress
+        self.remote: bool
+
+    @property
+    def wan_macaddr(self):
+        return str(self._wan_macaddr)
+    @property
+    def wan_macaddress(self):
+        return self._wan_macaddr
+
+    @property
+    def wan_ipv4_ipaddr(self):
+        return str(self._wan_ipv4_ipaddr)
+    @property
+    def wan_ipv4_ipaddress(self):
+        return self._wan_ipv4_ipaddr
+
+    @property
+    def wan_ipv4_gateway(self):
+        return str(self._wan_ipv4_gateway)
+    @property
+    def wan_ipv4_gateway_address(self):
+        return self._wan_ipv4_gateway
+
+    @property
+    def wan_ipv4_netmask(self):
+        return str(self._wan_ipv4_netmask)
+    @property
+    def wan_ipv4_netmask_address(self):
+        return self._wan_ipv4_netmask
+    
+    @property
+    def wan_ipv4_pridns(self):
+        return str(self._wan_ipv4_pridns)
+    @property
+    def wan_ipv4_pridns_address(self):
+        return self._wan_ipv4_pridns
+
+    @property
+    def wan_ipv4_snddns(self):
+        return str(self._wan_ipv4_snddns)
+    @property
+    def wan_ipv4_snddns_address(self):
+        return self._wan_ipv4_snddns
+    
+    @property
+    def lan_macaddr(self):
+        return str(self._lan_macaddr)
+    @property
+    def lan_macaddress(self):
+        return self._lan_macaddr
+
+    @property
+    def lan_ipv4_ipaddr(self):
+        return str(self._lan_ipv4_ipaddr)
+    @property
+    def lan_ipv4_ipaddress(self):
+        return self._lan_ipv4_ipaddr
+
+    @property
+    def lan_ipv4_netmask(self):
+        return str(self._lan_ipv4_netmask)
+    @property
+    def lan_ipv4_netmask_address(self):
+        return self._lan_ipv4_netmask
+
+

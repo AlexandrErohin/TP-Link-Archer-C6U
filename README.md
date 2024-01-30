@@ -82,6 +82,7 @@ try:
 | reboot |  | reboot router |
 | authorize |  | authorize for actions |
 | logout |  | logout after all is done |
+| query | query, operation='operation=read' | execute cgi-bin query | dictionary of result or None |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -94,11 +95,16 @@ try:
 ### <a id="status">Status</a>
 | Field | Description | Type |
 | --- |---|---|
-| wan_macaddr | router mac address | macaddress |
-| lan_macaddr | router mac address | macaddress |
-| wan_ipv4_addr | router mac address | ipaddress |
-| lan_ipv4_addr | router mac address | ipaddress |
-| wan_ipv4_gateway | router mac address | ipaddress |
+| wan_macaddr | router mac address | str |
+| wan_macaddress | router mac address | macaddress |
+| lan_macaddr | router mac address | str |
+| lan_macaddress | router mac address | macaddress |
+| wan_ipv4_addr | router mac address | str |
+| wan_ipv4_address | router mac address | ipaddress |
+| lan_ipv4_addr | router mac address | str |
+| lan_ipv4_address | router mac address | ipaddress |
+| wan_ipv4_gateway | router mac address | str |
+| wan_ipv4_gateway_address | router mac address | ipaddress |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of main wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
@@ -118,40 +124,55 @@ try:
 | Field | Description | Type |
 | --- |---|---|
 | type | client connection type (2.4G or 5G, guest wifi or main wifi) | [Wifi](#wifi) |
-| macaddr | client mac address | macaddress |
-| ipaddr | client ip address | ipaddress |
+| macaddr | client mac address | str |
+| macaddress | client mac address | macaddress |
+| ipaddr | client ip address | str |
+| ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
 | --- |---|---|
-| macaddr | client mac address | macaddress |
-| ipaddr | client ip address | ipaddress |
+| macaddr | client mac address | str |
+| macaddress| client mac address | macaddress |
+| ipaddr | client ip address | str |
+| ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | enabled | enabled | bool |
 
 ### <a id="IPv4DHCPLease">IPv4DHCPLease</a>
 | Field | Description | Type |
 | --- |---|---|
-| macaddr | client mac address | macaddress |
-| ipaddr | client ip address | ipaddress |
+| macaddr | client mac address | str |
+| macaddress | client mac address | macaddress |
+| ipaddr | client ip address | str |
+| ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | lease_time | ip address lease time | str |
 
 ### <a id="IPv4Status">IPv4Status</a>
 | Field | Description | Type |
 | --- |---|---|
-| wan_macaddr | router mac address | macaddress |
-| wan_ipv4_ipaddr | router mac address | ipaddress |
-| wan_ipv4_gateway | router WAN gateway IP address | ipaddress |
+| wan_macaddr | router mac address | str |
+| wan_macaddress | router mac address | macaddress |
+| wan_ipv4_ipaddr | router mac address | str |
+| wan_ipv4_ipaddress | router mac address | ipaddress |
+| wan_ipv4_gateway | router WAN gateway IP address | str |
+| wan_ipv4_gateway_address | router WAN gateway IP address | ipaddress |
 | wan_ipv4_conntype | router connection type | str |
-| wan_ipv4_netmask | router WAN gateway IP netmask | ipaddress |
-| wan_ipv4_pridns | router primary dns server | ipaddress |
-| wan_ipv4_snddns | router secondary dns server | ipaddress |
-| lan_macaddr | router mac address | macaddress |
-| lan_ipv4_ipaddr | router LAN IP address | ipaddress |
+| wan_ipv4_netmask | router WAN gateway IP netmask | str |
+| wan_ipv4_netmask_address | router WAN gateway IP netmask | ipaddress |
+| wan_ipv4_pridns | router primary dns server | str |
+| wan_ipv4_pridns_address | router primary dns server | ipaddress |
+| wan_ipv4_snddns | router secondary dns server | str |
+| wan_ipv4_snddns_address | router secondary dns server | ipaddress |
+| lan_macaddr | router mac address | str |
+| lan_macaddress | router mac address | macaddress |
+| lan_ipv4_ipaddr | router LAN IP address | str |
+| lan_ipv4_ipaddress | router LAN IP address | ipaddress |
 | lan_ipv4_dhcp_enable | router LAN DHCP enabled | bool |
-| lan_ipv4_netmask | router LAN gateway IP netmask | ipaddress |
+| lan_ipv4_netmask | router LAN gateway IP netmask | str |
+| lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
 | remote | router remote | bool |
 
 ## Enum
@@ -207,6 +228,8 @@ Please let me know if you have tested integration with one of this or other mode
 - Run `pip install -e path/to/repo`.
 - Make changes to files within the `tplinkrouter6u` directory.
 - Exercise the changes following the "Usage" section above.
+
+The sanity check test.py illustrates a few tests and runs through a list of queries in queries.txt creating logs of the results of each query in the logs folder. This can be used to capture the dictionary output of all cgi-bin form submissions.
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
