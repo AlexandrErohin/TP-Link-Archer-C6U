@@ -6,6 +6,7 @@ from tplinkrouterc6u import TplinkRouter, Wifi
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from mac_vendor_lookup import MacLookup, BaseMacLookup
 import pprint
+import json
 from pathlib import Path
 BaseMacLookup.cache_path = "mac_lookup.txt"
 maclookup = MacLookup()
@@ -139,6 +140,9 @@ with open('queries.txt') as queries:
             with open(folder + os.sep + f"{tokens[1]}.log", "w") as log_file:
                 pp = pprint.PrettyPrinter(indent=4, stream=log_file)
                 pp.pprint(data)
+            with open(folder + os.sep + f"{tokens[1]}.json", "w") as log_file:
+                json.dump(data, log_file)
+
         except Exception as ex:
             print(f"{query} exception {ex}")
             router = TplinkRouter('http://192.168.0.1', password, timeout=10)
