@@ -5,6 +5,7 @@ import json
 import requests
 import macaddress
 import ipaddress
+import urllib.parse
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
@@ -61,7 +62,7 @@ class TplinkRouter:
             unencrypted = [
                 "locale?form=lang",
                 "admin/firmware?form=save_upgrade",
-                "firmware?form=config_multipart"
+                "admin/firmware?form=config_multipart"
             ]
             encrypt = True
             if query in unencrypted:
@@ -307,8 +308,7 @@ class TplinkRouter:
 
             return {'sign': sign, 'data': encrypted_data}
         else:
-            tokens = data.split('=')
-            return {tokens[0]: tokens[1]}
+            return urllib.parse.parse_qs(data)
 
     def _request(self, callback: Callable):
         if not self.single_request_mode:
@@ -361,6 +361,12 @@ class TplinkRouter:
                 elif self._logger:
                     self._logger.error(f"TplinkRouter Integration Exception - error \'{json_response['errorcode']}\' happened while fetching data {data}")
         except ValueError:
+            try:
+                data = self._encryption.aes_decrypt(json_response)
+                print(data)
+            except:
+                pass
+
             if self._logger:
                 self._logger.error("TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
 

@@ -83,6 +83,49 @@ print("Connecting to router")
 password = input("password: ")
 router = TplinkRouter('http://192.168.0.1', password, timeout=10, logger=logging)
 
+# Call each of the cgi-bin forms on the router web application
+print("Calling all cgi-bin entrypoints")
+with open('queries.txt') as queries:
+    for line in queries:
+        line = line.strip()
+        if line.startswith('#') or len(line) == 0:
+            continue
+
+        tokens = line.split(' ')
+        query = tokens[0]
+        operation = "operation=read"
+        if len(tokens) > 1:
+            operation = tokens[1]
+
+        try:
+            print(f"BEGIN {query}")
+            data = router.query(query, operation)
+            if data is None:
+                print(query + f" {operation} failed")
+                operation = "operation=load"
+                data = router.query(query, operation)
+                if data is None:
+                    print(query + f" {operation} failed")
+            if data is not None:
+                print(query + f" {operation} ok")
+                tokens = query.split('?')
+                folder = "logs" + os.sep + tokens[0]
+                Path(folder).mkdir(parents=True, exist_ok=True)
+                with open(folder + os.sep + f"{tokens[1]} {operation}.log", "w") as log_file:
+                    pp = pprint.PrettyPrinter(indent=4, stream=log_file)
+                    pp.pprint(data)
+                with open(folder + os.sep + f"{tokens[1]} {operation}.json", "w") as log_file:
+                    json.dump(data, log_file)
+            print(f"END {query}\n")
+
+
+        except Exception as ex:
+            print(f"{query} exception {ex}")
+            router = TplinkRouter('http://192.168.0.1', password, timeout=10)
+        finally:
+            pass
+
+
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
 print(f"firmware version: {firmware.firmware_version}")
@@ -126,41 +169,5 @@ for lease in leases:
     if lease.lease_time != "Permanent":
         print(f"{i:03} {lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12} {lookup(lease.macaddr)}")
         i = i + 1
-
-# Call each of the cgi-bin forms on the router web application
-print("Calling all cgi-bin entrypoints")
-with open('queries.txt') as queries:
-    for query in queries:
-        query = query.strip()
-        if query.startswith('#'):
-            continue
-        try:
-            print(f"BEGIN {query}")
-            operation = "operation=read"
-            data = router.query(query, operation)
-            if data is None:
-                print(query + f" {operation} failed")
-                operation = "operation=load"
-                data = router.query(query, operation)
-                if data is None:
-                    print(query + f" {operation} failed")
-            if data is not None:
-                print(query + f" {operation} ok")
-            print(f"END {query}")
-
-            tokens = query.split('?')
-            folder = "logs" + os.sep + tokens[0]
-            Path(folder).mkdir(parents=True, exist_ok=True)
-            with open(folder + os.sep + f"{tokens[1]}.log", "w") as log_file:
-                pp = pprint.PrettyPrinter(indent=4, stream=log_file)
-                pp.pprint(data)
-            with open(folder + os.sep + f"{tokens[1]}.json", "w") as log_file:
-                json.dump(data, log_file)
-
-        except Exception as ex:
-            print(f"{query} exception {ex}")
-            router = TplinkRouter('http://192.168.0.1', password, timeout=10)
-        finally:
-            pass
 
 
