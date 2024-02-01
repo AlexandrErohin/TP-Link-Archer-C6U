@@ -57,7 +57,17 @@ class TplinkRouter:
     
     def query(self, query, operation='operation=read'):
         def callback():
-            return self._get_data(query, operation)
+            
+            unencrypted = [
+                "locale?form=lang",
+                "admin/firmware?form=save_upgrade",
+                "firmware?form=config_multipart"
+            ]
+            encrypt = True
+            if query in unencrypted:
+                encrypt = False
+
+            return self._get_data(query, operation, encrypt)
             
         return self._request(callback)
         
@@ -217,17 +227,6 @@ class TplinkRouter:
             
         return dhcp_leases
 
-    def _query(self, query, operation):
-        data = self._get_data(query, operation)
-
-        #for item in data:
-        #    dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
-            
-        return data
-
-# TODO
-#        data2 = self._get_data('admin/dhcps?form=setting', 'operation=read')
-
     def _str2bool(self, v):
             return str(v).lower() in ("yes", "true", "on")
     
@@ -299,13 +298,17 @@ class TplinkRouter:
             verify=self._verify_ssl,
         )
 
-    def _prepare_data(self, data) -> dict:
-        encrypted_data = self._encryption.aes_encrypt(data)
-        data_len = len(encrypted_data)
+    def _prepare_data(self, data, encrypt = True) -> dict:
+        if encrypt:
+            encrypted_data = self._encryption.aes_encrypt(data)
+            data_len = len(encrypted_data)
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn, self.ee)
+            sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn, self.ee)
 
-        return {'sign': sign, 'data': encrypted_data}
+            return {'sign': sign, 'data': encrypted_data}
+        else:
+            tokens = data.split('=')
+            return {tokens[0]: tokens[1]}
 
     def _request(self, callback: Callable):
         if not self.single_request_mode:
@@ -324,7 +327,7 @@ class TplinkRouter:
         finally:
             self.clear()
 
-    def _get_data(self, path: str, data: str = 'operation=read') -> dict | None:
+    def _get_data(self, path: str, data: str = 'operation=read', encrypt: bool = True) -> dict | None:
         if self._logged is False:
             raise Exception('Not authorised')
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
@@ -332,7 +335,7 @@ class TplinkRouter:
 
         response = requests.post(
             url,
-            data=self._prepare_data(data),
+            data=self._prepare_data(data, encrypt),
             headers={'Referer': referer},
             cookies={'sysauth': self._sysauth},
             timeout=self.timeout,
@@ -342,14 +345,13 @@ class TplinkRouter:
         data = response.text
         try:
             json_response = response.json()
-            if 'data' not in json_response:
-                raise Exception("Router didn't respond with JSON - " + data)
-            data = self._encryption.aes_decrypt(json_response['data'])
-
-            json_response = json.loads(data)
-
-            if 'success' in json_response and json_response['success']:
-                return json_response['data']
+            if len(json_response) == 1 and json_response['data']:
+                data = self._encryption.aes_decrypt(json_response['data'])
+                json_response = json.loads(data)
+                if 'success' in json_response and json_response['success']:
+                    return json_response['data']
+            elif 'success' in json_response and json_response['success']:
+                return json_response
             else:
                 if 'errorcode' in json_response and json_response['errorcode'] == 'timeout':
                     if self._logger:
@@ -357,12 +359,12 @@ class TplinkRouter:
                     self._stok = ''
                     self._sysauth = ''
                 elif self._logger:
-                    self._logger.error("TplinkRouter Integration Exception - An unknown error happened while fetching data %s", data)
+                    self._logger.error(f"TplinkRouter Integration Exception - error \'{json_response['errorcode']}\' happened while fetching data {data}")
         except ValueError:
             if self._logger:
                 self._logger.error("TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
 
-        raise Exception('An unknown response - ' + data)
+        raise Exception(f"TplinkRouter Integration Exception - error \'{json_response['errorcode']}\' happened while fetching data {data}")
 
     def _send_data(self, path: str, data: str) -> None:
         if self._logged is False:

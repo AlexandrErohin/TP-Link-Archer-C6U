@@ -1,4 +1,5 @@
 import os
+import logging
 import macaddress
 import ipaddress
 from typing import TypeAlias
@@ -25,6 +26,8 @@ def lookup(mac):
     except:
         vendor = "Unknown"
     return vendor
+
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-8s %(message)s")
 
 # Test @property getters from Device dataclass
 print("testing Device dataclass")
@@ -78,7 +81,7 @@ assert isinstance(s.lan_ipv4_address, ipaddress.IPv4Address), "Type of ipaddress
 # Connect to router
 print("Connecting to router")
 password = input("password: ")
-router = TplinkRouter('http://192.168.0.1', password, timeout=10)
+router = TplinkRouter('http://192.168.0.1', password, timeout=10, logger=logging)
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
@@ -132,8 +135,19 @@ with open('queries.txt') as queries:
         if query.startswith('#'):
             continue
         try:
-            data = router.query(query)
-            print(query)
+            print(f"BEGIN {query}")
+            operation = "operation=read"
+            data = router.query(query, operation)
+            if data is None:
+                print(query + f" {operation} failed")
+                operation = "operation=load"
+                data = router.query(query, operation)
+                if data is None:
+                    print(query + f" {operation} failed")
+            if data is not None:
+                print(query + f" {operation} ok")
+            print(f"END {query}")
+
             tokens = query.split('?')
             folder = "logs" + os.sep + tokens[0]
             Path(folder).mkdir(parents=True, exist_ok=True)
