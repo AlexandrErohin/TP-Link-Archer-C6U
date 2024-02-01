@@ -97,8 +97,8 @@ try:
 |---|---|---|
 | wan_macaddr | router wan mac address | str, None |
 | wan_macaddress | router wan mac address | macaddress.EUI48, None |
-| lan_macaddr | router lan mac address | str, None |
-| lan_macaddress | router lan mac address | macaddress.EUI48, None |
+| lan_macaddr | router lan mac address | str |
+| lan_macaddress | router lan mac address | macaddress.EUI48 |
 | wan_ipv4_addr | router wan ipv4 address | str, None |
 | wan_ipv4_address | router wan ipv4 address | ipaddress.IPv4Address, None |
 | lan_ipv4_addr | router lan ipv4 address | str, None |
