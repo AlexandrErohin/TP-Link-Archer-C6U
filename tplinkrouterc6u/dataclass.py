@@ -19,11 +19,11 @@ class Device:
         self._macaddr = macaddr
         self._ipaddr = ipaddr
         self.hostname = hostname
-    
+
     @property
     def macaddr(self):
         return str(self._macaddr)
-    
+
     @property
     def macaddress(self):
         return self._macaddr
@@ -31,19 +31,20 @@ class Device:
     @property
     def ipaddr(self):
         return str(self._ipaddr)
-    
+
     @property
     def ipaddress(self):
         return self._ipaddr
 
+
 @dataclass
 class Status:
     def __init__(self) -> None:
-        self._wan_macaddr: macaddress
+        self._wan_macaddr: macaddress.EUI48 | None
         self._lan_macaddr: macaddress
-        self._wan_ipv4_addr: ipaddress
-        self._lan_ipv4_addr: ipaddress
-        self._wan_ipv4_gateway: ipaddress
+        self._wan_ipv4_addr: ipaddress.IPv4Address | None
+        self._lan_ipv4_addr: ipaddress.IPv4Address | None
+        self._wan_ipv4_gateway: ipaddress.IPv4Address | None
         self.wired_total: int
         self.wifi_clients_total: int
         self.guest_clients_total: int
@@ -60,39 +61,45 @@ class Status:
         self.devices: list[Device]
 
     @property
-    def wan_macaddr(self):
+    def wan_macaddr(self) -> str | None:
         return str(self._wan_macaddr)
+
     @property
-    def wan_macaddress(self):
+    def wan_macaddress(self) -> macaddress.EUI48 | None:
         return self._wan_macaddr
-    
+
     @property
     def lan_macaddr(self):
         return str(self._lan_macaddr)
+
     @property
     def lan_macaddress(self):
         return self._lan_macaddr
-    
+
     @property
-    def wan_ipv4_addr(self):
+    def wan_ipv4_addr(self) -> str | None:
         return str(self._wan_ipv4_addr)
+
     @property
-    def wan_ipv4_address(self):
+    def wan_ipv4_address(self) -> ipaddress.IPv4Address | None:
         return self._wan_ipv4_addr
-    
+
     @property
-    def lan_ipv4_addr(self):
+    def lan_ipv4_addr(self) -> str | None:
         return str(self._lan_ipv4_addr)
+
     @property
-    def lan_ipv4_address(self):
+    def lan_ipv4_address(self) -> ipaddress.IPv4Address | None:
         return self._lan_ipv4_addr
-    
+
     @property
-    def wan_ipv4_gateway(self):
+    def wan_ipv4_gateway(self) -> str | None:
         return str(self._wan_ipv4_gateway)
+
     @property
-    def wan_ipv4_gateway_address(self):
+    def wan_ipv4_gateway_address(self) -> ipaddress.IPv4Address | None:
         return self._wan_ipv4_gateway
+
 
 @dataclass
 class IPv4Reservation:
@@ -105,16 +112,19 @@ class IPv4Reservation:
     @property
     def macaddr(self):
         return str(self._macaddr)
+
     @property
     def macaddress(self):
         return self._macaddr
-    
+
     @property
     def ipaddr(self):
         return str(self._ipaddr)
+
     @property
     def ipaddress(self):
         return self._ipaddr
+
 
 @dataclass
 class IPv4DHCPLease:
@@ -127,17 +137,20 @@ class IPv4DHCPLease:
     @property
     def macaddr(self):
         return str(self._macaddr)
+
     @property
     def macaddress(self):
         return self._macaddr
-    
+
     @property
     def ipaddr(self):
         return str(self._ipaddr)
+
     @property
     def ipaddress(self):
         return self._ipaddr
-    
+
+
 @dataclass
 class IPv4Status:
     def __init__(self) -> None:
@@ -157,6 +170,7 @@ class IPv4Status:
     @property
     def wan_macaddr(self):
         return str(self._wan_macaddr)
+
     @property
     def wan_macaddress(self):
         return self._wan_macaddr
@@ -164,6 +178,7 @@ class IPv4Status:
     @property
     def wan_ipv4_ipaddr(self):
         return str(self._wan_ipv4_ipaddr)
+
     @property
     def wan_ipv4_ipaddress(self):
         return self._wan_ipv4_ipaddr
@@ -171,6 +186,7 @@ class IPv4Status:
     @property
     def wan_ipv4_gateway(self):
         return str(self._wan_ipv4_gateway)
+
     @property
     def wan_ipv4_gateway_address(self):
         return self._wan_ipv4_gateway
@@ -178,13 +194,15 @@ class IPv4Status:
     @property
     def wan_ipv4_netmask(self):
         return str(self._wan_ipv4_netmask)
+
     @property
     def wan_ipv4_netmask_address(self):
         return self._wan_ipv4_netmask
-    
+
     @property
     def wan_ipv4_pridns(self):
         return str(self._wan_ipv4_pridns)
+
     @property
     def wan_ipv4_pridns_address(self):
         return self._wan_ipv4_pridns
@@ -192,13 +210,15 @@ class IPv4Status:
     @property
     def wan_ipv4_snddns(self):
         return str(self._wan_ipv4_snddns)
+
     @property
     def wan_ipv4_snddns_address(self):
         return self._wan_ipv4_snddns
-    
+
     @property
     def lan_macaddr(self):
         return str(self._lan_macaddr)
+
     @property
     def lan_macaddress(self):
         return self._lan_macaddr
@@ -206,6 +226,7 @@ class IPv4Status:
     @property
     def lan_ipv4_ipaddr(self):
         return str(self._lan_ipv4_ipaddr)
+
     @property
     def lan_ipv4_ipaddress(self):
         return self._lan_ipv4_ipaddr
@@ -213,8 +234,7 @@ class IPv4Status:
     @property
     def lan_ipv4_netmask(self):
         return str(self._lan_ipv4_netmask)
+
     @property
     def lan_ipv4_netmask_address(self):
         return self._lan_ipv4_netmask
-
-

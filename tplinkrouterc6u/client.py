@@ -12,7 +12,8 @@ from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation,
 
 
 class TplinkRouter:
-    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None, verify_ssl: bool = True, timeout: int = 10) -> None:
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 10) -> None:
         self.host = host
         if not (self.host.startswith('http://') or self.host.startswith('https://')):
             self.host = "http://{}".format(self.host)
@@ -45,22 +46,22 @@ class TplinkRouter:
 
     def get_status(self) -> Status | None:
         return self._request(self._get_status)
-    
+
     def get_ipv4_status(self) -> IPv4Status | None:
         return self._request(self._get_ipv4_status)
-    
+
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
         return self._request(self._get_ipv4_reservations)
-    
+
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         return self._request(self._get_ipv4_dhcp_leases)
-    
+
     def query(self, query, operation='operation=read'):
         def callback():
             return self._get_data(query, operation)
-            
+
         return self._request(callback)
-        
+
     def get_full_info(self) -> tuple[Firmware, Status] | None:
         def callback():
             firmware = self._get_firmware()
@@ -78,7 +79,7 @@ class TplinkRouter:
 
         self._request(callback)
 
-    def reboot(self) ->None:
+    def reboot(self) -> None:
         def callback():
             self._send_data('admin/system?form=reboot', 'operation=write')
 
@@ -122,7 +123,8 @@ class TplinkRouter:
             return True
         except (ValueError, KeyError, AttributeError) as e:
             if self._logger:
-                self._logger.error("TplinkRouter Integration Exception - Couldn't fetch auth tokens! Response was: %s", response.text)
+                self._logger.error("TplinkRouter Integration Exception - Couldn't fetch auth tokens! Response was: %s",
+                                   response.text)
 
         return False
 
@@ -152,11 +154,12 @@ class TplinkRouter:
         data = self._get_data('admin/status?form=all', 'operation=read')
         status = Status()
         status.devices = []
-        status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
+        status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
-        status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
-        status._lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
-        status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
+        status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
+        status._lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
+        status._wan_ipv4_gateway = ipaddress.IPv4Address(
+            data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = _calc_cpu_usage(data)
@@ -173,14 +176,16 @@ class TplinkRouter:
 
         for item in data.get('access_devices_wireless_host', []):
             type = Wifi.WIFI_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_5G
-            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['hostname']))
+            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
+                                         item['hostname']))
 
         for item in data.get('access_devices_wireless_guest', []):
             type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
-            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['hostname']))
+            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
+                                         item['hostname']))
 
         return status
-    
+
     def _get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
         data = self._get_data('admin/network?form=status_ipv4', 'operation=read')
@@ -204,33 +209,37 @@ class TplinkRouter:
         data = self._get_data('admin/dhcps?form=reservation', 'operation=load')
 
         for item in data:
-            ipv4_reservations.append(IPv4Reservation(macaddress.EUI48(item['mac']), ipaddress.IPv4Address(item['ip']), item['comment'], self._str2bool(item['enable'])))
-            
+            ipv4_reservations.append(
+                IPv4Reservation(macaddress.EUI48(item['mac']), ipaddress.IPv4Address(item['ip']), item['comment'],
+                                self._str2bool(item['enable'])))
+
         return ipv4_reservations
-    
+
     def _get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []
         data = self._get_data('admin/dhcps?form=client', 'operation=load')
 
         for item in data:
-            dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
-            
+            dhcp_leases.append(
+                IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'],
+                              item['leasetime']))
+
         return dhcp_leases
 
     def _query(self, query, operation):
         data = self._get_data(query, operation)
 
-        #for item in data:
+        # for item in data:
         #    dhcp_leases.append(IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'], item['leasetime']))
-            
+
         return data
 
-# TODO
-#        data2 = self._get_data('admin/dhcps?form=setting', 'operation=read')
+    # TODO
+    #        data2 = self._get_data('admin/dhcps?form=setting', 'operation=read')
 
     def _str2bool(self, v):
-            return str(v).lower() in ("yes", "true", "on")
-    
+        return str(v).lower() in ("yes", "true", "on")
+
     def _request_pwd(self, referer: str) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
 
@@ -303,7 +312,8 @@ class TplinkRouter:
         encrypted_data = self._encryption.aes_encrypt(data)
         data_len = len(encrypted_data)
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn, self.ee)
+        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn,
+                                              self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
 
@@ -353,14 +363,17 @@ class TplinkRouter:
             else:
                 if 'errorcode' in json_response and json_response['errorcode'] == 'timeout':
                     if self._logger:
-                        self._logger.info("TplinkRouter Integration Exception - Token timed out. Relogging on next scan")
+                        self._logger.info(
+                            "TplinkRouter Integration Exception - Token timed out. Relogging on next scan")
                     self._stok = ''
                     self._sysauth = ''
                 elif self._logger:
-                    self._logger.error("TplinkRouter Integration Exception - An unknown error happened while fetching data %s", data)
+                    self._logger.error(
+                        "TplinkRouter Integration Exception - An unknown error happened while fetching data %s", data)
         except ValueError:
             if self._logger:
-                self._logger.error("TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
+                self._logger.error(
+                    "TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
 
         raise Exception('An unknown response - ' + data)
 

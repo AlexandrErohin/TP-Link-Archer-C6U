@@ -94,17 +94,17 @@ try:
 
 ### <a id="status">Status</a>
 | Field | Description | Type |
-| --- |---|---|
-| wan_macaddr | router mac address | str |
-| wan_macaddress | router mac address | macaddress |
-| lan_macaddr | router mac address | str |
-| lan_macaddress | router mac address | macaddress |
-| wan_ipv4_addr | router mac address | str |
-| wan_ipv4_address | router mac address | ipaddress |
-| lan_ipv4_addr | router mac address | str |
-| lan_ipv4_address | router mac address | ipaddress |
-| wan_ipv4_gateway | router mac address | str |
-| wan_ipv4_gateway_address | router mac address | ipaddress |
+|---|---|---|
+| wan_macaddr | router wan mac address | str, None |
+| wan_macaddress | router wan mac address | macaddress.EUI48, None |
+| lan_macaddr | router lan mac address | str, None |
+| lan_macaddress | router lan mac address | macaddress.EUI48, None |
+| wan_ipv4_addr | router wan ipv4 address | str, None |
+| wan_ipv4_address | router wan ipv4 address | ipaddress.IPv4Address, None |
+| lan_ipv4_addr | router lan ipv4 address | str, None |
+| lan_ipv4_address | router lan ipv4 address | ipaddress.IPv4Address, None |
+| wan_ipv4_gateway | router wan ipv4 gateway | str, None |
+| wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of main wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
@@ -200,6 +200,7 @@ try:
 - Archer C6 v3.0
 - Archer C6U v1.0
 - Archer C7 v5.0
+- TL-WA3001 v1.0
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
