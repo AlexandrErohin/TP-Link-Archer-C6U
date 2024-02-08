@@ -68,6 +68,62 @@ try:
         finally:
             router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
+If you have the TP-link C1200 V2, you can use the TplinkC1200Router class instead of the TplinkRouter class.
+Remember that the password is different, here you need to use the web encrypted password.
+You can get the web encrypted password like this:
+1. Go to the webinterface of you TP-link router and open the developertools(ctrl+shift+i or F12).
+2. In the developertools navigate to the network tab.
+3. Make sure the recoder is enabeld.
+4. Login to you wifi router
+5. There should appear activity in the networking tab.
+6. Scroll up until you find "login?form=login" and click it.
+7. Click payload, and copy the string of caracters, it should be a long string.
+8. This is the web encrypted password.
+
+This is an exemple code for the Tp-link C1200 Router:
+
+```python
+from tplinkrouterc6u import TplinkC1200Router, Wifi
+from logging import Logger
+
+router = TplinkC1200Router('http://192.168.0.1', 'WebEncryptedPassword')
+
+# You may also pass a logger to log errors as
+# TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
+
+# Remember the WebEncryptedPassword is different from your normal password.
+#You can get the web encrypted password like this:
+#1. Go to the webinterface of you TP-link router and open the developertools(ctrl+shift+i or F12).
+#2. In the developertools navigate to the network tab.
+#3. Make sure the recoder is enabeld.
+#4. Login to you wifi router
+#5. There should appear activity in the networking tab.
+#6. Scroll up until you find "login?form=login" and click it.
+#7. Click payload, and copy the string of caracters, it should be a long string.
+#8. This is the web encrypted password.
+
+# Get firmware info - returns Firmware
+firmware = router.get_firmware()
+
+# Get status info - returns Status
+status = router.get_status()
+
+# Turn ON guest wifi 2.5G
+router.set_wifi(Wifi.WIFI_GUEST_2G, True)
+
+
+# Get Address reservations, sort by ipaddr
+reservations = router.get_ipv4_reservations()
+reservations.sort(key=lambda a:a.ipaddr)
+for res in reservations:
+    print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+
+# Get DHCP leases, sort by ipaddr
+leases = router.get_ipv4_dhcp_leases()
+leases.sort(key=lambda a:a.ipaddr)
+for lease in leases:
+    print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
+```
 
 ## Functions
 | Function | Args | Description | Return |
@@ -214,7 +270,7 @@ try:
 - Archer C59 V2
 - Archer C90 V6
 - Archer C900 V1
-- Archer C1200 V3 (V2 - should work, but not have been tested)
+- Archer C1200 V3
 - Archer C1900 V2
 - Archer C2300 (V1, V2)
 - Archer C4000 (V2 and V3)
