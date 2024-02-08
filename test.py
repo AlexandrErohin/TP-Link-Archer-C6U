@@ -2,7 +2,7 @@ import os
 import macaddress
 import ipaddress
 from typing import TypeAlias
-from tplinkrouterc6u import TplinkRouter, Wifi
+from tplinkrouterc6u import TplinkRouter, Wifi, TplinkC1200Router
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from mac_vendor_lookup import MacLookup, BaseMacLookup
 import pprint
@@ -77,7 +77,7 @@ assert isinstance(s.lan_ipv4_address, ipaddress.IPv4Address), "Type of ipaddress
 # Connect to router
 print("Connecting to router")
 password = input("password: ")
-router = TplinkRouter('http://192.168.0.1', password, timeout=10)
+router = TplinkC1200Router('http://192.168.1.100', password, timeout=10)
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
