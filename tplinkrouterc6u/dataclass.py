@@ -165,7 +165,7 @@ class IPv4Status:
         self._lan_ipv4_ipaddr: ipaddress
         self.lan_ipv4_dhcp_enable: bool
         self._lan_ipv4_netmask: ipaddress
-        self.remote: bool
+        self.remote: bool | None
 
     @property
     def wan_macaddr(self):

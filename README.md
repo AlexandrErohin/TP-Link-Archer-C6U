@@ -7,8 +7,7 @@ Python package for API access and management for TP-Link Router
 See [Supported routers](#supports)
 
 ## Installation
-`pip install tplinkrouterc6u`
-`pip install -r requirements.txt`
+`pip install tplinkrouterc6u && pip install -r requirements.txt`
 
 ## Dependencies
  - [requests](https://pypi.org/project/requests/)
@@ -18,13 +17,18 @@ See [Supported routers](#supports)
 Enter the host & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
 
 ```python
-from tplinkrouterc6u import TplinkRouter, Wifi
+from tplinkrouterc6u import TplinkRouterProvider, TplinkC1200Router, Wifi
 from logging import Logger
 
-router = TplinkRouter('http://192.168.0.1', 'password')
-
+router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
+# You may use client directly like
+# router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
-# TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
+# router = TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
+# If you have the TP-link C1200 V2 or similar, you can use the TplinkC1200Router class instead of the TplinkRouter class.
+# Remember that the password for this router is different, here you need to use the web encrypted password.
+# To get web encrypted password, read Web Encrypted Password section
+# router = TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
@@ -56,7 +60,7 @@ To reduce authorization requests client allows to make several actions with one 
 ```python
 from tplinkrouterc6u import TplinkRouter, Wifi
 
-router = TplinkRouter('http://192.168.0.1', 'password', timeout)
+router = TplinkRouter('http://192.168.0.1', 'password')
 router.single_request_mode = False  # make client use single authorization
 
 
@@ -68,62 +72,16 @@ try:
         finally:
             router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
-If you have the TP-link C1200 V2, you can use the TplinkC1200Router class instead of the TplinkRouter class.
-Remember that the password is different, here you need to use the web encrypted password.
-You can get the web encrypted password like this:
-1. Go to the webinterface of you TP-link router and open the developertools(ctrl+shift+i or F12).
-2. In the developertools navigate to the network tab.
-3. Make sure the recoder is enabeld.
-4. Login to you wifi router
-5. There should appear activity in the networking tab.
-6. Scroll up until you find "login?form=login" and click it.
-7. Click payload, and copy the string of caracters, it should be a long string.
-8. This is the web encrypted password.
 
-This is an exemple code for the Tp-link C1200 Router:
-
-```python
-from tplinkrouterc6u import TplinkC1200Router, Wifi
-from logging import Logger
-
-router = TplinkC1200Router('http://192.168.0.1', 'WebEncryptedPassword')
-
-# You may also pass a logger to log errors as
-# TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
-
-# Remember the WebEncryptedPassword is different from your normal password.
-#You can get the web encrypted password like this:
-#1. Go to the webinterface of you TP-link router and open the developertools(ctrl+shift+i or F12).
-#2. In the developertools navigate to the network tab.
-#3. Make sure the recoder is enabeld.
-#4. Login to you wifi router
-#5. There should appear activity in the networking tab.
-#6. Scroll up until you find "login?form=login" and click it.
-#7. Click payload, and copy the string of caracters, it should be a long string.
-#8. This is the web encrypted password.
-
-# Get firmware info - returns Firmware
-firmware = router.get_firmware()
-
-# Get status info - returns Status
-status = router.get_status()
-
-# Turn ON guest wifi 2.5G
-router.set_wifi(Wifi.WIFI_GUEST_2G, True)
-
-
-# Get Address reservations, sort by ipaddr
-reservations = router.get_ipv4_reservations()
-reservations.sort(key=lambda a:a.ipaddr)
-for res in reservations:
-    print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
-
-# Get DHCP leases, sort by ipaddr
-leases = router.get_ipv4_dhcp_leases()
-leases.sort(key=lambda a:a.ipaddr)
-for lease in leases:
-    print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
-```
+### <a id="encrypted_pass">Web Encrypted Password</a>
+If you got exception - `You need to use web encrypted password instead. Check the documentation!`
+or you have TP-link C1200 V2 or similar router you need to get web encrypted password by these actions:
+1. Go to the login page of your router. (default: 192.168.0.1).
+2. Type in the password you use to login into the password field.
+3. Click somewhere else on the page so that the password field is not selected anymore.
+4. Open the JavaScript console of your browser (usually by pressing F12 and then clicking on "Console").
+5. Type `document.getElementById("login-password").value;`
+6. Copy the returned value as password and use it.
 
 ## Functions
 | Function | Args | Description | Return |
@@ -229,7 +187,7 @@ for lease in leases:
 | lan_ipv4_dhcp_enable | router LAN DHCP enabled | bool |
 | lan_ipv4_netmask | router LAN gateway IP netmask | str |
 | lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
-| remote | router remote | bool |
+| remote | router remote | bool, None |
 
 ## Enum
 ### <a id="wifi">Wifi</a>
@@ -248,10 +206,12 @@ for lease in leases:
 - Archer AX21 v1.20
 - Archer AX50 v1.0
 - Archer AX55 V1.60
+- Archer AX72 V1
 - Archer AX73 V1
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
+- Archer C1200 v2.0 (You need to use [web encrypted password](#encrypted_pass))
 - Archer C6 v2.0
 - Archer C6 v3.0
 - Archer C6U v1.0
@@ -279,6 +239,9 @@ for lease in leases:
 - TL-WR1043N V5
 
 Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
+
+## <a id="add_support">Adding Support For More Models</a>
+Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/master/CONTRIBUTING.md)
 
 ## Local Development
 
