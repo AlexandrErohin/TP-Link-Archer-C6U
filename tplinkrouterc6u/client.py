@@ -19,7 +19,7 @@ class AbstractRouter(ABC):
         pass
 
     @abstractmethod
-    def authorize(self)-> None:
+    def authorize(self) -> None:
         pass
 
     @abstractmethod
