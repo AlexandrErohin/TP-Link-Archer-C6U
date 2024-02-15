@@ -87,6 +87,7 @@ assert isinstance(s.lan_ipv4_address, ipaddress.IPv4Address), "Type of ipaddress
 print("Connecting to router")
 password = input("password: ")
 router = TplinkRouterProvider.get_client('http://192.168.0.1', password)
+router.authorize()
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
@@ -133,6 +134,8 @@ for lease in leases:
         print(
             f"{i:03} {lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12} {lookup(lease.macaddr)}")
         i = i + 1
+router.logout()
+router.authorize()
 
 # Call each of the cgi-bin forms on the router web application
 print("Calling all cgi-bin entrypoints")

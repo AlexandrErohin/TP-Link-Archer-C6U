@@ -30,48 +30,33 @@ router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 # To get web encrypted password, read Web Encrypted Password section
 # router = TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
 
-# Get firmware info - returns Firmware
-firmware = router.get_firmware()
-
-# Get status info - returns Status
-status = router.get_status()
-
-# Turn ON guest wifi 2.5G
-router.set_wifi(Wifi.WIFI_GUEST_2G, True)
-
-
-# Get Address reservations, sort by ipaddr
-reservations = router.get_ipv4_reservations()
-reservations.sort(key=lambda a:a.ipaddr)
-for res in reservations:
-    print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
-
-# Get DHCP leases, sort by ipaddr
-leases = router.get_ipv4_dhcp_leases()
-leases.sort(key=lambda a:a.ipaddr)
-for lease in leases:
-    print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
-```
-
-The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
-So before action client authorize and after logout
-To reduce authorization requests client allows to make several actions with one authorization
-
-```python
-from tplinkrouterc6u import TplinkRouter, Wifi
-
-router = TplinkRouter('http://192.168.0.1', 'password')
-router.single_request_mode = False  # make client use single authorization
-
-
 try:
     if router.authorize():  # authorizing
+        # Get firmware info - returns Firmware
+        firmware = router.get_firmware()
+
+        # Get status info - returns Status
         status = router.get_status()
         if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
             router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
-        finally:
-            router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
+
+        # Get Address reservations, sort by ipaddr
+        reservations = router.get_ipv4_reservations()
+        reservations.sort(key=lambda a: a.ipaddr)
+        for res in reservations:
+            print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+
+        # Get DHCP leases, sort by ipaddr
+        leases = router.get_ipv4_dhcp_leases()
+        leases.sort(key=lambda a: a.ipaddr)
+        for lease in leases:
+            print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
+finally:
+    router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
+
+The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
+So before action you need to authorize and after logout
 
 ### <a id="encrypted_pass">Web Encrypted Password</a>
 If you got exception - `You need to use web encrypted password instead. Check the documentation!`
@@ -88,7 +73,6 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 |--|--|--|--|
 | get_firmware |  | Gets firmware info about the router | [Firmware](#firmware) |
 | get_status |  | Gets status about the router info including wifi statuses and wifi clients info | [Status](#status) |
-| get_full_info |  | Gets firmware and status info | tuple[[Firmware](#firmware),[Status](#status)] |
 | get_ipv4_status | | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
 | get_ipv4_reservations| | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | get_ipv4_dhcp_leases | | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
@@ -96,7 +80,6 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | reboot |  | reboot router |
 | authorize |  | authorize for actions |
 | logout |  | logout after all is done |
-| query | query, operation='operation=read' | execute cgi-bin query | dictionary of result or None |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
