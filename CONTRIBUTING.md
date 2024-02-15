@@ -1,6 +1,6 @@
 # Adding Support For Your Model
 
-The best way would be great if you create PR with a new class for your router witch extends AbstractRouter from client.py
+The best way would be great if you create PR with a new class for your router witch extends [AbstractRouter](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client.py#L16)
 
 If you cannot do it, lets do next
 
