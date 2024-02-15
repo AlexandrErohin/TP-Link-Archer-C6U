@@ -1,6 +1,5 @@
 import hashlib
 import re
-from collections.abc import Callable
 import json
 import time
 import requests
@@ -10,6 +9,7 @@ from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.exception import ClientException
 from abc import ABC, abstractmethod
 
 
@@ -19,15 +19,23 @@ class AbstractRouter(ABC):
         pass
 
     @abstractmethod
-    def get_full_info(self) -> tuple[Firmware, Status] | None:
+    def authorize(self)-> None:
         pass
 
     @abstractmethod
-    def get_status(self) -> Status | None:
+    def logout(self) -> None:
         pass
 
     @abstractmethod
-    def reboot(self, purchase) -> None:
+    def get_firmware(self) -> Firmware:
+        pass
+
+    @abstractmethod
+    def get_status(self) -> Status:
+        pass
+
+    @abstractmethod
+    def reboot(self) -> None:
         pass
 
     @abstractmethod
@@ -47,7 +55,6 @@ class TplinkBaseRouter(AbstractRouter):
         self.username = username
         self.password = password
         self.timeout = timeout
-        self.single_request_mode = True
         self._logger = logger
         self._login_referer = '{}/webpages/login.html?t={}'.format(self.host, time.time())
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
@@ -63,74 +70,37 @@ class TplinkBaseRouter(AbstractRouter):
     def authorize(self) -> bool:
         pass
 
-    def get_firmware(self) -> Firmware | None:
-        return self._request(self._get_firmware)
-
-    def get_status(self) -> Status | None:
-        return self._request(self._get_status)
-
-    def get_ipv4_status(self) -> IPv4Status | None:
-        return self._request(self._get_ipv4_status)
-
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
-        return self._request(self._get_ipv4_reservations)
-
-    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
-        return self._request(self._get_ipv4_dhcp_leases)
-
     def query(self, query, operation='operation=read'):
-        def callback():
-            return self._get_data(query, operation)
-
-        return self._request(callback)
-
-    def get_full_info(self) -> tuple[Firmware, Status] | None:
-        def callback():
-            firmware = self._get_firmware()
-            status = self._get_status()
-
-            return firmware, status
-
-        return self._request(callback)
+        self.request(query, operation)
 
     def set_wifi(self, wifi: Wifi, enable: bool) -> None:
-        def callback():
-            path = f"admin/wireless?&form=guest&form={wifi.value}"
-            data = f"operation=write&{wifi.value}_enable={'on' if enable else 'off'}"
-            self._send_data(path, data)
-
-        self._request(callback)
+        path = f"admin/wireless?&form=guest&form={wifi.value}"
+        data = f"operation=write&{wifi.value}_enable={'on' if enable else 'off'}"
+        self.request(path, data)
 
     def reboot(self) -> None:
-        def callback():
-            self._send_data('admin/system?form=reboot', 'operation=write')
-
-        self._request(callback)
+        self.request('admin/system?form=reboot', 'operation=write', True)
 
     def logout(self) -> None:
-        if self._logged:
-            self._send_data('admin/system?form=logout', 'operation=write')
-        self.clear()
-
-    def clear(self, full: bool = False) -> None:
+        self.request('admin/system?form=logout', 'operation=write', True)
         self._stok = ''
         self._sysauth = ''
         self._logged = False
 
-    def _get_firmware(self) -> Firmware:
-        data = self._get_data(self._url_firmware)
+    def get_firmware(self) -> Firmware:
+        data = self.request(self._url_firmware)
         firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
 
-    def _get_status(self) -> Status:
+    def get_status(self) -> Status:
 
         def _calc_cpu_usage(data: dict) -> float | None:
             cpu_usage = (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0)
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
 
-        data = self._get_data('admin/status?form=all&operation=read')
+        data = self.request('admin/status?form=all&operation=read')
         status = Status()
         status.devices = []
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
@@ -165,9 +135,9 @@ class TplinkBaseRouter(AbstractRouter):
 
         return status
 
-    def _get_ipv4_status(self) -> IPv4Status:
+    def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
-        data = self._get_data('admin/network?form=status_ipv4&operation=read')
+        data = self.request('admin/network?form=status_ipv4&operation=read')
         ipv4_status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
         ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
         ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
@@ -183,9 +153,9 @@ class TplinkBaseRouter(AbstractRouter):
 
         return ipv4_status
 
-    def _get_ipv4_reservations(self) -> [IPv4Reservation]:
+    def get_ipv4_reservations(self) -> [IPv4Reservation]:
         ipv4_reservations = []
-        data = self._get_data(self._url_ipv4_reservations, 'operation=load')
+        data = self.request(self._url_ipv4_reservations, 'operation=load')
 
         for item in data:
             ipv4_reservations.append(
@@ -194,9 +164,9 @@ class TplinkBaseRouter(AbstractRouter):
 
         return ipv4_reservations
 
-    def _get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []
-        data = self._get_data(self._url_ipv4_dhcp_leases, 'operation=load')
+        data = self.request(self._url_ipv4_dhcp_leases, 'operation=load')
 
         for item in data:
             dhcp_leases.append(
@@ -208,27 +178,11 @@ class TplinkBaseRouter(AbstractRouter):
     def _str2bool(self, v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
 
-    def _request(self, callback: Callable):
-        if not self.single_request_mode:
-            return callback()
-
-        try:
-            if self.authorize():
-                data = callback()
-                self.logout()
-                return data
-        except Exception as error:
-            self.clear(True)
-            if self._logger:
-                self._logger.error('TplinkRouter Integration Exception - {}'.format(error))
-        finally:
-            self.clear()
-
-    def _get_data(self, path: str, data: str = 'operation=read') -> dict | None:
+    def request(self, path: str, data: str = 'operation=read', ignore_response: bool = False) -> dict | None:
         if self._logged is False:
             raise Exception('Not authorised')
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = '{}/webpages/index.html'.format(self.host)
+        referer = '{}/webpages/index.{}.html'.format(self.host, time.time())
 
         response = requests.post(
             url,
@@ -239,31 +193,23 @@ class TplinkBaseRouter(AbstractRouter):
             verify=self._verify_ssl,
         )
 
+        if ignore_response:
+            return None
+
         data = response.text
         try:
-            json_response = response.json()
-            if 'data' not in json_response:
-                raise Exception("Router didn't respond with JSON - Request {} - Response {}".format(path, data))
-            json_response = self._decrypt_response(json_response)
+            data = response.json()
+            if 'data' not in data:
+                raise Exception("Router didn't respond with JSON")
+            data = self._decrypt_response(data)
 
-            if 'success' in json_response and json_response['success']:
-                return json_response['data']
-            else:
-                if 'errorcode' in json_response and json_response['errorcode'] == 'timeout':
-                    if self._logger:
-                        self._logger.info(
-                            "TplinkRouter Integration Exception - Token timed out. Relogging on next scan")
-                    self._stok = ''
-                    self._sysauth = ''
-                elif self._logger:
-                    self._logger.error(
-                        "TplinkRouter Integration Exception - An unknown error happened while fetching data %s", data)
-        except ValueError:
+            if 'success' in data and data['success']:
+                return data['data']
+        except Exception as e:
+            error = 'TplinkRouter - An unknown response - {}; Request {} - Response {}'.format(e, path, data)
             if self._logger:
-                self._logger.error(
-                    "TplinkRouter Integration Exception - Router didn't respond with JSON. Check if credentials are correct")
-
-        raise Exception('An unknown response - Request {} - Response {}'.format(path, data))
+                self._logger.error(error)
+            raise ClientException(error)
 
     def _prepare_data(self, data):
         return data
@@ -271,27 +217,12 @@ class TplinkBaseRouter(AbstractRouter):
     def _decrypt_response(self, data):
         return data
 
-    def _send_data(self, path: str, data: str) -> None:
-        if self._logged is False:
-            raise Exception('Not authorised')
-        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = '{}/webpages/index.{}.html'.format(self.host, time.time())
-
-        body = self._prepare_data(data)
-        requests.post(
-            url,
-            data=body,
-            headers={'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'},
-            cookies={'sysauth': self._sysauth},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
-
 
 class TplinkRouter(TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
+
         self._url_firmware = 'admin/firmware?form=upgrade'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
@@ -314,10 +245,10 @@ class TplinkRouter(TplinkBaseRouter):
         try:
             self._request_pwd()
             return True
-        except:
+        except ClientException:
             return False
 
-    def authorize(self) -> bool:
+    def authorize(self) -> None:
         if self._pwdNN == '':
             self._request_pwd()
 
@@ -341,20 +272,12 @@ class TplinkRouter(TplinkBaseRouter):
                 'sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
             self._logged = True
-            return True
-        except (ValueError, KeyError, AttributeError) as e:
+
+        except Exception as e:
+            error = "TplinkRouter - C6 - Cannot authorize! Error - {}; Response - {}".format(e, data)
             if self._logger:
-                self._logger.error(
-                    "TplinkRouter Integration Exception - C6 - Couldn't fetch auth tokens! Response was: %s",
-                    data)
-
-        return False
-
-    def clear(self, full: bool = False) -> None:
-        super().clear(full)
-        if full:
-            self._seq = ''
-            self._pwdNN = ''
+                self._logger.error(error)
+            raise ClientException(error)
 
     def _request_pwd(self) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
@@ -374,13 +297,12 @@ class TplinkRouter(TplinkBaseRouter):
 
             self._pwdNN = args[0]
             self._pwdEE = args[1]
-        except json.decoder.JSONDecodeError:
+
+        except Exception as e:
+            error = 'TplinkRouter - C6 - Unknown error for pwd! Error - {}; Response - {}'.format(e, response.text)
             if self._logger:
-                self._logger.error(
-                    'TplinkRouter Integration Exception - C6 - No pwd response - {}'.format(response.text))
-            raise Exception('Unsupported router!')
-        except Exception as error:
-            raise Exception('Unknown error for pwd - C6 - {}; Response - {}'.format(error, response.text))
+                self._logger.error(error)
+            raise ClientException(error)
 
     def _request_seq(self) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
@@ -402,13 +324,12 @@ class TplinkRouter(TplinkBaseRouter):
 
             self.nn = args[0]
             self.ee = args[1]
-        except json.decoder.JSONDecodeError:
+
+        except Exception as e:
+            error = 'TplinkRouter - C6 - Unknown error for seq! Error - {}; Response - {}'.format(e, response.text)
             if self._logger:
-                self._logger.error(
-                    'TplinkRouter Integration Exception - C6 - No seq response - {}'.format(response.text))
-            raise Exception('Unsupported router!')
-        except Exception as error:
-            raise Exception('Unknown error for seq - C6 - {}; Response - {}'.format(error, response.text))
+                self._logger.error(error)
+            raise ClientException(error)
 
     def _try_login(self) -> requests.Response:
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
@@ -443,7 +364,7 @@ class TplinkC1200Router(TplinkBaseRouter):
     def supports(self) -> bool:
         return True
 
-    def authorize(self) -> bool:
+    def authorize(self) -> None:
         if len(self.password) < 200:
             raise Exception('You need to use web encrypted password instead. Check the documentation!')
 
@@ -462,17 +383,12 @@ class TplinkC1200Router(TplinkBaseRouter):
             regex_result = re.search('sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
             self._logged = True
-            return True
-        except json.decoder.JSONDecodeError:
+
+        except Exception as e:
+            error = "TplinkRouter - C1200 - Cannot authorize! Error - {}; Response - {}".format(e, response.text)
             if self._logger:
-                self._logger.error(
-                    'TplinkRouter Integration Exception - Unsupported - C1200 - {}'.format(response.text))
-            raise Exception('Unsupported router!')
-        except:
-            if self._logger:
-                self._logger.error(
-                    'TplinkRouter Integration Exception - C1200 - Cannot authorize - {}'.format(response.text))
-        return False
+                self._logger.error(error)
+            raise ClientException(error)
 
 
 class TplinkRouterProvider:
