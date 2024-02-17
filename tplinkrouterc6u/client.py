@@ -19,7 +19,7 @@ class AbstractRouter(ABC):
         pass
 
     @abstractmethod
-    def authorize(self) -> None:
+    def authorize(self)-> None:
         pass
 
     @abstractmethod
@@ -100,6 +100,7 @@ class TplinkBaseRouter(AbstractRouter):
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
 
+
         data = self.request('admin/status?form=all&operation=read')
         status = Status()
         status.devices = []
@@ -133,6 +134,13 @@ class TplinkBaseRouter(AbstractRouter):
             status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
                                          item['hostname']))
 
+        if not status.devices:
+            device_data = self.request('admin/wireless?form=statistics&operation=read')
+            for item in device_data:
+                type = Wifi.WIFI_2G if '2.4GHz' == item['type'] else Wifi.WIFI_5G
+                status.devices.append(Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'),
+                                         'UNKOWN'))
+            
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
