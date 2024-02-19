@@ -106,7 +106,6 @@ class TplinkBaseRouter(AbstractRouter):
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
         
-        device_data = self.request('admin/wireless?form=statistics&operation=read')
         data = self.request('admin/status?form=all&operation=read')
         status = Status()
         status.devices = []
@@ -140,6 +139,7 @@ class TplinkBaseRouter(AbstractRouter):
             status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
                                          item['hostname']))
         if self.get_AP_Mode:
+            device_data = self.request('admin/wireless?form=statistics&operation=read')
             if len(device_data) is not len(status.devices):
                 for item in device_data:
                     if item['mac'] not in [device.macaddr for device in status.devices]:
