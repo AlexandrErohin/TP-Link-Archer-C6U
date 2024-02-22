@@ -107,11 +107,11 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | guest_clients_total | Total amount of guest wifi clients | int |
 | clients_total | Total amount of all connected clients | int |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool |
-| guest_5g_enable | Is guest wifi 5G enabled | bool |
+| guest_5g_enable | Is guest wifi 5G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
-| wifi_5g_enable | Is main wifi 5G enabled | bool |
+| wifi_5g_enable | Is main wifi 5G enabled | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage | float, None |
 | cpu_usage | CPU usage | float, None |
@@ -199,6 +199,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C6 v3.0
 - Archer C6U v1.0
 - Archer C7 v5.0
+- Archer MR200 v5.3
 - TL-WA3001 v1.0
 
 ### Not fully tested Hardware Versions
@@ -237,3 +238,4 @@ The sanity check test.py illustrates a few tests and runs through a list of quer
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
+ - [Encryption for TP-Link W9960](https://github.com/Electry/TPLink-W9960-APIClient) by [@Electry](https://github.com/Electry)
