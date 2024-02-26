@@ -106,7 +106,6 @@ class TplinkBaseRouter(AbstractRouter):
         
         data = self.request('admin/status?form=all&operation=read')
         status = Status()
-        status.devices = []
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
         status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
