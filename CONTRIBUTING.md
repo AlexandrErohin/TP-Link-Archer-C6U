@@ -11,7 +11,7 @@ If you cannot do it, lets do next
 ## Steps
 ### Setup
 1. Go over to the router's web management page (don't log in yet)
-2. Open the Inspect window > Network tab
+2. Open the Inspect window > Network tab (usually by pressing F12 and then clicking on "Network")
 3. Tick the "Preserve Log" checkbox and set the filter to "XHR"
 ### Recording
 4. Login to your router

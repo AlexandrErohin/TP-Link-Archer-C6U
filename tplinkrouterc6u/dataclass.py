@@ -52,20 +52,20 @@ class Status:
         self._wan_ipv4_addr: ipaddress.IPv4Address | None
         self._lan_ipv4_addr: ipaddress.IPv4Address | None
         self._wan_ipv4_gateway: ipaddress.IPv4Address | None
-        self.wired_total: int
-        self.wifi_clients_total: int
-        self.guest_clients_total: int
-        self.clients_total: int
+        self.wired_total: int = 0
+        self.wifi_clients_total: int = 0
+        self.guest_clients_total: int = 0
+        self.clients_total: int = 0
         self.guest_2g_enable: bool
-        self.guest_5g_enable: bool
-        self.iot_2g_enable: bool | None
-        self.iot_5g_enable: bool | None
+        self.guest_5g_enable: bool | None
+        self.iot_2g_enable: bool | None = None
+        self.iot_5g_enable: bool | None = None
         self.wifi_2g_enable: bool
-        self.wifi_5g_enable: bool
-        self.wan_ipv4_uptime: int | None
-        self.mem_usage: float | None
-        self.cpu_usage: float | None
-        self.devices: list[Device]
+        self.wifi_5g_enable: bool | None
+        self.wan_ipv4_uptime: int | None = None
+        self.mem_usage: float | None = None
+        self.cpu_usage: float | None = None
+        self.devices: list[Device] = []
 
     @property
     def wan_macaddr(self) -> str | None:
@@ -172,7 +172,7 @@ class IPv4Status:
         self._lan_ipv4_ipaddr: ipaddress
         self.lan_ipv4_dhcp_enable: bool
         self._lan_ipv4_netmask: ipaddress
-        self.remote: bool | None
+        self.remote: bool | None = None
 
     @property
     def wan_macaddr(self):
