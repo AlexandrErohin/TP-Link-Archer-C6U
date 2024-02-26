@@ -9,7 +9,7 @@ from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper
 from tplinkrouterc6u.enum import Wifi
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status, AP_Mode
-from tplinkrouterc6u.exception import ClientException
+from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
 
 
