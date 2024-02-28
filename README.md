@@ -73,10 +73,11 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 |--|--|--|--|
 | get_firmware |  | Gets firmware info about the router | [Firmware](#firmware) |
 | get_status |  | Gets status about the router info including wifi statuses and wifi clients info | [Status](#status) |
-| get_ipv4_status | | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
-| get_ipv4_reservations| | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
-| get_ipv4_dhcp_leases | | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
+| get_ipv4_status |  | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
+| get_ipv4_reservations |  | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
+| get_ipv4_dhcp_leases |  | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
 | set_wifi | wifi: [Wifi](#wifi), enable: bool | Allow to turn on/of 4 wifi networks |  |
+| send_sms | phone_number: str, message: str | Send sms for LTE routers |  |
 | reboot |  | reboot router |
 | authorize |  | authorize for actions |
 | logout |  | logout after all is done |
@@ -126,6 +127,8 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | ipaddr | client ip address | str |
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
+| packets_sent | total packets sent | int, None |
+| packets_received | total packets received | int, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -199,8 +202,11 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C6 v3.0
 - Archer C6U v1.0
 - Archer C7 v5.0
+- Archer MR200 v5
 - Archer MR200 v5.3
+- Archer MR600
 - TL-WA3001 v1.0
+- TL-MR6400 v5
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
@@ -220,6 +226,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C4000 (V2 and V3)
 - Archer C5400 V2
 - Archer C5400X V1
+- TD-W9960 v1
 - TL-WR1043N V5
 
 Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
