@@ -10,7 +10,7 @@ import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Wifi
-from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status, AP_Mode
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
 
@@ -91,6 +91,11 @@ class TplinkBaseRouter(AbstractRouter):
         firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
+    
+    def get_AP_Mode(self) -> AP_Mode:
+        data = self.request('admin/system?form=sysmode', 'operation=read')
+        mode = AP_Mode(data.get('mode'))
+        return mode
 
     def get_status(self) -> Status:
 
@@ -98,7 +103,7 @@ class TplinkBaseRouter(AbstractRouter):
             cpu_usage = (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0)
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
-
+        
         data = self.request('admin/status?form=all&operation=read')
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
@@ -130,7 +135,14 @@ class TplinkBaseRouter(AbstractRouter):
             type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
             status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
                                          item['hostname']))
-
+        if self.get_AP_Mode:
+            device_data = self.request('admin/wireless?form=statistics&operation=read')
+            if len(device_data) is not len(status.devices):
+                for item in device_data:
+                    if item['mac'] not in [device.macaddr for device in status.devices]:
+                        type = Wifi.WIFI_2G if '2.4GHz' == item['type'] else Wifi.WIFI_5G
+                        status.devices.append(Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'),
+                                                'UNKOWN'))
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
