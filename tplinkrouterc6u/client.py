@@ -10,7 +10,7 @@ import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Wifi
-from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status, AP_Mode
+from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
 
@@ -60,6 +60,7 @@ class TplinkBaseRouter(AbstractRouter):
         self._logger = logger
         self._login_referer = '{}/webpages/login.html?t={}'.format(self.host, time.time())
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
+        self._url_wireless_stats = 'admin/wireless?form=statistics&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
 
@@ -91,11 +92,6 @@ class TplinkBaseRouter(AbstractRouter):
         firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
-    
-    def get_AP_Mode(self) -> AP_Mode:
-        data = self.request('admin/system?form=sysmode', 'operation=read')
-        mode = AP_Mode(data.get('mode'))
-        return mode
 
     def get_status(self) -> Status:
 
@@ -103,7 +99,7 @@ class TplinkBaseRouter(AbstractRouter):
             cpu_usage = (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0)
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
-        
+
         data = self.request('admin/status?form=all&operation=read')
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
@@ -118,7 +114,6 @@ class TplinkBaseRouter(AbstractRouter):
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
         status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
         status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
         status.iot_2g_enable = data.get('iot_2g_enable') == 'on' if data.get('iot_2g_enable') is not None else None
@@ -126,23 +121,32 @@ class TplinkBaseRouter(AbstractRouter):
         status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
         status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
 
+        devices = {}
+
+        def _add_device(type: Wifi, item: dict) -> None:
+            devices[item['macaddr']] = Device(type, macaddress.EUI48(item['macaddr']),
+                                              ipaddress.IPv4Address(item['ipaddr']),
+                                              item['hostname'])
+
         for item in data.get('access_devices_wireless_host', []):
             type = Wifi.WIFI_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_5G
-            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
-                                         item['hostname']))
+            _add_device(type, item)
 
         for item in data.get('access_devices_wireless_guest', []):
             type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
-            status.devices.append(Device(type, macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']),
-                                         item['hostname']))
-        if self.get_AP_Mode:
-            device_data = self.request('admin/wireless?form=statistics&operation=read')
-            if len(device_data) is not len(status.devices):
-                for item in device_data:
-                    if item['mac'] not in [device.macaddr for device in status.devices]:
-                        type = Wifi.WIFI_2G if '2.4GHz' == item['type'] else Wifi.WIFI_5G
-                        status.devices.append(Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'),
-                                                'UNKOWN'))
+            _add_device(type, item)
+
+        for item in self.request(self._url_wireless_stats):
+            if item['mac'] not in devices:
+                status.wifi_clients_total += 1
+                type = Wifi.WIFI_2G if '2.4G' == item['type'] else Wifi.WIFI_5G
+                devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'), '')
+            devices[item['mac']].packets_sent = item['txpkts']
+            devices[item['mac']].packets_received = item['rxpkts']
+
+        status.devices = list(devices.values())
+        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
@@ -240,6 +244,7 @@ class TplinkRouter(TplinkBaseRouter):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade'
+        self._url_wireless_stats = 'admin/wireless?form=statistics'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
 
@@ -550,39 +555,41 @@ class TPLinkMRClient(AbstractRouter):
                 'hostName',
                 'X_TP_ConnType',
                 'active',
-            ])
+            ]),
+            self.ActItem(self.ActItem.GS, 'LAN_WLAN_ASSOC_DEV', attrs=[
+                'associatedDeviceMACAddress',
+                'X_TP_TotalPacketsSent',
+                'X_TP_TotalPacketsReceived',
+            ]),
         ]
-        response, values = self.req_act(acts)
+        _, values = self.req_act(acts)
 
-        status._lan_macaddr = macaddress.EUI48(values[0]['X_TP_MACAddress'])
-        status._lan_ipv4_addr = ipaddress.IPv4Address(values[0]['IPInterfaceIPAddress'])
+        status._lan_macaddr = macaddress.EUI48(values['0']['X_TP_MACAddress'])
+        status._lan_ipv4_addr = ipaddress.IPv4Address(values['0']['IPInterfaceIPAddress'])
 
-        if values[1].__class__ != list:
-            values[1] = [values[1]]
-        for item in values[1]:
-            if int(item['enable']) == 0 and len(values[1]) != 1:
+        for item in self._to_list(values.get('1')):
+            if int(item['enable']) == 0 and values.get('1').__class__ == list:
                 continue
             status._wan_macaddr = macaddress.EUI48(item['MACAddress'])
             status._wan_ipv4_addr = ipaddress.IPv4Address(item['externalIPAddress'])
             status._wan_ipv4_gateway = ipaddress.IPv4Address(item['defaultGateway'])
 
-        if values[2].__class__ != list:
-            status.wifi_2g_enable = bool(int(values[2]['enable']))
+        if values['2'].__class__ != list:
+            status.wifi_2g_enable = bool(int(values['2']['enable']))
             status.wifi_5g_enable = None
         else:
-            status.wifi_2g_enable = bool(int(values[2][0]['enable']))
-            status.wifi_5g_enable = bool(int(values[2][1]['enable']))
+            status.wifi_2g_enable = bool(int(values['2'][0]['enable']))
+            status.wifi_5g_enable = bool(int(values['2'][1]['enable']))
 
-        if values[3].__class__ != list:
-            status.guest_2g_enable = bool(int(values[3]['enable']))
+        if values['3'].__class__ != list:
+            status.guest_2g_enable = bool(int(values['3']['enable']))
             status.guest_5g_enable = None
         else:
-            status.guest_2g_enable = bool(int(values[3][0]['enable']))
-            status.guest_5g_enable = bool(int(values[3][1]['enable']))
+            status.guest_2g_enable = bool(int(values['3'][0]['enable']))
+            status.guest_5g_enable = bool(int(values['3'][1]['enable']))
 
-        if values[4].__class__ != list:
-            values[4] = [values[4]]
-        for val in values[4]:
+        devices = {}
+        for val in self._to_list(values.get('4')):
             if int(val['active']) == 0:
                 continue
             type = int(val['X_TP_ConnType'])
@@ -595,11 +602,23 @@ class TPLinkMRClient(AbstractRouter):
                 status.wifi_clients_total += 1
             else:
                 continue
-            status.devices.append(Device(self.CLIENT_TYPES[type],
-                                         macaddress.EUI48(val['MACAddress']),
-                                         ipaddress.IPv4Address(val['IPAddress']),
-                                         val['hostName']))
+            devices[val['MACAddress']] = Device(self.CLIENT_TYPES[type],
+                                                macaddress.EUI48(val['MACAddress']),
+                                                ipaddress.IPv4Address(val['IPAddress']),
+                                                val['hostName'])
 
+        for val in self._to_list(values.get('5')):
+            if val['associatedDeviceMACAddress'] not in devices:
+                status.wifi_clients_total += 1
+                devices[val['associatedDeviceMACAddress']] = Device(
+                    Wifi.WIFI_2G,
+                    macaddress.EUI48(val['associatedDeviceMACAddress']),
+                    ipaddress.IPv4Address('0.0.0.0'),
+                    '')
+            devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
+            devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
+
+        status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
         return status
@@ -611,9 +630,7 @@ class TPLinkMRClient(AbstractRouter):
         _, values = self.req_act(acts)
 
         ipv4_reservations = []
-        if values.__class__ != list:
-            values = [values]
-        for item in values:
+        for item in self._to_list(values):
             ipv4_reservations.append(
                 IPv4Reservation(
                     macaddress.EUI48(item['chaddr']),
@@ -629,10 +646,9 @@ class TPLinkMRClient(AbstractRouter):
             self.ActItem(5, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName', 'leaseTimeRemaining']),
         ]
         _, values = self.req_act(acts)
+
         dhcp_leases = []
-        if values.__class__ != list:
-            values = [values]
-        for item in values:
+        for item in self._to_list(values):
             lease_time = item['leaseTimeRemaining']
             dhcp_leases.append(
                 IPv4DHCPLease(
@@ -656,15 +672,13 @@ class TPLinkMRClient(AbstractRouter):
         _, values = self.req_act(acts)
 
         ipv4_status = IPv4Status()
-        ipv4_status._lan_macaddr = macaddress.EUI48(values[0]['X_TP_MACAddress'])
-        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(values[0]['IPInterfaceIPAddress'])
-        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(values[0]['IPInterfaceSubnetMask'])
-        ipv4_status.lan_ipv4_dhcp_enable = bool(int(values[1]['DHCPServerEnable']))
+        ipv4_status._lan_macaddr = macaddress.EUI48(values['0']['X_TP_MACAddress'])
+        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(values['0']['IPInterfaceIPAddress'])
+        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(values['0']['IPInterfaceSubnetMask'])
+        ipv4_status.lan_ipv4_dhcp_enable = bool(int(values['1']['DHCPServerEnable']))
 
-        if values[2].__class__ != list:
-            values[2] = [values[2]]
-        for item in values[2]:
-            if int(item['enable']) == 0 and len(values[2]) != 1:
+        for item in self._to_list(values.get('2')):
+            if int(item['enable']) == 0 and values.get('2').__class__ == list:
                 continue
             ipv4_status._wan_macaddr = macaddress.EUI48(item['MACAddress'])
             ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(item['externalIPAddress'])
@@ -684,6 +698,17 @@ class TPLinkMRClient(AbstractRouter):
                 'LAN_WLAN' if wifi in [Wifi.WIFI_2G, Wifi.WIFI_5G] else 'LAN_WLAN_MSSIDENTRY',
                 self.WIFI_SET[wifi],
                 attrs=['enable={}'.format(int(enable))]),
+        ]
+        self.req_act(acts)
+
+    def send_sms(self, phone_number: str, message: str) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'LTE_SMS_SENDNEWMSG', attrs=[
+                    'index=1',
+                    'to={}'.format(phone_number),
+                    'textContent={}'.format(message),
+                ]),
         ]
         self.req_act(acts)
 
@@ -724,11 +749,18 @@ class TPLinkMRClient(AbstractRouter):
 
         result = self._merge_response(response)
 
-        return response, result[0] if len(result) == 1 else result
+        return response, result.get('0') if len(result) == 1 and result.get('0') else result
 
     @staticmethod
-    def _merge_response(response: str) -> dict | list:
-        result = []
+    def _to_list(response: dict | list | None) -> list:
+        if response is None:
+            return []
+
+        return [response] if response.__class__ != list else response
+
+    @staticmethod
+    def _merge_response(response: str) -> dict:
+        result = {}
         obj = {}
         lines = response.split('\n')
         for l in lines:
@@ -736,16 +768,14 @@ class TPLinkMRClient(AbstractRouter):
                 regexp = re.search('\[\d,\d,\d,\d,\d,\d\](\d)', l)
                 if regexp is not None:
                     obj = {}
-                    index = int(regexp.group(1))
-                    try:
-                        item = result[index]
+                    index = regexp.group(1)
+                    item = result.get(index)
+                    if item is not None:
                         if item.__class__ != list:
                             result[index] = [item]
-                            result[index].append(obj)
-                        else:
-                            result[index].append(obj)
-                    except IndexError:
-                        result.insert(index, obj)
+                        result[index].append(obj)
+                    else:
+                        result[index] = obj
                 continue
             if '=' in l:
                 keyval = l.split('=')
@@ -753,7 +783,7 @@ class TPLinkMRClient(AbstractRouter):
 
                 obj[keyval[0]] = keyval[1]
 
-        return result
+        return result if result else []
 
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         # add timestamp param
