@@ -11,7 +11,14 @@ class Firmware:
         self.model = model
         self.firmware_version = firmware
 
-
+@dataclass
+class AP_Mode:
+    def __init__(self, mode: str) -> None:
+        if mode == 'ap':
+            self.ap_mode = True
+        else:
+            self.ap_mode = False
+            
 @dataclass
 class Device:
     def __init__(self, type: Wifi, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
