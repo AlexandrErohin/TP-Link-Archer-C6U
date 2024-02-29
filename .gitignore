@@ -4,6 +4,9 @@ __pycache__
 .vscode
 *.egg-info
 build
+logs
+temp
+dist
 docker-compose.yaml
-logs/*
-mac_lookup.txt
+*.txt
+*.zip
