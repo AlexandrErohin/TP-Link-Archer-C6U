@@ -7,8 +7,7 @@ Python package for API access and management for TP-Link Router
 See [Supported routers](#supports)
 
 ## Installation
-`pip install tplinkrouterc6u`
-`pip install -r requirements.txt`
+`pip install tplinkrouterc6u && pip install -r requirements.txt`
 
 ## Dependencies
  - [requests](https://pypi.org/project/requests/)
@@ -18,71 +17,70 @@ See [Supported routers](#supports)
 Enter the host & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
 
 ```python
-from tplinkrouterc6u import TplinkRouter, Wifi
+from tplinkrouterc6u import TplinkRouterProvider, TplinkC1200Router, Wifi
 from logging import Logger
 
-router = TplinkRouter('http://192.168.0.1', 'password')
-
+router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
+# You may use client directly like
+# router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
-# TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
-
-# Get firmware info - returns Firmware
-firmware = router.get_firmware()
-
-# Get status info - returns Status
-status = router.get_status()
-
-# Turn ON guest wifi 2.5G
-router.set_wifi(Wifi.WIFI_GUEST_2G, True)
-
-
-# Get Address reservations, sort by ipaddr
-reservations = router.get_ipv4_reservations()
-reservations.sort(key=lambda a:a.ipaddr)
-for res in reservations:
-    print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
-
-# Get DHCP leases, sort by ipaddr
-leases = router.get_ipv4_dhcp_leases()
-leases.sort(key=lambda a:a.ipaddr)
-for lease in leases:
-    print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
-```
-
-The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
-So before action client authorize and after logout
-To reduce authorization requests client allows to make several actions with one authorization
-
-```python
-from tplinkrouterc6u import TplinkRouter, Wifi
-
-router = TplinkRouter('http://192.168.0.1', 'password', timeout)
-router.single_request_mode = False  # make client use single authorization
-
+# router = TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
+# If you have the TP-link C1200 V2 or similar, you can use the TplinkC1200Router class instead of the TplinkRouter class.
+# Remember that the password for this router is different, here you need to use the web encrypted password.
+# To get web encrypted password, read Web Encrypted Password section
+# router = TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
 
 try:
     if router.authorize():  # authorizing
+        # Get firmware info - returns Firmware
+        firmware = router.get_firmware()
+
+        # Get status info - returns Status
         status = router.get_status()
         if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
             router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
-        finally:
-            router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
+
+        # Get Address reservations, sort by ipaddr
+        reservations = router.get_ipv4_reservations()
+        reservations.sort(key=lambda a: a.ipaddr)
+        for res in reservations:
+            print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+
+        # Get DHCP leases, sort by ipaddr
+        leases = router.get_ipv4_dhcp_leases()
+        leases.sort(key=lambda a: a.ipaddr)
+        for lease in leases:
+            print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
+finally:
+    router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
+
+The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
+So before action you need to authorize and after logout
+
+### <a id="encrypted_pass">Web Encrypted Password</a>
+If you got exception - `You need to use web encrypted password instead. Check the documentation!`
+or you have TP-link C1200 V2 or similar router you need to get web encrypted password by these actions:
+1. Go to the login page of your router. (default: 192.168.0.1).
+2. Type in the password you use to login into the password field.
+3. Click somewhere else on the page so that the password field is not selected anymore.
+4. Open the JavaScript console of your browser (usually by pressing F12 and then clicking on "Console").
+5. Type `document.getElementById("login-password").value;`
+6. Copy the returned value as password and use it.
 
 ## Functions
 | Function | Args | Description | Return |
 |--|--|--|--|
 | get_firmware |  | Gets firmware info about the router | [Firmware](#firmware) |
 | get_status |  | Gets status about the router info including wifi statuses and wifi clients info | [Status](#status) |
-| get_full_info |  | Gets firmware and status info | tuple[[Firmware](#firmware),[Status](#status)] |
-| get_ipv4_status | | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
-| get_ipv4_reservations| | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
-| get_ipv4_dhcp_leases | | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
+| get_ipv4_status |  | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
+| get_ipv4_reservations |  | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
+| get_ipv4_dhcp_leases |  | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
 | set_wifi | wifi: [Wifi](#wifi), enable: bool | Allow to turn on/of 4 wifi networks |  |
+| send_sms | phone_number: str, message: str | Send sms for LTE routers |  |
 | reboot |  | reboot router |
 | authorize |  | authorize for actions |
 | logout |  | logout after all is done |
-| query | query, operation='operation=read' | execute cgi-bin query | dictionary of result or None |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -94,27 +92,27 @@ try:
 
 ### <a id="status">Status</a>
 | Field | Description | Type |
-| --- |---|---|
-| wan_macaddr | router mac address | str |
-| wan_macaddress | router mac address | macaddress |
-| lan_macaddr | router mac address | str |
-| lan_macaddress | router mac address | macaddress |
-| wan_ipv4_addr | router mac address | str |
-| wan_ipv4_address | router mac address | ipaddress |
-| lan_ipv4_addr | router mac address | str |
-| lan_ipv4_address | router mac address | ipaddress |
-| wan_ipv4_gateway | router mac address | str |
-| wan_ipv4_gateway_address | router mac address | ipaddress |
+|---|---|---|
+| wan_macaddr | router wan mac address | str, None |
+| wan_macaddress | router wan mac address | macaddress.EUI48, None |
+| lan_macaddr | router lan mac address | str |
+| lan_macaddress | router lan mac address | macaddress.EUI48 |
+| wan_ipv4_addr | router wan ipv4 address | str, None |
+| wan_ipv4_address | router wan ipv4 address | ipaddress.IPv4Address, None |
+| lan_ipv4_addr | router lan ipv4 address | str, None |
+| lan_ipv4_address | router lan ipv4 address | ipaddress.IPv4Address, None |
+| wan_ipv4_gateway | router wan ipv4 gateway | str, None |
+| wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of main wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
 | clients_total | Total amount of all connected clients | int |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool |
-| guest_5g_enable | Is guest wifi 5G enabled | bool |
+| guest_5g_enable | Is guest wifi 5G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
-| wifi_5g_enable | Is main wifi 5G enabled | bool |
+| wifi_5g_enable | Is main wifi 5G enabled | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage | float, None |
 | cpu_usage | CPU usage | float, None |
@@ -129,6 +127,8 @@ try:
 | ipaddr | client ip address | str |
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
+| packets_sent | total packets sent | int, None |
+| packets_received | total packets received | int, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -173,7 +173,7 @@ try:
 | lan_ipv4_dhcp_enable | router LAN DHCP enabled | bool |
 | lan_ipv4_netmask | router LAN gateway IP netmask | str |
 | lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
-| remote | router remote | bool |
+| remote | router remote | bool, None |
 
 ## Enum
 ### <a id="wifi">Wifi</a>
@@ -189,16 +189,24 @@ try:
 - Archer A7 V5
 - Archer AX10 v1.0
 - Archer AX20 v1.0
+- Archer AX21 v1.20
 - Archer AX50 v1.0
 - Archer AX55 V1.60
+- Archer AX72 V1
 - Archer AX73 V1
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
+- Archer C1200 v2.0 (You need to use [web encrypted password](#encrypted_pass))
 - Archer C6 v2.0
 - Archer C6 v3.0
 - Archer C6U v1.0
 - Archer C7 v5.0
+- Archer MR200 v5
+- Archer MR200 v5.3
+- Archer MR600
+- TL-WA3001 v1.0
+- TL-MR6400 v5
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
@@ -212,15 +220,19 @@ try:
 - Archer C59 V2
 - Archer C90 V6
 - Archer C900 V1
-- Archer C1200 V3 (V2 - should work, but not have been tested)
+- Archer C1200 V3
 - Archer C1900 V2
 - Archer C2300 (V1, V2)
 - Archer C4000 (V2 and V3)
 - Archer C5400 V2
 - Archer C5400X V1
+- TD-W9960 v1
 - TL-WR1043N V5
 
 Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
+
+## <a id="add_support">Adding Support For More Models</a>
+Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/master/CONTRIBUTING.md)
 
 ## Local Development
 
@@ -233,3 +245,4 @@ The sanity check test.py illustrates a few tests and runs through a list of quer
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
+ - [Encryption for TP-Link W9960](https://github.com/Electry/TPLink-W9960-APIClient) by [@Electry](https://github.com/Electry)

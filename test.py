@@ -3,12 +3,13 @@ import logging
 import macaddress
 import ipaddress
 from typing import TypeAlias
-from tplinkrouterc6u import TplinkRouter, Wifi
-from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u import TplinkRouter, Wifi, TplinkRouterProvider
+from tplinkrouterc6u.dataclass import Status, Device
 from mac_vendor_lookup import MacLookup, BaseMacLookup
 import pprint
 import json
 from pathlib import Path
+
 BaseMacLookup.cache_path = "mac_lookup.txt"
 maclookup = MacLookup()
 try:
@@ -20,6 +21,7 @@ try:
 except Exception as ex:
     pass
 
+
 def lookup(mac):
     try:
         vendor = maclookup.lookup(str(mac))
@@ -27,13 +29,15 @@ def lookup(mac):
         vendor = "Unknown"
     return vendor
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-8s %(message)s")
 
 # Test @property getters from Device dataclass
 print("testing Device dataclass")
+
+
 def get_device() -> Device:
     d = Device(Wifi.WIFI_2G, macaddress.EUI48("11-22-33-44-55-66"), ipaddress.IPv4Address("192.168.0.1"), "router")
     return d
+
 
 d = get_device()
 assert isinstance(d.macaddr, str), "Type of macaddr is not type str"
@@ -48,6 +52,8 @@ tracked[d.macaddr] = "This item is tracked"
 
 # Test the Status dataclass
 print("testing Status dataclass")
+
+
 def get_status(device: d) -> Status:
     status = Status()
     status.devices = []
@@ -72,6 +78,7 @@ def get_status(device: d) -> Status:
     status.devices.append(d)
     return status
 
+
 s = get_status(d)
 assert isinstance(s.wan_macaddr, str), "Type of macaddr is not type str"
 assert isinstance(s.wan_macaddress, macaddress.EUI48), "macaddress is not type macaddress.EUI48"
@@ -81,50 +88,8 @@ assert isinstance(s.lan_ipv4_address, ipaddress.IPv4Address), "Type of ipaddress
 # Connect to router
 print("Connecting to router")
 password = input("password: ")
-router = TplinkRouter('http://192.168.0.1', password, timeout=10, logger=logging)
-
-# Call each of the cgi-bin forms on the router web application
-print("Calling all cgi-bin entrypoints")
-with open('queries.txt') as queries:
-    for line in queries:
-        line = line.strip()
-        if line.startswith('#') or len(line) == 0:
-            continue
-
-        tokens = line.split(' ')
-        query = tokens[0]
-        operation = "operation=read"
-        if len(tokens) > 1:
-            operation = tokens[1]
-
-        try:
-            print(f"BEGIN {query}")
-            data = router.query(query, operation)
-            if data is None:
-                print(query + f" {operation} failed")
-                operation = "operation=load"
-                data = router.query(query, operation)
-                if data is None:
-                    print(query + f" {operation} failed")
-            if data is not None:
-                print(query + f" {operation} ok")
-                tokens = query.split('?')
-                folder = "logs" + os.sep + tokens[0]
-                Path(folder).mkdir(parents=True, exist_ok=True)
-                with open(folder + os.sep + f"{tokens[1]} {operation}.log", "w") as log_file:
-                    pp = pprint.PrettyPrinter(indent=4, stream=log_file)
-                    pp.pprint(data)
-                with open(folder + os.sep + f"{tokens[1]} {operation}.json", "w") as log_file:
-                    json.dump(data, log_file)
-            print(f"END {query}\n")
-
-
-        except Exception as ex:
-            print(f"{query} exception {ex}")
-            router = TplinkRouter('http://192.168.0.1', password, timeout=10)
-        finally:
-            pass
-
+router = TplinkRouterProvider.get_client('http://192.168.0.1', password)
+router.authorize()
 
 # Get firmware info - returns Firmware
 firmware = router.get_firmware()
@@ -145,10 +110,11 @@ print(type(mac))
 print(tracked)
 
 devices = list(status.devices)
-devices.sort(key=lambda a:a.ipaddress)
+devices.sort(key=lambda a: a.ipaddress)
 i = 1
 for device in devices:
-    print(f"{i:03} {device.type.name} {device.macaddress} {device.ipaddress:16s} {device.hostname:36} {lookup(device.macaddr)}")
+    print(
+        f"{i:03} {device.type.name} {device.macaddress} {device.ipaddress:16s} {device.hostname:36} {lookup(device.macaddr)}")
     i = i + 1
 
 # Get IPV4 Status
@@ -157,17 +123,40 @@ status = router.get_ipv4_status()
 # Get Address reservations
 i = 1
 reservations = router.get_ipv4_reservations()
-reservations.sort(key=lambda a:a.ipaddr)
+reservations.sort(key=lambda a: a.ipaddr)
 for res in reservations:
     print(f"{i:03} {res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12} {lookup(res.macaddr)}")
     i = i + 1
 
 # Get DHCP leases
 leases = router.get_ipv4_dhcp_leases()
-leases.sort(key=lambda a:a.ipaddr)
+leases.sort(key=lambda a: a.ipaddr)
 for lease in leases:
     if lease.lease_time != "Permanent":
-        print(f"{i:03} {lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12} {lookup(lease.macaddr)}")
+        print(
+            f"{i:03} {lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12} {lookup(lease.macaddr)}")
         i = i + 1
+router.logout()
+router.authorize()
 
-
+# Call each of the cgi-bin forms on the router web application
+print("Calling all cgi-bin entrypoints")
+with open('queries.txt') as queries:
+    for query in queries:
+        query = query.strip()
+        if query.startswith('#'):
+            continue
+        try:
+            data = router.query(query)
+            print(query)
+            tokens = query.split('?')
+            folder = "logs" + os.sep + tokens[0]
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            with open(folder + os.sep + f"{tokens[1]}.log", "w") as log_file:
+                pp = pprint.PrettyPrinter(indent=4, stream=log_file)
+                pp.pprint(data)
+        except Exception as ex:
+            print(f"{query} exception {ex}")
+            router = TplinkRouter('http://192.168.0.1', password, timeout=10)
+        finally:
+            pass
