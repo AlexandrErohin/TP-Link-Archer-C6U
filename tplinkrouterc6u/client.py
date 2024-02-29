@@ -7,7 +7,6 @@ import requests
 import datetime
 import macaddress
 import ipaddress
-import urllib.parse
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Wifi
@@ -377,9 +376,8 @@ class TplinkRouter(TplinkBaseRouter):
         sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn,
                                               self.ee)
 
-            return {'sign': sign, 'data': encrypted_data}
-        else:
-            return urllib.parse.parse_qs(data)
+        return {'sign': sign, 'data': encrypted_data}
+
 
     def _decrypt_response(self, data):
         return json.loads(self._encryption.aes_decrypt(data['data']))
@@ -512,6 +510,24 @@ class TPLinkMRClient(AbstractRouter):
         # request TokenID
         self._token = self._req_token()
 
+    def query(self, query, operation='operation=read') -> dict | None:
+        '''
+        Executes given query 
+        '''
+        def callback():
+            
+            unencrypted = [
+                "locale?form=lang",
+                "admin/firmware?form=save_upgrade",
+                "admin/firmware?form=config_multipart"
+            ]
+            encrypt = True
+            if query in unencrypted:
+                encrypt = False
+
+            return self._get_data(query, operation, encrypt)
+            
+        return self._request(callback)
     def logout(self) -> None:
         '''
         Logs out from the host
