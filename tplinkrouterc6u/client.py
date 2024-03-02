@@ -391,10 +391,9 @@ class TplinkRouter(TplinkBaseRouter):
             verify=self._verify_ssl,
         )
 
-    def _prepare_data(self, data, encrypt = True) -> dict:
-        if encrypt:
-            encrypted_data = self._encryption.aes_encrypt(data)
-            data_len = len(encrypted_data)
+    def _prepare_data(self, data) -> dict:
+        encrypted_data = self._encryption.aes_encrypt(data)
+        data_len = len(encrypted_data)
 
         sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn,
                                               self.ee)
