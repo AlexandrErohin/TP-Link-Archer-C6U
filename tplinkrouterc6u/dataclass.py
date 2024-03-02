@@ -53,10 +53,12 @@ class Status:
         self.clients_total: int = 0
         self.guest_2g_enable: bool
         self.guest_5g_enable: bool | None
+        self.guest_6g_enable: bool | None
         self.iot_2g_enable: bool | None = None
         self.iot_5g_enable: bool | None = None
         self.wifi_2g_enable: bool
         self.wifi_5g_enable: bool | None
+        self.wifi_6g_enable: bool | None
         self.wan_ipv4_uptime: int | None = None
         self.mem_usage: float | None = None
         self.cpu_usage: float | None = None

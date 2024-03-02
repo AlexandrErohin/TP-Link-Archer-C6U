@@ -11,3 +11,4 @@ class Wifi(Enum):
     WIFI_IOT_2G = 'iot_2g'
     WIFI_IOT_5G = 'iot_5g'
     WIFI_IOT_6G = 'iot_6g'
+    WIFI_UNKNOWN = 'unknown'

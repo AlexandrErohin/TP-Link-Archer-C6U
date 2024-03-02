@@ -116,10 +116,12 @@ class TplinkBaseRouter(AbstractRouter):
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
         status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
         status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
+        status.guest_6g_enable = data.get('guest_6g_enable') == 'on'
         status.iot_2g_enable = data.get('iot_2g_enable') == 'on' if data.get('iot_2g_enable') is not None else None
         status.iot_5g_enable = data.get('iot_5g_enable') == 'on' if data.get('iot_5g_enable') is not None else None
         status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
         status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
+        status.wifi_6g_enable = data.get('wireless_6g_enable') == 'on'
 
         devices = {}
 
@@ -129,17 +131,17 @@ class TplinkBaseRouter(AbstractRouter):
                                               item['hostname'])
 
         for item in data.get('access_devices_wireless_host', []):
-            type = Wifi.WIFI_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_5G
+            type = self._map_wire_type(item['wire_type'])
             _add_device(type, item)
 
         for item in data.get('access_devices_wireless_guest', []):
-            type = Wifi.WIFI_GUEST_2G if '2.4G' == item['wire_type'] else Wifi.WIFI_GUEST_5G
+            type = self._map_wire_type(item['wire_type'], False)
             _add_device(type, item)
 
         for item in self.request(self._url_wireless_stats):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
-                type = Wifi.WIFI_2G if '2.4G' == item['type'] else Wifi.WIFI_5G
+                type = self._map_wire_type(item['type'])
                 devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'), '')
             devices[item['mac']].packets_sent = item['txpkts']
             devices[item['mac']].packets_received = item['rxpkts']
@@ -236,7 +238,28 @@ class TplinkBaseRouter(AbstractRouter):
 
     def _decrypt_response(self, data):
         return data
-
+    
+    def _map_wire_type(self, data, host = True):
+        if host:
+            match data:
+                case '2.4G' | '2.4GHz':
+                    return Wifi.WIFI_2G
+                case '5G' | '5GHz' | '5GHz-1':
+                    return Wifi.WIFI_5G
+                case '6G' | '6GHz':
+                    return Wifi.WIFI_6G
+                case _ :
+                    return Wifi.WIFI_UNKNOWN
+        else:
+            match data:
+                case '2.4G':
+                    return Wifi.WIFI_GUEST_2G
+                case '5G':
+                    return Wifi.WIFI_GUEST_5G
+                case '6G':
+                    return Wifi.WIFI_GUEST_6G
+                case _ :
+                    return Wifi.WIFI_UNKNOWN
 
 class TplinkRouter(TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
@@ -510,24 +533,6 @@ class TPLinkMRClient(AbstractRouter):
         # request TokenID
         self._token = self._req_token()
 
-    def query(self, query, operation='operation=read') -> dict | None:
-        '''
-        Executes given query 
-        '''
-        def callback():
-            
-            unencrypted = [
-                "locale?form=lang",
-                "admin/firmware?form=save_upgrade",
-                "admin/firmware?form=config_multipart"
-            ]
-            encrypt = True
-            if query in unencrypted:
-                encrypt = False
-
-            return self._get_data(query, operation, encrypt)
-            
-        return self._request(callback)
     def logout(self) -> None:
         '''
         Logs out from the host

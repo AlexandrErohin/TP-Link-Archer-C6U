@@ -8,5 +8,8 @@ logs
 temp
 dist
 docker-compose.yaml
-*.txt
+allqueries.txt
+goodqueries.txt
+badqueries.txt
+mac_lookup.txt
 *.zip
