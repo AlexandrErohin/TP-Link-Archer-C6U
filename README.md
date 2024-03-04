@@ -112,6 +112,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | guest_6g_enable | Is guest wifi 6G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
+| iot_6g_enable | Is IoT wifi 6G enabled | bool, None |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
 | wifi_5g_enable | Is main wifi 5G enabled | bool, None |
 | wifi_6g_enable | Is main wifi 6G enabled | bool, None |
@@ -196,6 +197,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX20 v1.0
 - Archer AX21 v1.20
 - Archer AX50 v1.0
+- Archer AX55 v1.0
 - Archer AX55 V1.60
 - Archer AX72 V1
 - Archer AX73 V1
@@ -248,6 +250,9 @@ Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6
 - Exercise the changes following the "Usage" section above.
 
 The sanity check test.py illustrates a few tests and runs through a list of queries in queries.txt creating logs of the results of each query in the logs folder. This can be used to capture the dictionary output of all cgi-bin form submissions.
+
+### Run tests
+- Run `python -m unittest discover ./test`
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)

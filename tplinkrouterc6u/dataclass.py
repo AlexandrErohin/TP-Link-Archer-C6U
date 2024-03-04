@@ -52,13 +52,14 @@ class Status:
         self.guest_clients_total: int = 0
         self.clients_total: int = 0
         self.guest_2g_enable: bool
-        self.guest_5g_enable: bool | None
-        self.guest_6g_enable: bool | None
+        self.guest_5g_enable: bool | None = None
+        self.guest_6g_enable: bool | None = None
         self.iot_2g_enable: bool | None = None
         self.iot_5g_enable: bool | None = None
+        self.iot_6g_enable: bool | None = None
         self.wifi_2g_enable: bool
-        self.wifi_5g_enable: bool | None
-        self.wifi_6g_enable: bool | None
+        self.wifi_5g_enable: bool | None = None
+        self.wifi_6g_enable: bool | None = None
         self.wan_ipv4_uptime: int | None = None
         self.mem_usage: float | None = None
         self.cpu_usage: float | None = None
@@ -90,7 +91,7 @@ class Status:
 
     @property
     def lan_ipv4_addr(self) -> str | None:
-        return str(self._lan_ipv4_addr)
+        return str(self._lan_ipv4_addr) if self._lan_ipv4_addr else None
 
     @property
     def lan_ipv4_address(self) -> ipaddress.IPv4Address | None:

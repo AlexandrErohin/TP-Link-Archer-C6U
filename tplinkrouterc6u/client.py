@@ -16,6 +16,19 @@ from abc import ABC, abstractmethod
 
 
 class AbstractRouter(ABC):
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 10) -> None:
+        self.username = username
+        self.password = password
+        self.timeout = timeout
+        self._logger = logger
+        self.host = host
+        if not (self.host.startswith('http://') or self.host.startswith('https://')):
+            self.host = "http://{}".format(self.host)
+        self._verify_ssl = verify_ssl
+        if self._verify_ssl is False:
+            requests.packages.urllib3.disable_warnings()
+
     @abstractmethod
     def supports(self) -> bool:
         pass
@@ -48,16 +61,8 @@ class AbstractRouter(ABC):
 class TplinkBaseRouter(AbstractRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
-        self.host = host
-        if not (self.host.startswith('http://') or self.host.startswith('https://')):
-            self.host = "http://{}".format(self.host)
-        self._verify_ssl = verify_ssl
-        if self._verify_ssl is False:
-            requests.packages.urllib3.disable_warnings()
-        self.username = username
-        self.password = password
-        self.timeout = timeout
-        self._logger = logger
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+
         self._login_referer = '{}/webpages/login.html?t={}'.format(self.host, time.time())
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_wireless_stats = 'admin/wireless?form=statistics&operation=read'
@@ -114,14 +119,15 @@ class TplinkBaseRouter(AbstractRouter):
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
-        status.guest_2g_enable = data.get('guest_2g_enable') == 'on'
-        status.guest_5g_enable = data.get('guest_5g_enable') == 'on'
-        status.guest_6g_enable = data.get('guest_6g_enable') == 'on'
-        status.iot_2g_enable = data.get('iot_2g_enable') == 'on' if data.get('iot_2g_enable') is not None else None
-        status.iot_5g_enable = data.get('iot_5g_enable') == 'on' if data.get('iot_5g_enable') is not None else None
-        status.wifi_2g_enable = data.get('wireless_2g_enable') == 'on'
-        status.wifi_5g_enable = data.get('wireless_5g_enable') == 'on'
-        status.wifi_6g_enable = data.get('wireless_6g_enable') == 'on'
+        status.guest_2g_enable = self._str2bool(data.get('guest_2g_enable'))
+        status.guest_5g_enable = self._str2bool(data.get('guest_5g_enable'))
+        status.guest_6g_enable = self._str2bool(data.get('guest_6g_enable'))
+        status.iot_2g_enable = self._str2bool(data.get('iot_2g_enable'))
+        status.iot_5g_enable = self._str2bool(data.get('iot_5g_enable'))
+        status.iot_6g_enable = self._str2bool(data.get('iot_6g_enable'))
+        status.wifi_2g_enable = self._str2bool(data.get('wireless_2g_enable'))
+        status.wifi_5g_enable = self._str2bool(data.get('wireless_5g_enable'))
+        status.wifi_6g_enable = self._str2bool(data.get('wireless_6g_enable'))
 
         devices = {}
 
@@ -131,20 +137,20 @@ class TplinkBaseRouter(AbstractRouter):
                                               item['hostname'])
 
         for item in data.get('access_devices_wireless_host', []):
-            type = self._map_wire_type(item['wire_type'])
+            type = self._map_wire_type(item.get('wire_type'))
             _add_device(type, item)
 
         for item in data.get('access_devices_wireless_guest', []):
-            type = self._map_wire_type(item['wire_type'], False)
+            type = self._map_wire_type(item.get('wire_type'), False)
             _add_device(type, item)
 
         for item in self.request(self._url_wireless_stats):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
-                type = self._map_wire_type(item['type'])
+                type = self._map_wire_type(item.get('type'))
                 devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'), '')
-            devices[item['mac']].packets_sent = item['txpkts']
-            devices[item['mac']].packets_received = item['rxpkts']
+            devices[item['mac']].packets_sent = item.get('txpkts')
+            devices[item['mac']].packets_received = item.get('rxpkts')
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
@@ -230,7 +236,8 @@ class TplinkBaseRouter(AbstractRouter):
             self._logger.error(error)
         raise ClientError(error)
 
-    def _str2bool(self, v) -> bool | None:
+    @staticmethod
+    def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
 
     def _prepare_data(self, data):
@@ -238,28 +245,20 @@ class TplinkBaseRouter(AbstractRouter):
 
     def _decrypt_response(self, data):
         return data
-    
-    def _map_wire_type(self, data, host = True):
-        if host:
-            match data:
-                case '2.4G' | '2.4GHz':
-                    return Wifi.WIFI_2G
-                case '5G' | '5GHz' | '5GHz-1':
-                    return Wifi.WIFI_5G
-                case '6G' | '6GHz':
-                    return Wifi.WIFI_6G
-                case _ :
-                    return Wifi.WIFI_UNKNOWN
-        else:
-            match data:
-                case '2.4G':
-                    return Wifi.WIFI_GUEST_2G
-                case '5G':
-                    return Wifi.WIFI_GUEST_5G
-                case '6G':
-                    return Wifi.WIFI_GUEST_6G
-                case _ :
-                    return Wifi.WIFI_UNKNOWN
+
+    @staticmethod
+    def _map_wire_type(data: str | None, host: bool = True) -> Wifi:
+        result = Wifi.WIFI_UNKNOWN
+        if data is None:
+            return result
+        if data.startswith('2.4'):
+            result = Wifi.WIFI_2G if host else Wifi.WIFI_GUEST_2G
+        elif data.startswith('5'):
+            result = Wifi.WIFI_5G if host else Wifi.WIFI_GUEST_5G
+        elif data.startswith('6'):
+            result = Wifi.WIFI_6G if host else Wifi.WIFI_GUEST_6G
+        return result
+
 
 class TplinkRouter(TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
@@ -400,7 +399,6 @@ class TplinkRouter(TplinkBaseRouter):
 
         return {'sign': sign, 'data': encrypted_data}
 
-
     def _decrypt_response(self, data):
         return json.loads(self._encryption.aes_decrypt(data['data']))
 
@@ -490,16 +488,7 @@ class TPLinkMRClient(AbstractRouter):
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
-        self.username = username
-        self.password = password
-        self.timeout = timeout
-        self._logger = logger
-        self.host = host
-        if not (self.host.startswith('http://') or self.host.startswith('https://')):
-            self.host = "http://{}".format(self.host)
-        self._verify_ssl = verify_ssl
-        if self._verify_ssl is False:
-            requests.packages.urllib3.disable_warnings()
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self.req = requests.Session()
         self._token = None
@@ -600,14 +589,12 @@ class TPLinkMRClient(AbstractRouter):
 
         if values['2'].__class__ != list:
             status.wifi_2g_enable = bool(int(values['2']['enable']))
-            status.wifi_5g_enable = None
         else:
             status.wifi_2g_enable = bool(int(values['2'][0]['enable']))
             status.wifi_5g_enable = bool(int(values['2'][1]['enable']))
 
         if values['3'].__class__ != list:
             status.guest_2g_enable = bool(int(values['3']['enable']))
-            status.guest_5g_enable = None
         else:
             status.guest_2g_enable = bool(int(values['3'][0]['enable']))
             status.guest_5g_enable = bool(int(values['3'][1]['enable']))
