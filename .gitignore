@@ -4,6 +4,12 @@ __pycache__
 .vscode
 *.egg-info
 build
+logs
+temp
+dist
 docker-compose.yaml
-logs/*
+allqueries.txt
+goodqueries.txt
+badqueries.txt
 mac_lookup.txt
+*.zip

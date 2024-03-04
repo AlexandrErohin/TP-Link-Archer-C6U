@@ -1,4 +1,6 @@
 import os
+import logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-8s %(message)s")
 import macaddress
 import ipaddress
 from typing import TypeAlias
@@ -6,6 +8,7 @@ from tplinkrouterc6u import TplinkRouter, Wifi, TplinkRouterProvider
 from tplinkrouterc6u.dataclass import Status, Device
 from mac_vendor_lookup import MacLookup, BaseMacLookup
 import pprint
+import json
 from pathlib import Path
 
 BaseMacLookup.cache_path = "mac_lookup.txt"
@@ -86,7 +89,7 @@ assert isinstance(s.lan_ipv4_address, ipaddress.IPv4Address), "Type of ipaddress
 # Connect to router
 print("Connecting to router")
 password = input("password: ")
-router = TplinkRouterProvider.get_client('http://192.168.0.1', password)
+router = TplinkRouterProvider.get_client('http://192.168.0.1', password, logger=logging)
 router.authorize()
 
 # Get firmware info - returns Firmware
@@ -101,6 +104,11 @@ print(f"WAN IPV4: {status.wan_ipv4_addr}")
 print(f"WAN GATEWAY IPV4: {status.wan_ipv4_gateway}")
 print(f"LAN MAC: {status.lan_macaddr}")
 print(f"LAN IPV4: {status.lan_ipv4_addr}")
+print(f"LAN IPV4: {status.lan_ipv4_addr}")
+print(f"LAN IPV4: {status.lan_ipv4_addr}")
+print(f"WIFI 2G enabled: ", status.wifi_2g_enable)
+print(f"WIFI 5G enabled: ", status.wifi_5g_enable)
+print(f"WIFI 6G enabled: ", status.wifi_6g_enable)
 
 mac = status.wan_macaddr
 tracked[status.wan_macaddr] = "tracked"
@@ -140,21 +148,40 @@ router.authorize()
 # Call each of the cgi-bin forms on the router web application
 print("Calling all cgi-bin entrypoints")
 with open('queries.txt') as queries:
-    for query in queries:
-        query = query.strip()
-        if query.startswith('#'):
+    for line in queries:
+        line = line.strip()
+        if line.startswith('#') or len(line) == 0:
             continue
+
+        tokens = line.split(' ')
+        path = tokens[0]
+        operation = "operation=read"
+        if len(tokens) > 1:
+            operation = tokens[1]
+
         try:
-            data = router.query(query)
-            print(query)
-            tokens = query.split('?')
-            folder = "logs" + os.sep + tokens[0]
-            Path(folder).mkdir(parents=True, exist_ok=True)
-            with open(folder + os.sep + f"{tokens[1]}.log", "w") as log_file:
-                pp = pprint.PrettyPrinter(indent=4, stream=log_file)
-                pp.pprint(data)
+            print(f"BEGIN {path}")
+            data = router.request(path, operation)
+            if data is None:
+                print(path + f" {operation} failed")
+                operation = "operation=load"
+                data = router.request(path, operation)
+                if data is None:
+                    print(path + f" {operation} failed")
+            if data is not None:
+                print(path + f" {operation} ok")
+                tokens = path.split('?')
+                folder = "logs" + os.sep + tokens[0]
+                Path(folder).mkdir(parents=True, exist_ok=True)
+                with open(folder + os.sep + f"{tokens[1]} {operation}.log", "w") as log_file:
+                    pp = pprint.PrettyPrinter(indent=4, stream=log_file)
+                    pp.pprint(data)
+                with open(folder + os.sep + f"{tokens[1]} {operation}.json", "w") as log_file:
+                    json.dump(data, log_file)
+            print(f"END {path}\n")
+
+
         except Exception as ex:
-            print(f"{query} exception {ex}")
-            router = TplinkRouter('http://192.168.0.1', password, timeout=10)
+            print(f"{path} exception {ex}")
         finally:
             pass

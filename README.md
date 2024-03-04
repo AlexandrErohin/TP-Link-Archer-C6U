@@ -109,10 +109,12 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | clients_total | Total amount of all connected clients | int |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool |
 | guest_5g_enable | Is guest wifi 5G enabled | bool, None |
+| guest_6g_enable | Is guest wifi 6G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | wifi_2g_enable | Is main wifi 2.4G enabled | bool |
 | wifi_5g_enable | Is main wifi 5G enabled | bool, None |
+| wifi_6g_enable | Is main wifi 6G enabled | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage | float, None |
 | cpu_usage | CPU usage | float, None |
@@ -179,10 +181,13 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 ### <a id="wifi">Wifi</a>
 - Wifi.WIFI_2G - main wifi 2.4G
 - Wifi.WIFI_5G - main wifi 5G
+- Wifi.WIFI_6G - main wifi 5G
 - Wifi.WIFI_GUEST_2G - guest wifi 2.4G
 - Wifi.WIFI_GUEST_5G - guest wifi 5G
+- Wifi.WIFI_GUEST_6G - guest wifi 5G
 - Wifi.WIFI_IOT_2G - IoT wifi 2.4G
 - Wifi.WIFI_IOT_5G - IoT wifi 5G
+- Wifi.WIFI_IOT_6G - IoT wifi 6G
 
 ## <a id="supports">Supported routers</a>
 ### Fully tested Hardware Versions
@@ -194,6 +199,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX55 V1.60
 - Archer AX72 V1
 - Archer AX73 V1
+- Archer AXE75 V1
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
