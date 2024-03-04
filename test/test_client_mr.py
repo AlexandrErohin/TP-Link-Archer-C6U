@@ -14,7 +14,7 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkMRClient(unittest.TestCase):
-    def test_merge_response(self):
+    def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=mac1
 IPInterfaceIPAddress=192.168.4.1
@@ -65,7 +65,7 @@ test=10
         self.assertEqual(len(result['5']), 1)
         self.assertEqual(result['5']['test'], '10')
 
-    def test_merge_response_no_response(self):
+    def test_merge_response_no_response(self) -> None:
         response = '''
 name=wlan6
 [error]0
@@ -76,7 +76,7 @@ name=wlan6
 
         self.assertEqual(result, [])
 
-    def test_firmware(self):
+    def test_firmware(self) -> None:
         response = '''
 [0,0,0,0,0,0]0
 hardwareVersion=Archer MR200 v5.3
@@ -99,7 +99,7 @@ softwareVersion=1.1
         self.assertEqual(result.model, 'Archer MR200')
         self.assertEqual(result.firmware_version, '1.1')
 
-    def test_get_status_with_5G(self):
+    def test_get_status_with_5G(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=a0:28:84:de:dd:5c
 IPInterfaceIPAddress=192.168.4.1
@@ -192,7 +192,7 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.devices[0].packets_sent, 176)
         self.assertEqual(status.devices[0].packets_received, 467)
 
-    def test_get_status_without_5G(self):
+    def test_get_status_without_5G(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=a0:28:84:de:dd:5c
 IPInterfaceIPAddress=192.168.4.1
@@ -247,7 +247,7 @@ active=1
         self.assertEqual(status.cpu_usage, None)
         self.assertEqual(len(status.devices), 0)
 
-    def test_get_status_with_wlan_dev(self):
+    def test_get_status_with_wlan_dev(self) -> None:
         response = '''
 [1,1,0,0,0,0]0
 X_TP_MACAddress=a0:28:84:de:dd:5c
@@ -292,10 +292,13 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.clients_total, 1)
         self.assertEqual(status.guest_2g_enable, False)
         self.assertEqual(status.guest_5g_enable, None)
+        self.assertEqual(status.guest_6g_enable, None)
         self.assertEqual(status.iot_2g_enable, None)
         self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.iot_6g_enable, None)
         self.assertEqual(status.wifi_2g_enable, True)
         self.assertEqual(status.wifi_5g_enable, None)
+        self.assertEqual(status.wifi_6g_enable, None)
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
@@ -307,7 +310,7 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.devices[0].packets_sent, 176)
         self.assertEqual(status.devices[0].packets_received, 467)
 
-    def test_get_ipv4_reservations(self):
+    def test_get_ipv4_reservations(self) -> None:
         response = '''
 [1,1,0,0,0,0]0
 enable=1
@@ -331,7 +334,7 @@ yiaddr=192.168.8.21
         self.assertEqual(result[0].hostname, '')
         self.assertEqual(result[0].enabled, True)
 
-    def test_get_ipv4_reservations_no_reservations(self):
+    def test_get_ipv4_reservations_no_reservations(self) -> None:
         response = '''
 [error]0
 
@@ -346,7 +349,7 @@ yiaddr=192.168.8.21
 
         self.assertEqual(len(result), 0)
 
-    def test_get_ipv4_dhcp_leases_no_leases(self):
+    def test_get_ipv4_dhcp_leases_no_leases(self) -> None:
         response = '''
 [error]0
 
@@ -361,7 +364,7 @@ yiaddr=192.168.8.21
 
         self.assertEqual(len(result), 0)
 
-    def test_get_ipv4_dhcp_leases(self):
+    def test_get_ipv4_dhcp_leases(self) -> None:
         response = '''
 [1,0,0,0,0,0]0
 IPAddress=192.168.32.175
@@ -386,7 +389,7 @@ leaseTimeRemaining=85841
         self.assertEqual(result[0].hostname, 'name1')
         self.assertEqual(result[0].lease_time, '23:50:41')
 
-    def test_get_ipv4_dhcp_leases_permanent(self):
+    def test_get_ipv4_dhcp_leases_permanent(self) -> None:
         response = '''
 [1,0,0,0,0,0]0
 IPAddress=192.168.32.175
@@ -419,7 +422,7 @@ leaseTimeRemaining=86372
         self.assertEqual(result[1].hostname, 'name2')
         self.assertEqual(result[1].lease_time, '23:59:32')
 
-    def test_get_ipv4_status(self):
+    def test_get_ipv4_status(self) -> None:
         response = '''
 [1,1,0,0,0,0]0
 X_TP_MACAddress=bf:75:44:4c:dc:9e
@@ -468,7 +471,7 @@ DNSServers=7.7.7.7,2.2.2.2
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
 
-    def test_get_ipv4_status_one_wlan(self):
+    def test_get_ipv4_status_one_wlan(self) -> None:
         response = '''
 [1,1,0,0,0,0]0
 X_TP_MACAddress=bf:75:44:4c:dc:9e
@@ -509,7 +512,7 @@ DNSServers=0.0.0.0,0.0.0.0
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
 
-    def test_set_wifi(self):
+    def test_set_wifi(self) -> None:
         response = '''
 [error]0
 
@@ -531,7 +534,7 @@ DNSServers=0.0.0.0,0.0.0.0
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, '2\r\n[LAN_WLAN#1,1,0,0,0,0#0,0,0,0,0,0]0,1\r\nenable=1\r\n')
 
-    def test_send_sms(self):
+    def test_send_sms(self) -> None:
         response = '''
 [error]0
 
