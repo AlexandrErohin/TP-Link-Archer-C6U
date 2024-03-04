@@ -1,130 +1,124 @@
-# File generated from a UI click-through and saved to a .har file saved from chrome developer tools
-# har file searched using bash script:
-#       grep http router.har |grep cgi|grep url|sort|uniq|grep -oE "/admin.*$|/locale.*$|/upgrade.*$"|tr -d '\",'|sed 's/^\///g' > queries.txt
-admin/access_control?form=black_devices
-admin/access_control?form=black_list
-admin/access_control?form=enable
-admin/access_control?form=mode
-admin/access_control?form=white_devices
-admin/access_control?form=white_list
-admin/administration?form=account
-admin/administration?form=check_factory_default
-admin/administration?form=https
-admin/administration?form=local
-admin/administration?form=mode
-admin/administration?form=recovery
-admin/administration?form=remote
-admin/cloud_account?form=check_cloud
-admin/cloud_account?form=check_support
-admin/cloud_account?form=cloud_upgrade
-admin/cloud_account?form=get_deviceInfo
-admin/ddns?form=noip
-admin/ddns?form=provider
-admin/dhcps?form=client
-admin/dhcps?form=reservation
-admin/dhcps?form=setting
-admin/diag?form=diag
-admin/disk_setting?form=metadata
-admin/ffs?form=config
-admin/firmware?form=config
-admin/firmware?form=config_multipart
-admin/firmware?form=save_upgrade
-admin/firmware?form=upgrade
-admin/folder_sharing?form=account
-admin/folder_sharing?form=all
-admin/folder_sharing?form=auth
-admin/folder_sharing?form=mode
-admin/folder_sharing?form=partial
-admin/folder_sharing?form=server
-admin/folder_sharing?form=settings
-admin/folder_sharing?form=tree
-admin/folder_sharing?form=volumn
-admin/imb?form=arp_list
-admin/imb?form=bind_list
-admin/imb?form=setting
-admin/iptv?form=setting
-admin/ledgeneral?form=setting
-admin/ledpm?form=setting
-admin/menu?form=advanced_menu
-admin/menu?form=basic_menu
-admin/nat?form=alg
-admin/nat?form=dmz
-admin/nat?form=pt
-admin/nat?form=setting
-admin/nat?form=vs
-admin/network?form=lan_ipv4
-admin/network?form=lan_ipv6
-admin/network?form=mac_clone_advanced
-admin/network?form=port_speed_current
-admin/network?form=port_speed_supported
-admin/network?form=routes_static
-admin/network?form=routes_system
-admin/network?form=status_ipv4
-admin/network?form=wan_ipv4_dynamic
-admin/network?form=wan_ipv4_protos
-admin/network?form=wan_ipv4_status
-admin/network?form=wan_ipv6_protos
-admin/network?form=wan_ipv6_status
-admin/offline_download?form=allocation
-admin/offline_download?form=amule
-admin/offline_download?form=enable
-admin/offline_download?form=set
-admin/offline_download?form=volumn
-admin/onemesh?form=onemesh_enable
-admin/onemesh_network?form=available_mesh_device_list
-admin/onemesh_network?form=mesh_sclient_detail
-admin/onemesh_network?form=mesh_sclient_list_all
-admin/onemesh_network?form=mesh_topology
-admin/openvpn?form=config
-admin/pptpd?form=accounts
-admin/pptpd?form=config
-admin/reboot?form=set
-admin/region?form=region
-admin/security_settings?form=dos&form=ping
-admin/security_settings?form=dos_setting
-admin/security_settings?form=enable
-admin/security_settings?form=list
-admin/security_settings?form=spi_enable
-admin/smart_network?form=patrol_enable
-admin/smart_network?form=patrol_limit
-admin/smart_network?form=qos
-admin/status?form=all
-admin/status?form=internet
-admin/status?form=perf
-admin/status?form=router
-admin/syslog?form=filter
-admin/syslog?form=log
-admin/syslog?form=mail
-admin/syslog?form=types
-admin/system?form=sysmode
-admin/time?form=dst
-admin/time?form=hour24
-admin/time?form=settings
-admin/time?form=timezone
-admin/traffic?form=lists
-admin/traffic?form=status
-admin/upnp?form=enable
-admin/upnp?form=service
-admin/vpnconn?form=config
-admin/wireless?form=guest
-admin/wireless?form=guest_2g
-admin/wireless?form=guest_5g
-admin/wireless?form=guest&form=guest_2g&form=guest_5g
-admin/wireless?form=region
-admin/wireless?form=smart_connect
-admin/wireless?form=statistics
-admin/wireless?form=syspara_2g
-admin/wireless?form=syspara_5g
-admin/wireless?form=syspara_wps
-admin/wireless?form=wireless_2g
-admin/wireless?form=wireless_2g&form=wireless_5g
-admin/wireless?form=wireless_5g
-admin/wireless?form=wireless_schedule_2g
-admin/wireless?form=wireless_schedule_5g
-admin/wireless?form=wireless_schedule_wifi_disable
-admin/wireless?form=wps_connect
-admin/wireless?form=wps_pin
-locale?form=index_multilang
-locale?form=lang
-upgrade?form=read
-locale?form=index_lang
+admin/access_control?form=black_devices operation=load
+admin/access_control?form=black_list operation=load
+admin/access_control?form=enable operation=read
+admin/access_control?form=mode operation=read
+admin/access_control?form=white_devices operation=load
+admin/access_control?form=white_list operation=load
+admin/administration?form=account operation=read
+admin/administration?form=https operation=read
+admin/administration?form=local operation=load
+admin/administration?form=mode operation=read
+admin/administration?form=recovery operation=read
+admin/administration?form=remote operation=read
+admin/cloud_account?form=check_cloud operation=read
+admin/cloud_account?form=check_support operation=read
+admin/cloud_account?form=cloud_upgrade operation=read
+admin/cloud_account?form=get_deviceInfo operation=read
+admin/ddns?form=noip operation=read
+admin/ddns?form=provider operation=read
+admin/dhcps?form=client operation=load
+admin/dhcps?form=reservation operation=load
+admin/dhcps?form=setting operation=read
+admin/diag?form=diag operation=read
+admin/disk_setting?form=metadata operation=read
+admin/ffs?form=config operation=read
+admin/firmware?form=config operation=read
+admin/firmware?form=config_multipart operation=read
+admin/firmware?form=save_upgrade operation=read
+admin/firmware?form=upgrade operation=read
+admin/folder_sharing?form=account operation=read
+admin/folder_sharing?form=all operation=read
+admin/folder_sharing?form=auth operation=read
+admin/folder_sharing?form=mode operation=read
+admin/folder_sharing?form=partial operation=read
+admin/folder_sharing?form=server operation=read
+admin/folder_sharing?form=settings operation=read
+admin/folder_sharing?form=volumn operation=read
+admin/imb?form=arp_list operation=load
+admin/imb?form=bind_list operation=load
+admin/imb?form=setting operation=read
+admin/iptv?form=setting operation=read
+admin/ledgeneral?form=setting operation=read
+admin/ledpm?form=setting operation=read
+admin/menu?form=advanced_menu operation=read
+admin/menu?form=basic_menu operation=read
+admin/nat?form=alg operation=read
+admin/nat?form=dmz operation=read
+admin/nat?form=pt operation=read
+admin/nat?form=setting operation=read
+admin/nat?form=vs operation=read
+admin/network?form=lan_ipv4 operation=read
+admin/network?form=lan_ipv6 operation=read
+admin/network?form=mac_clone_advanced operation=read
+admin/network?form=port_speed_current operation=read
+admin/network?form=port_speed_supported operation=read
+admin/network?form=routes_static operation=load
+admin/network?form=routes_system operation=load
+admin/network?form=status_ipv4 operation=read
+admin/network?form=wan_ipv4_dynamic operation=read
+admin/network?form=wan_ipv4_protos operation=read
+admin/network?form=wan_ipv4_status operation=read
+admin/network?form=wan_ipv6_protos operation=read
+admin/network?form=wan_ipv6_status operation=read
+admin/offline_download?form=allocation operation=read
+admin/offline_download?form=enable operation=read
+admin/offline_download?form=set operation=read
+admin/offline_download?form=volumn operation=read
+admin/onemesh?form=onemesh_enable operation=read
+admin/onemesh_network?form=available_mesh_device_list operation=read
+admin/onemesh_network?form=mesh_sclient_list_all operation=read
+admin/onemesh_network?form=mesh_topology operation=read
+admin/onemesh_network?form=mesh_sclient_detail operation=read&mac=40-3F-8C-6F-AD-B1
+admin/onemesh_network?form=mesh_sclient_detail operation=read&mac=60-32-B1-EC-69-BA
+admin/openvpn?form=config operation=read
+admin/pptpd?form=accounts operation=load
+admin/pptpd?form=config operation=read
+admin/reboot?form=set operation=read
+admin/region?form=region operation=read
+admin/security_settings?form=dos&form=ping operation=read
+admin/security_settings?form=dos_setting operation=read
+admin/security_settings?form=enable operation=read
+admin/security_settings?form=list operation=load
+admin/security_settings?form=spi_enable operation=read
+admin/smart_network?form=patrol_enable operation=read
+admin/smart_network?form=patrol_limit operation=read
+admin/smart_network?form=qos operation=read
+admin/status?form=all operation=read
+admin/status?form=internet operation=read
+admin/status?form=perf operation=read
+admin/status?form=router operation=read
+admin/syslog?form=filter operation=read
+admin/syslog?form=log operation=load
+admin/syslog?form=mail operation=read
+admin/syslog?form=types operation=read
+admin/system?form=sysmode operation=read
+admin/time?form=dst operation=read
+admin/time?form=hour24 operation=read
+admin/time?form=settings operation=read
+admin/time?form=timezone operation=read
+admin/traffic?form=lists operation=load
+admin/traffic?form=status operation=read
+admin/upnp?form=enable operation=read
+admin/upnp?form=service operation=read
+admin/vpnconn?form=config operation=list&vpntype=openvpn
+admin/vpnconn?form=config operation=list&vpntype=pptp
+admin/wireless?form=guest operation=read
+admin/wireless?form=guest_2g operation=read
+admin/wireless?form=guest_5g operation=read
+admin/wireless?form=guest&form=guest_2g&form=guest_5g operation=read
+admin/wireless?form=region operation=read
+admin/wireless?form=smart_connect operation=read
+admin/wireless?form=statistics operation=read
+admin/wireless?form=syspara_2g operation=read
+admin/wireless?form=syspara_5g operation=read
+admin/wireless?form=syspara_wps operation=read
+admin/wireless?form=wireless_2g operation=read
+admin/wireless?form=wireless_2g&form=wireless_5g operation=read
+admin/wireless?form=wireless_5g operation=read
+admin/wireless?form=wireless_schedule_2g operation=read
+admin/wireless?form=wireless_schedule_5g operation=read
+admin/wireless?form=wireless_schedule_wifi_disable operation=read
+admin/wireless?form=wps_connect operation=read
+admin/wireless?form=wps_pin operation=read
+locale?form=index_multilang operation=read
+locale?form=lang operation=read
