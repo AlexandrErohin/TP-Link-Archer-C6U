@@ -1,10 +1,8 @@
 # TP-Link Router API
-Python package for API access and management for TP-Link Router
+Python package for API access and management for TP-Link Routers. See [Supported routers](#supports)
 
 [![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
-
-See [Supported routers](#supports)
 
 ## Installation
 `pip install tplinkrouterc6u && pip install -r requirements.txt`
@@ -31,26 +29,26 @@ router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 # router = TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
 
 try:
-    if router.authorize():  # authorizing
-        # Get firmware info - returns Firmware
-        firmware = router.get_firmware()
+    router.authorize()  # authorizing
+    # Get firmware info - returns Firmware
+    firmware = router.get_firmware()
 
-        # Get status info - returns Status
-        status = router.get_status()
-        if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
-            router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
+    # Get status info - returns Status
+    status = router.get_status()
+    if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
+        router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
 
-        # Get Address reservations, sort by ipaddr
-        reservations = router.get_ipv4_reservations()
-        reservations.sort(key=lambda a: a.ipaddr)
-        for res in reservations:
-            print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+    # Get Address reservations, sort by ipaddr
+    reservations = router.get_ipv4_reservations()
+    reservations.sort(key=lambda a: a.ipaddr)
+    for res in reservations:
+        print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
 
-        # Get DHCP leases, sort by ipaddr
-        leases = router.get_ipv4_dhcp_leases()
-        leases.sort(key=lambda a: a.ipaddr)
-        for lease in leases:
-            print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
+    # Get DHCP leases, sort by ipaddr
+    leases = router.get_ipv4_dhcp_leases()
+    leases.sort(key=lambda a: a.ipaddr)
+    for lease in leases:
+        print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
 finally:
     router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 ```
@@ -214,7 +212,9 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer MR200 v5
 - Archer MR200 v5.3
 - Archer MR600
+- Archer VR900v
 - TL-WA3001 v1.0
+- TL-MR105
 - TL-MR6400 v5
 
 ### Not fully tested Hardware Versions
