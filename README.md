@@ -3,9 +3,10 @@ Python package for API access and management for TP-Link Routers. See [Supported
 
 [![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
+![Python versions](https://img.shields.io/pypi/pyversions/tplinkrouterc6u)
 
 ## Installation
-`pip install tplinkrouterc6u && pip install -r requirements.txt`
+`pip install tplinkrouterc6u`
 
 ## Dependencies
  - [requests](https://pypi.org/project/requests/)
