@@ -202,7 +202,7 @@ class TestTPLinkClient(unittest.TestCase):
                 '''
 
         class TPLinkRouterTest(TplinkRouter):
-            def request(self, path: str, data: str = 'operation=read',
+            def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return json.loads(response_status)['data']
@@ -301,7 +301,7 @@ class TestTPLinkClient(unittest.TestCase):
                 '''
 
         class TPLinkRouterTest(TplinkRouter):
-            def request(self, path: str, data: str = 'operation=read',
+            def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return json.loads(response_status)['data']
@@ -324,10 +324,13 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertEqual(status.clients_total, 4)
         self.assertEqual(status.guest_2g_enable, True)
         self.assertEqual(status.guest_5g_enable, None)
+        self.assertEqual(status.guest_6g_enable, None)
         self.assertEqual(status.iot_2g_enable, None)
         self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.iot_6g_enable, None)
         self.assertEqual(status.wifi_2g_enable, True)
         self.assertEqual(status.wifi_5g_enable, None)
+        self.assertEqual(status.wifi_6g_enable, None)
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
