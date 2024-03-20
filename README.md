@@ -16,7 +16,14 @@ Python package for API access and management for TP-Link Routers. See [Supported
 Enter the host & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
 
 ```python
-from tplinkrouterc6u import TplinkRouterProvider, TplinkC1200Router, Wifi
+from tplinkrouterc6u import (
+    TplinkRouterProvider, 
+    TplinkRouter,
+    TplinkC1200Router,
+    TPLinkMRClient,
+    TPLinkDecoClient,
+    Wifi
+)
 from logging import Logger
 
 router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
@@ -157,13 +164,13 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | --- |---|---|
 | wan_macaddr | router mac address | str |
 | wan_macaddress | router mac address | macaddress |
-| wan_ipv4_ipaddr | router mac address | str |
-| wan_ipv4_ipaddress | router mac address | ipaddress |
-| wan_ipv4_gateway | router WAN gateway IP address | str |
-| wan_ipv4_gateway_address | router WAN gateway IP address | ipaddress |
+| wan_ipv4_ipaddr | router mac address | str, None |
+| wan_ipv4_ipaddress | router mac address | ipaddress.IPv4Address, None |
+| wan_ipv4_gateway | router WAN gateway IP address | str, None |
+| wan_ipv4_gateway_address | router WAN gateway IP address | ipaddress.IPv4Address, None |
 | wan_ipv4_conntype | router connection type | str |
-| wan_ipv4_netmask | router WAN gateway IP netmask | str |
-| wan_ipv4_netmask_address | router WAN gateway IP netmask | ipaddress |
+| wan_ipv4_netmask | router WAN gateway IP netmask | str, None |
+| wan_ipv4_netmask_address | router WAN gateway IP netmask | ipaddress.IPv4Address, None |
 | wan_ipv4_pridns | router primary dns server | str |
 | wan_ipv4_pridns_address | router primary dns server | ipaddress |
 | wan_ipv4_snddns | router secondary dns server | str |
@@ -212,8 +219,10 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C7 v5.0
 - Archer MR200 v5
 - Archer MR200 v5.3
-- Archer MR600
+- Archer MR600 v1
 - Archer VR900v
+- Deco M4 2.0
+- Deco M4R 2.0
 - TL-WA3001 v1.0
 - TL-MR105
 - TL-MR6400 v5

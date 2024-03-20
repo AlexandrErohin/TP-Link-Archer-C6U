@@ -83,7 +83,7 @@ class Status:
 
     @property
     def wan_ipv4_addr(self) -> str | None:
-        return str(self._wan_ipv4_addr) if self._wan_macaddr else None
+        return str(self._wan_ipv4_addr) if self._wan_ipv4_addr else None
 
     @property
     def wan_ipv4_address(self) -> ipaddress.IPv4Address | None:
@@ -99,7 +99,7 @@ class Status:
 
     @property
     def wan_ipv4_gateway(self) -> str | None:
-        return str(self._wan_ipv4_gateway) if self._wan_macaddr else None
+        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway else None
 
     @property
     def wan_ipv4_gateway_address(self) -> ipaddress.IPv4Address | None:
@@ -160,10 +160,10 @@ class IPv4DHCPLease:
 class IPv4Status:
     def __init__(self) -> None:
         self._wan_macaddr: macaddress
-        self._wan_ipv4_ipaddr: ipaddress
-        self._wan_ipv4_gateway: ipaddress
+        self._wan_ipv4_ipaddr: ipaddress.IPv4Address | None = None
+        self._wan_ipv4_gateway: ipaddress.IPv4Address | None = None
         self.wan_ipv4_conntype: str
-        self._wan_ipv4_netmask: ipaddress
+        self._wan_ipv4_netmask: ipaddress.IPv4Address | None = None
         self._wan_ipv4_pridns: ipaddress
         self._wan_ipv4_snddns: ipaddress
         self._lan_macaddr: macaddress
@@ -182,7 +182,7 @@ class IPv4Status:
 
     @property
     def wan_ipv4_ipaddr(self):
-        return str(self._wan_ipv4_ipaddr)
+        return str(self._wan_ipv4_ipaddr) if self._wan_ipv4_ipaddr else None
 
     @property
     def wan_ipv4_ipaddress(self):
@@ -190,7 +190,7 @@ class IPv4Status:
 
     @property
     def wan_ipv4_gateway(self):
-        return str(self._wan_ipv4_gateway)
+        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway else None
 
     @property
     def wan_ipv4_gateway_address(self):
@@ -198,7 +198,7 @@ class IPv4Status:
 
     @property
     def wan_ipv4_netmask(self):
-        return str(self._wan_ipv4_netmask)
+        return str(self._wan_ipv4_netmask) if self._wan_ipv4_netmask else None
 
     @property
     def wan_ipv4_netmask_address(self):

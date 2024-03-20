@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import re
 import json
@@ -58,21 +59,219 @@ class AbstractRouter(ABC):
         pass
 
 
-class TplinkBaseRouter(AbstractRouter):
+class TplinkRequest:
+    host = ''
+    _stok = ''
+    timeout = 10
+    _logged = False
+    _sysauth = None
+    _verify_ssl = False
+    _logger = None
+    _headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    _data_block = 'data'
+
+    def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+        if self._logged is False:
+            raise Exception('Not authorised')
+        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
+
+        response = requests.post(
+            url,
+            data=self._prepare_data(data),
+            headers=self._headers,
+            cookies={'sysauth': self._sysauth},
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        if ignore_response:
+            return None
+
+        data = response.text
+        error = ''
+        try:
+            data = response.json()
+            if 'data' not in data:
+                raise Exception("Router didn't respond with JSON")
+            data = self._decrypt_response(data)
+
+            if self._is_valid_response(data):
+                return data.get(self._data_block)
+            elif ignore_errors:
+                return data
+        except Exception as e:
+            error = ('TplinkRouter - {} - An unknown response - {}; Request {} - Response {}'
+                     .format(self.__class__.__name__, e, path, data))
+        error = ('TplinkRouter - {} - Response with error; Request {} - Response {}'
+                 .format(self.__class__.__name__, path, data)) if not error else error
+        if self._logger:
+            self._logger.error(error)
+        raise ClientError(error)
+
+    def _is_valid_response(self, data: dict) -> bool:
+        return 'success' in data and data['success'] and self._data_block in data
+
+    def _prepare_data(self, data: str):
+        return data
+
+    def _decrypt_response(self, data: dict) -> dict:
+        return data
+
+
+class TplinkEncryption(TplinkRequest):
+    username = ''
+    password = ''
+    nn = ''
+    ee = ''
+    _seq = ''
+    _pwdNN = ''
+    _pwdEE = ''
+    _encryption = EncryptionWrapper()
+
+    def supports(self) -> bool:
+        if len(self.password) > 125:
+            return False
+
+        try:
+            self._request_pwd()
+            return True
+        except ClientException:
+            return False
+
+    def authorize(self) -> None:
+        if self._pwdNN == '':
+            self._request_pwd()
+
+        if self._seq == '':
+            self._request_seq()
+
+        response = self._try_login()
+
+        is_valid_json = False
+        try:
+            response.json()
+            is_valid_json = True
+        except:
+            """Ignore"""
+
+        if is_valid_json is False or response.status_code == 403:
+            self._logged = False
+            self._request_pwd()
+            self._request_seq()
+            response = self._try_login()
+
+        data = response.text
+        try:
+            data = response.json()
+            data = self._decrypt_response(data)
+
+            self._stok = data[self._data_block]['stok']
+            regex_result = re.search(
+                'sysauth=(.*);', response.headers['set-cookie'])
+            self._sysauth = regex_result.group(1)
+            self._logged = True
+
+        except Exception as e:
+            error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
+                     .format(self.__class__.__name__, e, data))
+            if self._logger:
+                self._logger.error(error)
+            raise ClientException(error)
+
+    def _request_pwd(self) -> None:
+        url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
+
+        # If possible implement RSA encryption of password here.
+        response = requests.post(
+            url, params={'operation': 'read'},
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        try:
+            data = response.json()
+
+            args = data[self._data_block]['password']
+
+            self._pwdNN = args[0]
+            self._pwdEE = args[1]
+
+        except Exception as e:
+            error = ('TplinkRouter - {} - Unknown error for pwd! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response.text))
+            if self._logger:
+                self._logger.error(error)
+            raise ClientException(error)
+
+    def _request_seq(self) -> None:
+        url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
+
+        # If possible implement RSA encryption of password here.
+        response = requests.post(
+            url,
+            params={'operation': 'read'},
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        try:
+            data = response.json()
+
+            self._seq = data[self._data_block]['seq']
+            args = data[self._data_block]['key']
+
+            self.nn = args[0]
+            self.ee = args[1]
+
+        except Exception as e:
+            error = ('TplinkRouter - {} - Unknown error for seq! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response.text))
+            if self._logger:
+                self._logger.error(error)
+            raise ClientException(error)
+
+    def _try_login(self) -> requests.Response:
+        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+
+        crypted_pwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
+
+        body = self._prepare_data(self._get_login_data(crypted_pwd))
+
+        return requests.post(
+            url,
+            data=body,
+            headers=self._headers,
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+    @staticmethod
+    def _get_login_data(crypted_pwd: str) -> str:
+        return 'operation=login&password={}&confirm=true'.format(crypted_pwd)
+
+    def _prepare_data(self, data: str) -> dict:
+        encrypted_data = self._encryption.aes_encrypt(data)
+        data_len = len(encrypted_data)
+        hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
+
+        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, hash, self.nn,
+                                              self.ee)
+
+        return {'sign': sign, 'data': encrypted_data}
+
+    def _decrypt_response(self, data: dict) -> dict:
+        return json.loads(self._encryption.aes_decrypt(data['data']))
+
+
+class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        self._login_referer = '{}/webpages/login.html?t={}'.format(self.host, time.time())
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_wireless_stats = 'admin/wireless?form=statistics&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
-
-        self._stok = ''
-        self._sysauth = ''
-
-        self._logged = False
 
     @abstractmethod
     def authorize(self) -> bool:
@@ -93,7 +292,7 @@ class TplinkBaseRouter(AbstractRouter):
         self._logged = False
 
     def get_firmware(self) -> Firmware:
-        data = self.request(self._url_firmware)
+        data = self.request(self._url_firmware, 'operation=read')
         firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
 
         return firmware
@@ -105,7 +304,7 @@ class TplinkBaseRouter(AbstractRouter):
                          + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
             return cpu_usage / 4 if cpu_usage != 0 else None
 
-        data = self.request('admin/status?form=all&operation=read')
+        data = self.request('admin/status?form=all&operation=read', 'operation=read')
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
@@ -144,7 +343,7 @@ class TplinkBaseRouter(AbstractRouter):
             type = self._map_wire_type(item.get('wire_type'), False)
             _add_device(type, item)
 
-        for item in self.request(self._url_wireless_stats):
+        for item in self.request(self._url_wireless_stats, 'operation=read'):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
                 type = self._map_wire_type(item.get('type'))
@@ -159,7 +358,7 @@ class TplinkBaseRouter(AbstractRouter):
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
-        data = self.request('admin/network?form=status_ipv4&operation=read')
+        data = self.request('admin/network?form=status_ipv4&operation=read', 'operation=read')
         ipv4_status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
         ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
         ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
@@ -197,54 +396,9 @@ class TplinkBaseRouter(AbstractRouter):
 
         return dhcp_leases
 
-    def request(self, path: str, data: str = 'operation=read',
-                ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
-        if self._logged is False:
-            raise Exception('Not authorised')
-        url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        referer = '{}/webpages/index.{}.html'.format(self.host, time.time())
-
-        response = requests.post(
-            url,
-            data=self._prepare_data(data),
-            headers={'Referer': referer},
-            cookies={'sysauth': self._sysauth},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
-
-        if ignore_response:
-            return None
-
-        data = response.text
-        error = ''
-        try:
-            data = response.json()
-            if 'data' not in data:
-                raise Exception("Router didn't respond with JSON")
-            data = self._decrypt_response(data)
-
-            if 'success' in data and data['success']:
-                return data['data']
-            elif ignore_errors:
-                return data
-        except Exception as e:
-            error = 'TplinkRouter - An unknown response - {}; Request {} - Response {}'.format(e, path, data)
-        error = 'TplinkRouter - Response with error; Request {} - Response {}'.format(path,
-                                                                                      data) if not error else error
-        if self._logger:
-            self._logger.error(error)
-        raise ClientError(error)
-
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
-
-    def _prepare_data(self, data):
-        return data
-
-    def _decrypt_response(self, data):
-        return data
 
     @staticmethod
     def _map_wire_type(data: str | None, host: bool = True) -> Wifi:
@@ -260,7 +414,7 @@ class TplinkBaseRouter(AbstractRouter):
         return result
 
 
-class TplinkRouter(TplinkBaseRouter):
+class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
@@ -270,137 +424,154 @@ class TplinkRouter(TplinkBaseRouter):
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
 
-        self._seq = ''
-        self._hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
 
-        self.nn = ''
-        self.ee = ''
+class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 10) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        self._pwdNN = ''
-        self._pwdEE = ''
+        self._headers = {'Content-Type': 'application/json'}
+        self._data_block = 'result'
+        self.devices = []
 
-        self._encryption = EncryptionWrapper()
+    def logout(self) -> None:
+        self.request('admin/system?form=logout', json.dumps({'operation': 'logout'}), True)
+        self._stok = ''
+        self._sysauth = ''
+        self._logged = False
 
-    def supports(self) -> bool:
-        if len(self.password) > 125:
-            return False
+    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+        en = {'enable': enable}
+        if Wifi.WIFI_2G == wifi:
+            params = {'band2_4': {'host': en}}
+        elif Wifi.WIFI_5G == wifi:
+            params = {'band5_1': {'host': en}}
+        elif Wifi.WIFI_GUEST_5G == wifi:
+            params = {'band5_1': {'guest': en}}
+        else:
+            params = {'band2_4': {'guest': en}}
 
-        try:
-            self._request_pwd()
-            return True
-        except ClientException:
-            return False
+        self.request('admin/wireless?form=wlan', json.dumps({'operation': 'write', 'params': params}))
 
-    def authorize(self) -> None:
-        if self._pwdNN == '':
-            self._request_pwd()
+    def reboot(self) -> None:
+        if not self.devices:
+            self.get_firmware()
+        self.request('admin/device?form=system', json.dumps({
+            'operation': 'reboot',
+            'params': {'mac_list': [{"mac": item['mac']} for item in self.devices]}}))
 
-        if self._seq == '':
-            self._request_seq()
+    def get_firmware(self) -> Firmware:
+        self.devices = self.request('admin/device?form=device_list', json.dumps({"operation": "read"})).get(
+            'device_list', [])
 
-        response = self._try_login()
+        for item in self.devices:
+            if item.get('role') != 'master' and len(self.devices) != 1:
+                continue
+            firmware = Firmware(item.get('hardware_ver', ''),
+                                item.get('device_model', ''),
+                                item.get('software_ver', ''))
 
-        if 'text/plain' in response.headers.get('Content-Type'):
-            self._request_pwd()
-            self._request_seq()
-            response = self._try_login()
+        return firmware
 
-        data = response.text
-        try:
-            data = response.json()
-            data = self._decrypt_response(data)
+    def get_status(self) -> Status:
+        data = self.request('admin/network?form=wan_ipv4', json.dumps({'operation': 'read'}))
 
-            self._stok = data['data']['stok']
-            regex_result = re.search(
-                'sysauth=(.*);', response.headers['set-cookie'])
-            self._sysauth = regex_result.group(1)
-            self._logged = True
+        status = Status()
+        element = self._get_value(data, ['wan', 'ip_info', 'mac'])
+        status._wan_macaddr = macaddress.EUI48(element) if element else None
+        status._lan_macaddr = macaddress.EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
+        element = self._get_value(data, ['wan', 'ip_info', 'ip'])
+        status._wan_ipv4_addr = ipaddress.IPv4Address(element) if element else None
+        element = self._get_value(data, ['lan', 'ip_info', 'ip'])
+        status._lan_ipv4_addr = ipaddress.IPv4Address(element) if element else None
+        element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
+        status._wan_ipv4_gateway = ipaddress.IPv4Address(element) if element else None
 
-        except Exception as e:
-            error = "TplinkRouter - C6 - Cannot authorize! Error - {}; Response - {}".format(e, data)
-            if self._logger:
-                self._logger.error(error)
-            raise ClientException(error)
+        data = self.request('admin/network?form=performance', json.dumps({"operation": "read"}))
+        status.mem_usage = data.get('mem_usage')
+        status.cpu_usage = data.get('cpu_usage')
 
-    def _request_pwd(self) -> None:
-        url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
+        data = self.request('admin/wireless?form=wlan', json.dumps({'operation': 'read'}))
+        status.wifi_2g_enable = self._get_value(data, ['band2_4', 'host', 'enable'])
+        status.guest_2g_enable = self._get_value(data, ['band2_4', 'guest', 'enable'])
+        status.wifi_5g_enable = self._get_value(data, ['band5_1', 'host', 'enable'])
+        status.guest_5g_enable = self._get_value(data, ['band5_1', 'guest', 'enable'])
 
-        # If possible implement RSA encryption of password here.
-        response = requests.post(
-            url, params={'operation': 'read'},
-            headers={'Referer': self._login_referer},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
+        devices = []
+        data = self.request('admin/client?form=client_list', json.dumps(
+            {"operation": "read", "params": {"device_mac": "default"}})).get('client_list', [])
 
-        try:
-            data = response.json()
+        for item in data:
+            if not item.get('online'):
+                continue
+            if item.get('wire_type') == 'wired':
+                status.wired_total += 1
+                continue
+            if item.get('interface') == 'main':
+                status.wifi_clients_total += 1
+            else:
+                status.guest_clients_total += 1
+            devices.append(Device(self._map_wire_type(item),
+                                  macaddress.EUI48(item['mac']),
+                                  ipaddress.IPv4Address(item['ip']),
+                                  base64.b64decode(item['name']).decode()))
 
-            args = data['data']['password']
+        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        status.devices = devices
 
-            self._pwdNN = args[0]
-            self._pwdEE = args[1]
+        return status
 
-        except Exception as e:
-            error = 'TplinkRouter - C6 - Unknown error for pwd! Error - {}; Response - {}'.format(e, response.text)
-            if self._logger:
-                self._logger.error(error)
-            raise ClientException(error)
+    def get_ipv4_status(self) -> IPv4Status:
+        ipv4_status = IPv4Status()
+        data = self.request('admin/network?form=wan_ipv4', json.dumps({'operation': 'read'}))
+        ipv4_status._wan_macaddr = macaddress.EUI48(self._get_value(data, ['wan', 'ip_info', 'mac']))
+        element = self._get_value(data, ['wan', 'ip_info', 'ip'])
+        ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(element) if element else None
+        element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
+        ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(element) if element else None
+        ipv4_status.wan_ipv4_conntype = self._get_value(data, ['wan', 'dial_type'])
+        element = self._get_value(data, ['wan', 'ip_info', 'mask'])
+        ipv4_status._wan_ipv4_netmask = ipaddress.IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_pridns = ipaddress.IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns1']))
+        ipv4_status._wan_ipv4_snddns = ipaddress.IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns2']))
+        ipv4_status._lan_macaddr = macaddress.EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
+        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(self._get_value(data, ['lan', 'ip_info', 'ip']))
+        ipv4_status.lan_ipv4_dhcp_enable = False
+        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(self._get_value(data, ['lan', 'ip_info', 'mask']))
 
-    def _request_seq(self) -> None:
-        url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
+        return ipv4_status
 
-        # If possible implement RSA encryption of password here.
-        response = requests.post(
-            url,
-            params={'operation': 'read'},
-            headers={'Referer': self._login_referer},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
+    @staticmethod
+    def _get_value(dictionary: dict, keys: list):
+        nested_dict = dictionary
 
-        try:
-            data = response.json()
+        for key in keys:
+            try:
+                nested_dict = nested_dict[key]
+            except Exception:
+                return None
+        return nested_dict
 
-            self._seq = data['data']['seq']
-            args = data['data']['key']
+    @staticmethod
+    def _map_wire_type(data: dict) -> Wifi:
+        result = Wifi.WIFI_UNKNOWN
+        if data.get('connection_type') == 'band2_4':
+            result = Wifi.WIFI_2G if data.get('interface') == 'main' else Wifi.WIFI_GUEST_2G
+        elif data.get('connection_type') == 'band5':
+            result = Wifi.WIFI_5G if data.get('interface') == 'main' else Wifi.WIFI_GUEST_5G
+        return result
 
-            self.nn = args[0]
-            self.ee = args[1]
+    @staticmethod
+    def _get_login_data(crypted_pwd: str) -> str:
+        data = {
+            "params": {"password": crypted_pwd},
+            "operation": "login",
+        }
 
-        except Exception as e:
-            error = 'TplinkRouter - C6 - Unknown error for seq! Error - {}; Response - {}'.format(e, response.text)
-            if self._logger:
-                self._logger.error(error)
-            raise ClientException(error)
+        return json.dumps(data)
 
-    def _try_login(self) -> requests.Response:
-        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
-
-        cryptedPwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
-        data = 'operation=login&password={}&confirm=true'.format(cryptedPwd)
-
-        body = self._prepare_data(data)
-
-        return requests.post(
-            url,
-            data=body,
-            headers={'Referer': self._login_referer, 'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
-
-    def _prepare_data(self, data) -> dict:
-        encrypted_data = self._encryption.aes_encrypt(data)
-        data_len = len(encrypted_data)
-
-        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, self._hash, self.nn,
-                                              self.ee)
-
-        return {'sign': sign, 'data': encrypted_data}
-
-    def _decrypt_response(self, data):
-        return json.loads(self._encryption.aes_decrypt(data['data']))
+    def _is_valid_response(self, data: dict) -> bool:
+        return 'error_code' in data and data['error_code'] == 0
 
 
 class TplinkC1200Router(TplinkBaseRouter):
@@ -986,7 +1157,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 10) -> AbstractRouter | None:
-        for client in [TPLinkMRClient, TplinkRouter, TplinkC1200Router]:
+        for client in [TPLinkMRClient, TPLinkDecoClient, TplinkRouter, TplinkC1200Router]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
