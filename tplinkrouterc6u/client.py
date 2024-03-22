@@ -587,7 +587,7 @@ class TplinkC1200Router(TplinkBaseRouter):
         response = requests.post(
             url,
             params={'operation': 'login', 'username': self.username, 'password': self.password},
-            headers={'Referer': self._login_referer, 'Content-Type': 'application/x-www-form-urlencoded'},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
             timeout=self.timeout,
             verify=self._verify_ssl,
         )
