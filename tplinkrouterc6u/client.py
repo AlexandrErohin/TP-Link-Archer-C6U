@@ -67,7 +67,8 @@ class TplinkRequest:
     _sysauth = None
     _verify_ssl = False
     _logger = None
-    _headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    _headers_request = {}
+    _headers_login = {}
     _data_block = 'data'
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
@@ -78,7 +79,7 @@ class TplinkRequest:
         response = requests.post(
             url,
             data=self._prepare_data(data),
-            headers=self._headers,
+            headers=self._headers_request,
             cookies={'sysauth': self._sysauth},
             timeout=self.timeout,
             verify=self._verify_ssl,
@@ -240,7 +241,7 @@ class TplinkEncryption(TplinkRequest):
         return requests.post(
             url,
             data=body,
-            headers=self._headers,
+            headers=self._headers_login,
             timeout=self.timeout,
             verify=self._verify_ssl,
         )
@@ -272,6 +273,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_wireless_stats = 'admin/wireless?form=statistics&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
+        referer = '{}/webpages/index.html'.format(self.host)
+        self._headers_request = {'Referer': referer}
+        self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
 
     @abstractmethod
     def authorize(self) -> bool:
@@ -430,7 +434,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 10) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        self._headers = {'Content-Type': 'application/json'}
+        self._headers_request = {'Content-Type': 'application/json'}
+        self._headers_login = {'Content-Type': 'application/json'}
         self._data_block = 'result'
         self.devices = []
 
@@ -587,7 +592,7 @@ class TplinkC1200Router(TplinkBaseRouter):
         response = requests.post(
             url,
             params={'operation': 'login', 'username': self.username, 'password': self.password},
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            headers=self._headers_login,
             timeout=self.timeout,
             verify=self._verify_ssl,
         )

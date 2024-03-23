@@ -213,11 +213,11 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX6000 V1
 - Archer AX11000 V1
 - Archer C1200 v2.0 (You need to use [web encrypted password](#encrypted_pass))
+- Archer C2300 v1.0 (You need to use [web encrypted password](#encrypted_pass))
 - Archer C6 v2.0
 - Archer C6 v3.0
 - Archer C6U v1.0
 - Archer C7 v5.0
-- Archer C2300 v1.0
 - Archer MR200 v5
 - Archer MR200 v5.3
 - Archer MR600 v1
