@@ -270,7 +270,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
-        self._url_wireless_stats = 'admin/wireless?form=statistics&operation=read'
+        self._url_wireless_stats = 'admin/wireless?form=statistics'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
         referer = '{}/webpages/index.html'.format(self.host)
@@ -347,7 +347,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             type = self._map_wire_type(item.get('wire_type'), False)
             _add_device(type, item)
 
-        for item in self.request(self._url_wireless_stats, 'operation=read'):
+        for item in self.request(self._url_wireless_stats, 'operation=load'):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
                 type = self._map_wire_type(item.get('type'))
