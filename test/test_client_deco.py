@@ -182,6 +182,68 @@ class TestTPLinkDecoClient(unittest.TestCase):
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 10, "enable": true, "mode": "11ng",
                     "channel_width": "HT40", "enable_hide_ssid": false}}}, "error_code": 0}
 '''
+        response_clients = '''{"result": {"client_list": [
+        {"mac": "cf:51:c9:04:e1:02", "up_speed": 17, "down_speed": 3, "wire_type": "wireless", "access_host": "1",
+                "connection_type": "band5", "space_id": "1", "ip": "", "client_mesh": true,
+                "online": true, "name": "d2lyZWxlc3Mx", "enable_priority": false, "remain_time": 0,
+                "owner_id": "", "client_type": "other", "interface": "main"}]}, "error_code": 0}
+'''
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=wan_ipv4':
+                    return json.loads(response_network)['result']
+                elif path == 'admin/network?form=performance':
+                    return json.loads(response_performance)['result']
+                elif path == 'admin/wireless?form=wlan':
+                    return json.loads(response_wireless)['result']
+                elif path == 'admin/client?form=client_list':
+                    return json.loads(response_clients)['result']
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(len(status.devices), 1)
+        self.assertIsInstance(status.devices[0], Device)
+        self.assertEqual(status.devices[0].type, Wifi.WIFI_5G)
+        self.assertEqual(status.devices[0].macaddr, 'CF-51-C9-04-E1-02')
+        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[0].ipaddr, '0.0.0.0')
+        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[0].hostname, 'wireless1')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
+
+    def test_get_status_wrong_client_ip(self) -> None:
+        response_network = '''
+{"result": {
+    "wan": {
+        "ip_info": {
+            "mac": "44:e1:52:8c:40:36", "dns2": "0.0.0.0", "dns1": "0.0.0.0", "mask": "", "gateway": "", "ip": ""
+            }, 
+        "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
+    "lan": {
+        "ip_info": {
+            "mac": "44:e1:52:8c:40:37",
+            "mask": "255.255.255.0",
+            "ip": "192.168.68.1"
+    }}}, "error_code": 0}
+'''
+        response_performance = '{"result": {"mem_usage": 0.43, "cpu_usage": 0.1}, "error_code": 0}'
+        response_wireless = '''
+{"result": {
+    "band5_1": {"backhaul": {"channel": 44},
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+                    "enable": false, "need_set_vlan": false},
+        "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
+        "enable": true, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
+    "band2_4": {"backhaul": {"channel": 10},
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
+                    "enable": true, "need_set_vlan": false},
+        "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 10, "enable": true, "mode": "11ng",
+                    "channel_width": "HT40", "enable_hide_ssid": false}}}, "error_code": 0}
+'''
         response_clients = '{"result": {"client_list": []}, "error_code": 0}'
 
         class TPLinkRouterTest(TPLinkDecoClient):

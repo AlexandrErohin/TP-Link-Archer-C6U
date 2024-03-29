@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 
 class AbstractRouter(ABC):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 10) -> None:
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
         self.username = username
         self.password = password
         self.timeout = timeout
@@ -516,9 +516,10 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 status.wifi_clients_total += 1
             else:
                 status.guest_clients_total += 1
+            ip = item['ip'] if item.get('ip') else '0.0.0.0'
             devices.append(Device(self._map_wire_type(item),
                                   macaddress.EUI48(item['mac']),
-                                  ipaddress.IPv4Address(item['ip']),
+                                  ipaddress.IPv4Address(ip),
                                   base64.b64decode(item['name']).decode()))
 
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
