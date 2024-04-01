@@ -113,6 +113,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | wifi_clients_total | Total amount of main wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
 | clients_total | Total amount of all connected clients | int |
+| iot_clients_total | Total amount of all iot connected clients | int, None |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool |
 | guest_5g_enable | Is guest wifi 5G enabled | bool, None |
 | guest_6g_enable | Is guest wifi 6G enabled | bool, None |
@@ -222,10 +223,11 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer MR200 v5
 - Archer MR200 v5.3
 - Archer MR600 v1
+- Archer MR600 v3
 - Archer VR900v
 - Deco M4 2.0
 - Deco M4R 2.0
-- Deco XE75
+- Deco XE75 2.0
 - TL-WA3001 v1.0
 - TL-MR105
 - TL-MR6400 v5

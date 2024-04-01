@@ -102,6 +102,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertEqual(status.wired_total, 1)
         self.assertEqual(status.wifi_clients_total, 2)
         self.assertEqual(status.guest_clients_total, 2)
+        self.assertEqual(status.iot_clients_total, None)
         self.assertEqual(status.clients_total, 5)
         self.assertEqual(status.guest_2g_enable, True)
         self.assertEqual(status.guest_5g_enable, False)
@@ -153,7 +154,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertEqual(status.devices[3].packets_sent, None)
         self.assertEqual(status.devices[3].packets_received, None)
 
-    def test_get_status_no_internet(self) -> None:
+    def test_get_status_iot(self) -> None:
         response_network = '''
 {"result": {
     "wan": {
@@ -175,6 +176,11 @@ class TestTPLinkDecoClient(unittest.TestCase):
         "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
                     "enable": false, "need_set_vlan": false},
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
+        "enable": false, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
+    "band6": {"backhaul": {"channel": 37},
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+                    "enable": false, "need_set_vlan": false},
+        "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
         "enable": true, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
     "band2_4": {"backhaul": {"channel": 10},
         "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
@@ -186,7 +192,23 @@ class TestTPLinkDecoClient(unittest.TestCase):
         {"mac": "cf:51:c9:04:e1:02", "up_speed": 17, "down_speed": 3, "wire_type": "wireless", "access_host": "1",
                 "connection_type": "band5", "space_id": "1", "ip": "", "client_mesh": true,
                 "online": true, "name": "d2lyZWxlc3Mx", "enable_priority": false, "remain_time": 0,
-                "owner_id": "", "client_type": "other", "interface": "main"}]}, "error_code": 0}
+                "owner_id": "", "client_type": "other", "interface": "main"},
+        {"mac": "5f:f8:08:28:af:54", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
+                "connection_type": "band2_4", "space_id": "1", "ip": "192.168.68.100", "online": true, "name": "d2lyZWQx",
+                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
+                "interface": "iot"},
+        {"mac": "5f:f8:08:28:af:55", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
+                "connection_type": "band5", "space_id": "1", "ip": "192.168.68.101", "online": true, "name": "d2lyZWQx",
+                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
+                "interface": "iot"},
+        {"mac": "5f:f8:08:28:af:56", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
+                "connection_type": "band6", "space_id": "1", "ip": "192.168.68.102", "online": true, "name": "d2lyZWQx",
+                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
+                "interface": "iot"},
+        {"mac": "5f:f8:08:28:af:57", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
+                "space_id": "1", "ip": "192.168.68.103", "online": true, "name": "d2lyZWQx",
+                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device"}
+]}, "error_code": 0}
 '''
 
         class TPLinkRouterTest(TPLinkDecoClient):
@@ -204,18 +226,40 @@ class TestTPLinkDecoClient(unittest.TestCase):
         client = TPLinkRouterTest('', '')
         status = client.get_status()
 
-        self.assertEqual(len(status.devices), 1)
+        self.assertEqual(status.wired_total, 0)
+        self.assertEqual(status.wifi_clients_total, 1)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.iot_clients_total, 3)
+        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.guest_2g_enable, True)
+        self.assertEqual(status.guest_5g_enable, False)
+        self.assertEqual(status.guest_6g_enable, False)
+        self.assertEqual(status.iot_2g_enable, None)
+        self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.iot_6g_enable, None)
+        self.assertEqual(status.wifi_2g_enable, True)
+        self.assertEqual(status.wifi_5g_enable, False)
+        self.assertEqual(status.wifi_6g_enable, True)
+
+        self.assertEqual(len(status.devices), 5)
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Wifi.WIFI_5G)
         self.assertEqual(status.devices[0].macaddr, 'CF-51-C9-04-E1-02')
         self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '0.0.0.0')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'wireless1')
-        self.assertEqual(status.devices[0].packets_sent, None)
-        self.assertEqual(status.devices[0].packets_received, None)
+        self.assertIsInstance(status.devices[1], Device)
+        self.assertEqual(status.devices[1].type, Wifi.WIFI_IOT_2G)
+        self.assertEqual(status.devices[1].macaddr, '5F-F8-08-28-AF-54')
+        self.assertIsInstance(status.devices[2], Device)
+        self.assertEqual(status.devices[2].type, Wifi.WIFI_IOT_5G)
+        self.assertEqual(status.devices[2].macaddr, '5F-F8-08-28-AF-55')
+        self.assertIsInstance(status.devices[3], Device)
+        self.assertEqual(status.devices[3].type, Wifi.WIFI_IOT_6G)
+        self.assertEqual(status.devices[3].macaddr, '5F-F8-08-28-AF-56')
+        self.assertIsInstance(status.devices[4], Device)
+        self.assertEqual(status.devices[4].type, Wifi.WIFI_UNKNOWN)
+        self.assertEqual(status.devices[4].macaddr, '5F-F8-08-28-AF-57')
 
-    def test_get_status_wrong_client_ip(self) -> None:
+    def test_get_status_no_internet(self) -> None:
         response_network = '''
 {"result": {
     "wan": {
@@ -446,6 +490,10 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertEqual(check_data, '{"operation": "write", "params": {"band2_4": {"guest": {"enable": true}}}}')
         client.set_wifi(Wifi.WIFI_GUEST_5G, True)
         self.assertEqual(check_data, '{"operation": "write", "params": {"band5_1": {"guest": {"enable": true}}}}')
+        client.set_wifi(Wifi.WIFI_6G, True)
+        self.assertEqual(check_data, '{"operation": "write", "params": {"band6": {"host": {"enable": true}}}}')
+        client.set_wifi(Wifi.WIFI_GUEST_6G, True)
+        self.assertEqual(check_data, '{"operation": "write", "params": {"band6": {"guest": {"enable": true}}}}')
 
     def test_reboot_with_firmware(self) -> None:
         check_url = ''
