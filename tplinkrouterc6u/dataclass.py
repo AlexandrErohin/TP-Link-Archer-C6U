@@ -50,6 +50,7 @@ class Status:
         self.wired_total: int = 0
         self.wifi_clients_total: int = 0
         self.guest_clients_total: int = 0
+        self.iot_clients_total: int | None = None
         self.clients_total: int = 0
         self.guest_2g_enable: bool
         self.guest_5g_enable: bool | None = None

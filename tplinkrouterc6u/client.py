@@ -453,6 +453,10 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             params = {'band5_1': {'host': en}}
         elif Wifi.WIFI_GUEST_5G == wifi:
             params = {'band5_1': {'guest': en}}
+        elif Wifi.WIFI_6G == wifi:
+            params = {'band6': {'host': en}}
+        elif Wifi.WIFI_GUEST_6G == wifi:
+            params = {'band6': {'guest': en}}
         else:
             params = {'band2_4': {'guest': en}}
 
@@ -501,6 +505,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         status.guest_2g_enable = self._get_value(data, ['band2_4', 'guest', 'enable'])
         status.wifi_5g_enable = self._get_value(data, ['band5_1', 'host', 'enable'])
         status.guest_5g_enable = self._get_value(data, ['band5_1', 'guest', 'enable'])
+        status.wifi_6g_enable = self._get_value(data, ['band6', 'host', 'enable'])
+        status.guest_6g_enable = self._get_value(data, ['band6', 'guest', 'enable'])
 
         devices = []
         data = self.request('admin/client?form=client_list', json.dumps(
@@ -512,17 +518,24 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             if item.get('wire_type') == 'wired':
                 status.wired_total += 1
                 continue
-            if item.get('interface') == 'main':
+            wifi = self._map_wire_type(item)
+            if wifi in [Wifi.WIFI_2G, Wifi.WIFI_5G, Wifi.WIFI_6G]:
                 status.wifi_clients_total += 1
-            else:
+            elif wifi in [Wifi.WIFI_GUEST_2G, Wifi.WIFI_GUEST_5G, Wifi.WIFI_GUEST_5G]:
                 status.guest_clients_total += 1
+            elif wifi in [Wifi.WIFI_IOT_2G, Wifi.WIFI_IOT_5G, Wifi.WIFI_IOT_6G]:
+                if status.iot_clients_total is None:
+                    status.iot_clients_total = 0
+                status.iot_clients_total += 1
+
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
-            devices.append(Device(self._map_wire_type(item),
+            devices.append(Device(wifi,
                                   macaddress.EUI48(item['mac']),
                                   ipaddress.IPv4Address(ip),
                                   base64.b64decode(item['name']).decode()))
 
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
+                                + (0 if status.iot_clients_total is None else status.iot_clients_total))
         status.devices = devices
 
         return status
@@ -558,14 +571,14 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 return None
         return nested_dict
 
-    @staticmethod
-    def _map_wire_type(data: dict) -> Wifi:
-        result = Wifi.WIFI_UNKNOWN
-        if data.get('connection_type') == 'band2_4':
-            result = Wifi.WIFI_2G if data.get('interface') == 'main' else Wifi.WIFI_GUEST_2G
-        elif data.get('connection_type') == 'band5':
-            result = Wifi.WIFI_5G if data.get('interface') == 'main' else Wifi.WIFI_GUEST_5G
-        return result
+    def _map_wire_type(self, data: dict) -> Wifi:
+        mapping = {'band2_4': {'main': Wifi.WIFI_2G, 'guest': Wifi.WIFI_GUEST_2G, 'iot': Wifi.WIFI_IOT_2G},
+                   'band5': {'main': Wifi.WIFI_5G, 'guest': Wifi.WIFI_GUEST_5G, 'iot': Wifi.WIFI_IOT_5G},
+                   'band6': {'main': Wifi.WIFI_6G, 'guest': Wifi.WIFI_GUEST_6G, 'iot': Wifi.WIFI_IOT_6G}
+                   }
+        result = self._get_value(mapping, [data.get('connection_type'), data.get('interface')])
+
+        return result if result else Wifi.WIFI_UNKNOWN
 
     @staticmethod
     def _get_login_data(crypted_pwd: str) -> str:
@@ -753,6 +766,9 @@ class TPLinkMRClient(AbstractRouter):
             ]),
         ]
         _, values = self.req_act(acts)
+
+        if values['0'].__class__ == list:
+            values['0'] = values['0'][0]
 
         status._lan_macaddr = macaddress.EUI48(values['0']['X_TP_MACAddress'])
         status._lan_ipv4_addr = ipaddress.IPv4Address(values['0']['IPInterfaceIPAddress'])
