@@ -4,9 +4,10 @@ import ipaddress
 import json
 from tplinkrouterc6u import (
     TplinkRouter,
-    Wifi,
+    Connection,
     Status,
     Device,
+    ClientException,
 )
 
 
@@ -206,8 +207,9 @@ class TestTPLinkClient(unittest.TestCase):
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return json.loads(response_status)['data']
-                else:
+                elif path == 'admin/wireless?form=statistics':
                     return json.loads(response_stats)['data']
+                raise ClientException()
 
         client = TPLinkRouterTest('', '')
         status = client.get_status()
@@ -226,6 +228,7 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertEqual(status.wifi_clients_total, 2)
         self.assertEqual(status.guest_clients_total, 0)
         self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.iot_clients_total, None)
         self.assertEqual(status.guest_2g_enable, False)
         self.assertEqual(status.guest_5g_enable, False)
         self.assertEqual(status.iot_2g_enable, None)
@@ -234,26 +237,40 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertEqual(status.wifi_5g_enable, True)
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, 0.43)
-        self.assertEqual(status.cpu_usage, 0.07)
-        self.assertEqual(len(status.devices), 2)
+        self.assertEqual(status.cpu_usage, 0.28)
+        self.assertEqual(len(status.devices), 4)
         self.assertIsInstance(status.devices[0], Device)
-        self.assertEqual(status.devices[0].type, Wifi.WIFI_2G)
-        self.assertEqual(status.devices[0].macaddr, '06-82-9D-2B-8F-C6')
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
         self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '192.168.1.186')
+        self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
         self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'UNKNOWN')
-        self.assertEqual(status.devices[0].packets_sent, 450333)
-        self.assertEqual(status.devices[0].packets_received, 4867482)
-        self.assertIsInstance(status.devices[1], Device)
-        self.assertEqual(status.devices[1].type, Wifi.WIFI_5G)
-        self.assertEqual(status.devices[1].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[0].hostname, 'SERVER')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
+        self.assertIsInstance(status.devices[0], Device)
+        self.assertEqual(status.devices[1].type, Connection.WIRED)
+        self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
         self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[1].ipaddr, '0.0.0.0')
+        self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
         self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[1].hostname, '')
-        self.assertEqual(status.devices[1].packets_sent, 134815)
-        self.assertEqual(status.devices[1].packets_received, 2953078)
+        self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[1].packets_sent, None)
+        self.assertEqual(status.devices[1].packets_received, None)
+        self.assertIsInstance(status.devices[2], Device)
+        self.assertEqual(status.devices[2].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
+        self.assertEqual(status.devices[2].ipaddr, '192.168.1.186')
+        self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[2].packets_sent, 450333)
+        self.assertEqual(status.devices[2].packets_received, 4867482)
+        self.assertIsInstance(status.devices[3], Device)
+        self.assertEqual(status.devices[3].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[3].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[3].ipaddr, '0.0.0.0')
+        self.assertEqual(status.devices[3].hostname, '')
+        self.assertEqual(status.devices[3].packets_sent, 134815)
+        self.assertEqual(status.devices[3].packets_received, 2953078)
 
     def test_get_status_ax_55(self) -> None:
         response_status = '''
@@ -305,8 +322,9 @@ class TestTPLinkClient(unittest.TestCase):
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return json.loads(response_status)['data']
-                else:
+                elif path == 'admin/wireless?form=statistics':
                     return json.loads(response_stats)['data']
+                raise ClientException()
 
         client = TPLinkRouterTest('', '')
         status = client.get_status()
@@ -322,6 +340,7 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertEqual(status.wifi_clients_total, 2)
         self.assertEqual(status.guest_clients_total, 0)
         self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.iot_clients_total, None)
         self.assertEqual(status.guest_2g_enable, True)
         self.assertEqual(status.guest_5g_enable, None)
         self.assertEqual(status.guest_6g_enable, None)
@@ -334,25 +353,326 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
-        self.assertEqual(len(status.devices), 2)
+        self.assertEqual(len(status.devices), 4)
         self.assertIsInstance(status.devices[0], Device)
-        self.assertEqual(status.devices[0].type, Wifi.WIFI_2G)
-        self.assertEqual(status.devices[0].macaddr, '06-82-9D-2B-8F-C6')
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
         self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '192.168.1.186')
+        self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
         self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[0].hostname, 'SERVER')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
         self.assertIsInstance(status.devices[1], Device)
-        self.assertEqual(status.devices[1].type, Wifi.WIFI_UNKNOWN)
-        self.assertEqual(status.devices[1].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[1].type, Connection.WIRED)
+        self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
         self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[1].ipaddr, '0.0.0.0')
+        self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
         self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[1].hostname, '')
+        self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[1].packets_sent, None)
         self.assertEqual(status.devices[1].packets_received, None)
+        self.assertIsInstance(status.devices[2], Device)
+        self.assertEqual(status.devices[2].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
+        self.assertIsInstance(status.devices[2].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[2].ipaddr, '192.168.1.186')
+        self.assertIsInstance(status.devices[2].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[2].packets_sent, None)
+        self.assertEqual(status.devices[2].packets_received, None)
+        self.assertIsInstance(status.devices[3], Device)
+        self.assertEqual(status.devices[3].type, Connection.UNKNOWN)
+        self.assertEqual(status.devices[3].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[3].ipaddr, '0.0.0.0')
+        self.assertEqual(status.devices[3].hostname, '')
+        self.assertEqual(status.devices[3].packets_sent, None)
+        self.assertEqual(status.devices[3].packets_received, None)
+
+    def test_get_status_with_game_accelerator(self) -> None:
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "access_devices_wired": [
+            {
+                "wire_type": "wired",
+                "macaddr": "3d:24:25:24:30:79",
+                "ipaddr": "192.168.1.228",
+                "hostname": "SERVER"
+            },
+            {
+                "wire_type": "wired",
+                "macaddr": "ac:04:d6:25:2a:96",
+                "ipaddr": "192.168.1.254",
+                "hostname": "UNKNOWN"
+            }
+        ],
+        "access_devices_wireless_host": [
+            {
+                "wire_type": "2.4G",
+                "macaddr": "06:82:9d:2b:8f:c6",
+                "ipaddr": "192.168.1.186",
+                "hostname": "UNKNOWN"
+            }
+        ],
+        "guest_2g_enable": "on",
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_game_accelerator = '''
+  {
+      "data": [
+          {"mac": "06:82:9d:2b:8f:c6", "deviceTag":"2.4G", "isGuest":false, "ip":"192.168.1.186", "deviceName":"name1"},
+          {"mac": "fb:90:b8:2a:8a:b1", "deviceTag":"iot_2.4G", "isGuest":false, "ip":"192.168.1.187", "deviceName":"name2"},
+          {"mac": "54:b3:a2:f7:be:ea", "deviceTag":"iot_5G", "isGuest":false, "ip":"192.168.1.188", "deviceName":"name3"},
+          {"mac": "3c:ae:e1:83:94:9d", "deviceTag":"iot_6G", "isGuest":false, "ip":"192.168.1.189", "deviceName":"name4"}
+      ],
+      "timeout": false,
+      "success": true
+  }
+'''
+        response_stats = '''
+  {
+      "data": [
+          {
+              "mac": "06:82:9d:2b:8f:c6",
+              "type": "2.4GHz",
+              "encryption": "wpa/wpa2-psk",
+              "rxpkts": 4867482,
+              "txpkts": 450333
+          },
+          {
+              "mac": "1f:7a:bd:f7:20:0d",
+              "type": "5GHz",
+              "encryption": "wpa/wpa2-psk",
+              "rxpkts": 2953078,
+              "txpkts": 134815
+          }
+      ],
+      "timeout": false,
+      "success": true,
+      "operator": "load"
+  }
+'''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return json.loads(response_status)['data']
+                elif path == 'admin/smart_network?form=game_accelerator':
+                    return json.loads(response_game_accelerator)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return json.loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, None)
+        self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
+        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertEqual(status.wan_ipv4_addr, None)
+        self.assertEqual(status.lan_ipv4_addr, None)
+        self.assertEqual(status.wan_ipv4_gateway, None)
+        self.assertEqual(status.wired_total, 2)
+        self.assertEqual(status.wifi_clients_total, 2)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.iot_clients_total, 3)
+        self.assertEqual(status.guest_2g_enable, True)
+        self.assertEqual(status.guest_5g_enable, None)
+        self.assertEqual(status.guest_6g_enable, None)
+        self.assertEqual(status.iot_2g_enable, None)
+        self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.iot_6g_enable, None)
+        self.assertEqual(status.wifi_2g_enable, True)
+        self.assertEqual(status.wifi_5g_enable, None)
+        self.assertEqual(status.wifi_6g_enable, None)
+        self.assertEqual(status.wan_ipv4_uptime, None)
+        self.assertEqual(status.mem_usage, None)
+        self.assertEqual(status.cpu_usage, None)
+        self.assertEqual(len(status.devices), 7)
+        self.assertIsInstance(status.devices[0], Device)
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
+        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
+        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[0].hostname, 'SERVER')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
+        self.assertIsInstance(status.devices[1], Device)
+        self.assertEqual(status.devices[1].type, Connection.WIRED)
+        self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
+        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
+        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[1].packets_sent, None)
+        self.assertEqual(status.devices[1].packets_received, None)
+        self.assertIsInstance(status.devices[2], Device)
+        self.assertEqual(status.devices[2].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
+        self.assertIsInstance(status.devices[2].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[2].ipaddr, '192.168.1.186')
+        self.assertIsInstance(status.devices[2].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
+        self.assertEqual(status.devices[2].packets_sent, 450333)
+        self.assertEqual(status.devices[2].packets_received, 4867482)
+        self.assertIsInstance(status.devices[3], Device)
+        self.assertEqual(status.devices[3].type, Connection.IOT_2G)
+        self.assertEqual(status.devices[3].macaddr, 'FB-90-B8-2A-8A-B1')
+        self.assertIsInstance(status.devices[3].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[3].ipaddr, '192.168.1.187')
+        self.assertIsInstance(status.devices[3].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[3].hostname, 'name2')
+        self.assertEqual(status.devices[3].packets_sent, None)
+        self.assertEqual(status.devices[3].packets_received, None)
+        self.assertIsInstance(status.devices[4], Device)
+        self.assertEqual(status.devices[4].type, Connection.IOT_5G)
+        self.assertEqual(status.devices[4].macaddr, '54-B3-A2-F7-BE-EA')
+        self.assertIsInstance(status.devices[4].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[4].ipaddr, '192.168.1.188')
+        self.assertIsInstance(status.devices[4].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[4].hostname, 'name3')
+        self.assertEqual(status.devices[4].packets_sent, None)
+        self.assertEqual(status.devices[4].packets_received, None)
+        self.assertIsInstance(status.devices[5], Device)
+        self.assertEqual(status.devices[5].type, Connection.IOT_6G)
+        self.assertEqual(status.devices[5].macaddr, '3C-AE-E1-83-94-9D')
+        self.assertIsInstance(status.devices[5].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[5].ipaddr, '192.168.1.189')
+        self.assertIsInstance(status.devices[5].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[5].hostname, 'name4')
+        self.assertEqual(status.devices[5].packets_sent, None)
+        self.assertEqual(status.devices[5].packets_received, None)
+        self.assertIsInstance(status.devices[6], Device)
+        self.assertEqual(status.devices[6].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[6].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertIsInstance(status.devices[6].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[6].ipaddr, '0.0.0.0')
+        self.assertIsInstance(status.devices[6].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[6].hostname, '')
+        self.assertEqual(status.devices[6].packets_sent, 134815)
+        self.assertEqual(status.devices[6].packets_received, 2953078)
+
+    def test_get_status_with_perf_request(self) -> None:
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "guest_2g_enable": "on",
+            "wireless_2g_enable": "on"
+        }
+    }
+    '''
+        perf_stats = '''
+      {
+          "data": {"mem_usage":0.47, "cpu_usage":0.25},
+          "timeout": false,
+          "success": true,
+          "operator": "load"
+      }
+    '''
+        response_stats = '''
+      {
+          "data": [],
+          "timeout": false,
+          "success": true,
+          "operator": "load"
+      }
+    '''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return json.loads(response_status)['data']
+                elif path == 'admin/status?form=perf&operation=read':
+                    return json.loads(perf_stats)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return json.loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, None)
+        self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
+        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertEqual(status.wan_ipv4_addr, None)
+        self.assertEqual(status.lan_ipv4_addr, None)
+        self.assertEqual(status.wan_ipv4_gateway, None)
+        self.assertEqual(status.wired_total, 0)
+        self.assertEqual(status.wifi_clients_total, 0)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.clients_total, 0)
+        self.assertEqual(status.iot_clients_total, None)
+        self.assertEqual(status.guest_2g_enable, True)
+        self.assertEqual(status.guest_5g_enable, None)
+        self.assertEqual(status.guest_6g_enable, None)
+        self.assertEqual(status.iot_2g_enable, None)
+        self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.iot_6g_enable, None)
+        self.assertEqual(status.wifi_2g_enable, True)
+        self.assertEqual(status.wifi_5g_enable, None)
+        self.assertEqual(status.wifi_6g_enable, None)
+        self.assertEqual(status.wan_ipv4_uptime, None)
+        self.assertEqual(status.mem_usage, 0.47)
+        self.assertEqual(status.cpu_usage, 0.25)
+        self.assertEqual(len(status.devices), 0)
+
+    def test_set_wifi(self) -> None:
+        check_url = ''
+        check_data = ''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        result = client.set_wifi(Connection.HOST_2G, False)
+        self.assertIsNone(result)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_2g')
+        self.assertEqual(check_data, 'operation=write&wireless_2g_enable=off')
+        client.set_wifi(Connection.HOST_2G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_2g')
+        self.assertEqual(check_data, 'operation=write&wireless_2g_enable=on')
+        client.set_wifi(Connection.HOST_5G, False)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_5g')
+        self.assertEqual(check_data, 'operation=write&wireless_5g_enable=off')
+        client.set_wifi(Connection.HOST_6G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_6g')
+        self.assertEqual(check_data, 'operation=write&wireless_6g_enable=on')
+        client.set_wifi(Connection.GUEST_2G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_2g')
+        self.assertEqual(check_data, 'operation=write&guest_2g_enable=on')
+        client.set_wifi(Connection.GUEST_5G, False)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_5g')
+        self.assertEqual(check_data, 'operation=write&guest_5g_enable=off')
+        client.set_wifi(Connection.GUEST_6G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_6g')
+        self.assertEqual(check_data, 'operation=write&guest_6g_enable=on')
+        client.set_wifi(Connection.IOT_2G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_2g')
+        self.assertEqual(check_data, 'operation=write&iot_2g_enable=on')
+        client.set_wifi(Connection.IOT_5G, False)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_5g')
+        self.assertEqual(check_data, 'operation=write&iot_5g_enable=off')
+        client.set_wifi(Connection.IOT_6G, True)
+        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_6g')
+        self.assertEqual(check_data, 'operation=write&iot_6g_enable=on')
 
 
 if __name__ == '__main__':

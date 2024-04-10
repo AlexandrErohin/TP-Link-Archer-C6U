@@ -10,7 +10,7 @@ import macaddress
 import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
-from tplinkrouterc6u.enum import Wifi
+from tplinkrouterc6u.enum import Connection
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
@@ -55,7 +55,7 @@ class AbstractRouter(ABC):
         pass
 
     @abstractmethod
-    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
         pass
 
 
@@ -265,12 +265,14 @@ class TplinkEncryption(TplinkRequest):
 
 
 class TplinkBaseRouter(AbstractRouter, TplinkRequest):
+    _smart_network = True
+    _perf_status = True
+
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 10) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
-        self._url_wireless_stats = 'admin/wireless?form=statistics'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
         referer = '{}/webpages/index.html'.format(self.host)
@@ -281,9 +283,21 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def authorize(self) -> bool:
         pass
 
-    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
-        path = f"admin/wireless?&form=guest&form={wifi.value}"
-        data = f"operation=write&{wifi.value}_enable={'on' if enable else 'off'}"
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        values = {
+            Connection.HOST_2G: 'wireless_2g',
+            Connection.HOST_5G: 'wireless_5g',
+            Connection.HOST_6G: 'wireless_6g',
+            Connection.GUEST_2G: 'guest_2g',
+            Connection.GUEST_5G: 'guest_5g',
+            Connection.GUEST_6G: 'guest_6g',
+            Connection.IOT_2G: 'iot_2g',
+            Connection.IOT_5G: 'iot_5g',
+            Connection.IOT_6G: 'iot_6g',
+        }
+        value = values.get(wifi)
+        path = f"admin/wireless?&form=guest&form={value}"
+        data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
         self.request(path, data)
 
     def reboot(self) -> None:
@@ -302,12 +316,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return firmware
 
     def get_status(self) -> Status:
-
-        def _calc_cpu_usage(data: dict) -> float | None:
-            cpu_usage = (data.get('cpu_usage', 0) + data.get('cpu1_usage', 0)
-                         + data.get('cpu2_usage', 0) + data.get('cpu3_usage', 0))
-            return cpu_usage / 4 if cpu_usage != 0 else None
-
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
@@ -318,7 +326,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
-        status.cpu_usage = _calc_cpu_usage(data)
+        status.cpu_usage = data.get('cpu_usage')
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
@@ -332,12 +340,24 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wifi_5g_enable = self._str2bool(data.get('wireless_5g_enable'))
         status.wifi_6g_enable = self._str2bool(data.get('wireless_6g_enable'))
 
+        if (status.mem_usage is None or status.mem_usage is None) and self._perf_status:
+            try:
+                performance = self.request('admin/status?form=perf&operation=read', 'operation=read')
+                status.mem_usage = performance.get('mem_usage')
+                status.cpu_usage = performance.get('cpu_usage')
+            except:
+                self._perf_status = False
+
         devices = {}
 
-        def _add_device(type: Wifi, item: dict) -> None:
-            devices[item['macaddr']] = Device(type, macaddress.EUI48(item['macaddr']),
+        def _add_device(conn: Connection, item: dict) -> None:
+            devices[item['macaddr']] = Device(conn, macaddress.EUI48(item['macaddr']),
                                               ipaddress.IPv4Address(item['ipaddr']),
                                               item['hostname'])
+
+        for item in data.get('access_devices_wired', []):
+            type = self._map_wire_type(item.get('wire_type'))
+            _add_device(type, item)
 
         for item in data.get('access_devices_wireless_host', []):
             type = self._map_wire_type(item.get('wire_type'))
@@ -347,11 +367,31 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             type = self._map_wire_type(item.get('wire_type'), False)
             _add_device(type, item)
 
-        for item in self.request(self._url_wireless_stats, 'operation=load'):
+        smart_network = None
+        if self._smart_network:
+            try:
+                smart_network = self.request('admin/smart_network?form=game_accelerator', 'operation=loadDevice')
+            except Exception:
+                self._smart_network = False
+
+        if smart_network:
+            for item in smart_network:
+                if item['mac'] not in devices:
+                    conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
+                    devices[item['mac']] = Device(conn, macaddress.EUI48(item['mac']),
+                                                  ipaddress.IPv4Address(item['ip']),
+                                                  item['deviceName'])
+                    if conn.is_iot():
+                        if status.iot_clients_total is None:
+                            status.iot_clients_total = 0
+                        status.iot_clients_total += 1
+
+        for item in self.request('admin/wireless?form=statistics', 'operation=load'):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
                 type = self._map_wire_type(item.get('type'))
-                devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'), '')
+                devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'),
+                                              '')
             devices[item['mac']].packets_sent = item.get('txpkts')
             devices[item['mac']].packets_received = item.get('rxpkts')
 
@@ -405,16 +445,24 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
 
     @staticmethod
-    def _map_wire_type(data: str | None, host: bool = True) -> Wifi:
-        result = Wifi.WIFI_UNKNOWN
+    def _map_wire_type(data: str | None, host: bool = True) -> Connection:
+        result = Connection.UNKNOWN
         if data is None:
             return result
+        if data == 'wired':
+            result = Connection.WIRED
         if data.startswith('2.4'):
-            result = Wifi.WIFI_2G if host else Wifi.WIFI_GUEST_2G
+            result = Connection.HOST_2G if host else Connection.GUEST_2G
         elif data.startswith('5'):
-            result = Wifi.WIFI_5G if host else Wifi.WIFI_GUEST_5G
+            result = Connection.HOST_5G if host else Connection.GUEST_5G
         elif data.startswith('6'):
-            result = Wifi.WIFI_6G if host else Wifi.WIFI_GUEST_6G
+            result = Connection.HOST_6G if host else Connection.GUEST_6G
+        elif data.startswith('iot_2'):
+            result = Connection.IOT_2G
+        elif data.startswith('iot_5'):
+            result = Connection.IOT_5G
+        elif data.startswith('iot_6'):
+            result = Connection.IOT_6G
         return result
 
 
@@ -424,7 +472,6 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade'
-        self._url_wireless_stats = 'admin/wireless?form=statistics'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
 
@@ -445,17 +492,17 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._sysauth = ''
         self._logged = False
 
-    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
         en = {'enable': enable}
-        if Wifi.WIFI_2G == wifi:
+        if Connection.HOST_2G == wifi:
             params = {'band2_4': {'host': en}}
-        elif Wifi.WIFI_5G == wifi:
+        elif Connection.HOST_5G == wifi:
             params = {'band5_1': {'host': en}}
-        elif Wifi.WIFI_GUEST_5G == wifi:
+        elif Connection.GUEST_5G == wifi:
             params = {'band5_1': {'guest': en}}
-        elif Wifi.WIFI_6G == wifi:
+        elif Connection.HOST_6G == wifi:
             params = {'band6': {'host': en}}
-        elif Wifi.WIFI_GUEST_6G == wifi:
+        elif Connection.GUEST_6G == wifi:
             params = {'band6': {'guest': en}}
         else:
             params = {'band2_4': {'guest': en}}
@@ -515,21 +562,20 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         for item in data:
             if not item.get('online'):
                 continue
-            if item.get('wire_type') == 'wired':
+            conn = self._map_wire_type(item)
+            if conn == Connection.WIRED:
                 status.wired_total += 1
-                continue
-            wifi = self._map_wire_type(item)
-            if wifi in [Wifi.WIFI_2G, Wifi.WIFI_5G, Wifi.WIFI_6G]:
+            elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
-            elif wifi in [Wifi.WIFI_GUEST_2G, Wifi.WIFI_GUEST_5G, Wifi.WIFI_GUEST_5G]:
+            elif conn.is_guest_wifi():
                 status.guest_clients_total += 1
-            elif wifi in [Wifi.WIFI_IOT_2G, Wifi.WIFI_IOT_5G, Wifi.WIFI_IOT_6G]:
+            elif conn.is_iot():
                 if status.iot_clients_total is None:
                     status.iot_clients_total = 0
                 status.iot_clients_total += 1
 
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
-            devices.append(Device(wifi,
+            devices.append(Device(conn,
                                   macaddress.EUI48(item['mac']),
                                   ipaddress.IPv4Address(ip),
                                   base64.b64decode(item['name']).decode()))
@@ -571,14 +617,16 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 return None
         return nested_dict
 
-    def _map_wire_type(self, data: dict) -> Wifi:
-        mapping = {'band2_4': {'main': Wifi.WIFI_2G, 'guest': Wifi.WIFI_GUEST_2G, 'iot': Wifi.WIFI_IOT_2G},
-                   'band5': {'main': Wifi.WIFI_5G, 'guest': Wifi.WIFI_GUEST_5G, 'iot': Wifi.WIFI_IOT_5G},
-                   'band6': {'main': Wifi.WIFI_6G, 'guest': Wifi.WIFI_GUEST_6G, 'iot': Wifi.WIFI_IOT_6G}
+    def _map_wire_type(self, data: dict) -> Connection:
+        if data.get('wire_type') == 'wired':
+            return Connection.WIRED
+        mapping = {'band2_4': {'main': Connection.HOST_2G, 'guest': Connection.GUEST_2G, 'iot': Connection.IOT_2G},
+                   'band5': {'main': Connection.HOST_5G, 'guest': Connection.GUEST_5G, 'iot': Connection.IOT_5G},
+                   'band6': {'main': Connection.HOST_6G, 'guest': Connection.GUEST_6G, 'iot': Connection.IOT_6G}
                    }
         result = self._get_value(mapping, [data.get('connection_type'), data.get('interface')])
 
-        return result if result else Wifi.WIFI_UNKNOWN
+        return result if result else Connection.UNKNOWN
 
     @staticmethod
     def _get_login_data(crypted_pwd: str) -> str:
@@ -591,6 +639,37 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
     def _is_valid_response(self, data: dict) -> bool:
         return 'error_code' in data and data['error_code'] == 0
+
+
+class TplinkC6V4Router(AbstractRouter):
+    def supports(self) -> bool:
+        url = '{}/?code=2&asyn=1'.format(self.host)
+        try:
+            response = requests.post(url, timeout=self.timeout, verify=self._verify_ssl)
+        except:
+            return False
+        if response.status_code == 401 and response.text.startswith('00'):
+            raise ClientException(
+                'Your router is not supported. Please add your router support to https://github.com/AlexandrErohin/TP-Link-Archer-C6U by implementing methods for TplinkC6V4Router class')
+        return False
+
+    def authorize(self) -> None:
+        raise ClientException('Not Implemented')
+
+    def logout(self) -> None:
+        raise ClientException('Not Implemented')
+
+    def get_firmware(self) -> Firmware:
+        raise ClientException('Not Implemented')
+
+    def get_status(self) -> Status:
+        raise ClientException('Not Implemented')
+
+    def reboot(self) -> None:
+        raise ClientException('Not Implemented')
+
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        raise ClientException('Not Implemented')
 
 
 class TplinkC1200Router(TplinkBaseRouter):
@@ -638,24 +717,19 @@ class TPLinkMRClient(AbstractRouter):
     HTTP_ERR_USER_PWD_NOT_CORRECT = 71233
     HTTP_ERR_USER_BAD_REQUEST = 71234
 
-    LAN = 0
-    WIFI_2G = 1
-    WIFI_5G = 3
-    WIFI_GUEST_2G = 2
-    WIFI_GUEST_5G = 4
-
     CLIENT_TYPES = {
-        WIFI_2G: Wifi.WIFI_2G,
-        WIFI_5G: Wifi.WIFI_5G,
-        WIFI_GUEST_2G: Wifi.WIFI_GUEST_2G,
-        WIFI_GUEST_5G: Wifi.WIFI_GUEST_5G,
+        0: Connection.WIRED,
+        1: Connection.HOST_2G,
+        3: Connection.HOST_5G,
+        2: Connection.GUEST_2G,
+        4: Connection.GUEST_5G,
     }
 
     WIFI_SET = {
-        Wifi.WIFI_2G: '1,1,0,0,0,0',
-        Wifi.WIFI_5G: '1,2,0,0,0,0',
-        Wifi.WIFI_GUEST_2G: '1,1,1,0,0,0',
-        Wifi.WIFI_GUEST_5G: '1,2,1,0,0,0',
+        Connection.HOST_2G: '1,1,0,0,0,0',
+        Connection.HOST_5G: '1,2,0,0,0,0',
+        Connection.GUEST_2G: '1,1,1,0,0,0',
+        Connection.GUEST_5G: '1,2,1,0,0,0',
     }
 
     class ActItem:
@@ -796,17 +870,16 @@ class TPLinkMRClient(AbstractRouter):
         for val in self._to_list(values.get('4')):
             if int(val['active']) == 0:
                 continue
-            type = int(val['X_TP_ConnType'])
-            if type == self.LAN:
+            conn = self.CLIENT_TYPES.get(int(val['X_TP_ConnType']))
+            if conn is None:
+                continue
+            elif conn == Connection.WIRED:
                 status.wired_total += 1
-                continue
-            if type in [self.WIFI_GUEST_2G, self.WIFI_GUEST_5G]:
+            elif conn.is_guest_wifi():
                 status.guest_clients_total += 1
-            elif type in [self.WIFI_2G, self.WIFI_5G]:
+            elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
-            else:
-                continue
-            devices[val['MACAddress']] = Device(self.CLIENT_TYPES[type],
+            devices[val['MACAddress']] = Device(conn,
                                                 macaddress.EUI48(val['MACAddress']),
                                                 ipaddress.IPv4Address(val['IPAddress']),
                                                 val['hostName'])
@@ -815,7 +888,7 @@ class TPLinkMRClient(AbstractRouter):
             if val['associatedDeviceMACAddress'] not in devices:
                 status.wifi_clients_total += 1
                 devices[val['associatedDeviceMACAddress']] = Device(
-                    Wifi.WIFI_2G,
+                    Connection.HOST_2G,
                     macaddress.EUI48(val['associatedDeviceMACAddress']),
                     ipaddress.IPv4Address('0.0.0.0'),
                     '')
@@ -895,11 +968,11 @@ class TPLinkMRClient(AbstractRouter):
 
         return ipv4_status
 
-    def set_wifi(self, wifi: Wifi, enable: bool) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
         acts = [
             self.ActItem(
                 self.ActItem.SET,
-                'LAN_WLAN' if wifi in [Wifi.WIFI_2G, Wifi.WIFI_5G] else 'LAN_WLAN_MSSIDENTRY',
+                'LAN_WLAN' if wifi in [Connection.HOST_2G, Connection.HOST_5G] else 'LAN_WLAN_MSSIDENTRY',
                 self.WIFI_SET[wifi],
                 attrs=['enable={}'.format(int(enable))]),
         ]
@@ -1179,7 +1252,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 10) -> AbstractRouter | None:
-        for client in [TPLinkMRClient, TPLinkDecoClient, TplinkRouter, TplinkC1200Router]:
+        for client in [TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter, TplinkC1200Router]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router

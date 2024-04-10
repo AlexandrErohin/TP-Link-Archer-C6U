@@ -1,7 +1,7 @@
 import macaddress
 import ipaddress
 from dataclasses import dataclass, field
-from tplinkrouterc6u.enum import Wifi
+from tplinkrouterc6u.enum import Connection
 
 
 @dataclass
@@ -14,7 +14,7 @@ class Firmware:
 
 @dataclass
 class Device:
-    def __init__(self, type: Wifi, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
+    def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
         self.type = type
         self._macaddr = macaddr
         self._ipaddr = ipaddr
