@@ -3,7 +3,7 @@ import macaddress
 import ipaddress
 from tplinkrouterc6u import (
     TPLinkMRClient,
-    Wifi,
+    Connection,
     Firmware,
     Status,
     Device,
@@ -181,16 +181,25 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
-        self.assertEqual(len(status.devices), 1)
+        self.assertEqual(len(status.devices), 2)
         self.assertIsInstance(status.devices[0], Device)
-        self.assertEqual(status.devices[0].type, Wifi.WIFI_5G)
-        self.assertEqual(status.devices[0].macaddr, 'F4-A3-86-2D-41-B5')
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
         self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '192.168.30.11')
+        self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
         self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'host2')
-        self.assertEqual(status.devices[0].packets_sent, 176)
-        self.assertEqual(status.devices[0].packets_received, 467)
+        self.assertEqual(status.devices[0].hostname, 'host1')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
+        self.assertIsInstance(status.devices[1], Device)
+        self.assertEqual(status.devices[1].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[1].macaddr, 'F4-A3-86-2D-41-B5')
+        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[1].ipaddr, '192.168.30.11')
+        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[1].hostname, 'host2')
+        self.assertEqual(status.devices[1].packets_sent, 176)
+        self.assertEqual(status.devices[1].packets_received, 467)
 
     def test_get_status_without_5G(self) -> None:
         response = '''[1,1,0,0,0,0]0
@@ -245,7 +254,16 @@ active=1
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
-        self.assertEqual(len(status.devices), 0)
+        self.assertEqual(len(status.devices), 1)
+        self.assertIsInstance(status.devices[0], Device)
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
+        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
+        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertEqual(status.devices[0].hostname, 'host1')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
 
     def test_get_status_with_wlan_dev(self) -> None:
         response = '''
@@ -303,7 +321,7 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
         self.assertEqual(len(status.devices), 1)
-        self.assertEqual(status.devices[0].type, Wifi.WIFI_2G)
+        self.assertEqual(status.devices[0].type, Connection.HOST_2G)
         self.assertEqual(status.devices[0].macaddr, 'F4-A3-86-2D-41-B8')
         self.assertEqual(status.devices[0].ipaddr, '0.0.0.0')
         self.assertEqual(status.devices[0].hostname, '')
@@ -586,7 +604,7 @@ DNSServers=0.0.0.0,0.0.0.0
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
-        client.set_wifi(Wifi.WIFI_2G, True)
+        client.set_wifi(Connection.HOST_2G, True)
 
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, '2\r\n[LAN_WLAN#1,1,0,0,0,0#0,0,0,0,0,0]0,1\r\nenable=1\r\n')

@@ -17,12 +17,12 @@ Enter the host & credentials used to log in to your router management page. User
 
 ```python
 from tplinkrouterc6u import (
-    TplinkRouterProvider, 
+    TplinkRouterProvider,
     TplinkRouter,
     TplinkC1200Router,
     TPLinkMRClient,
     TPLinkDecoClient,
-    Wifi
+    Connection
 )
 from logging import Logger
 
@@ -44,7 +44,7 @@ try:
     # Get status info - returns Status
     status = router.get_status()
     if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
-        router.set_wifi(Wifi.WIFI_GUEST_2G, True)  # turn on guest 2.4G wifi
+        router.set_wifi(Connection.GUEST_2G, True)  # turn on guest 2.4G wifi
 
     # Get Address reservations, sort by ipaddr
     reservations = router.get_ipv4_reservations()
@@ -76,17 +76,17 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 
 ## Functions
 | Function | Args | Description | Return |
-|--|--|--|--|
-| get_firmware |  | Gets firmware info about the router | [Firmware](#firmware) |
-| get_status |  | Gets status about the router info including wifi statuses and wifi clients info | [Status](#status) |
-| get_ipv4_status |  | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
-| get_ipv4_reservations |  | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
-| get_ipv4_dhcp_leases |  | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
-| set_wifi | wifi: [Wifi](#wifi), enable: bool | Allow to turn on/of 4 wifi networks |  |
-| send_sms | phone_number: str, message: str | Send sms for LTE routers |  |
-| reboot |  | reboot router |
-| authorize |  | authorize for actions |
-| logout |  | logout after all is done |
+|---|---|---|---|
+| get_firmware |   | Gets firmware info about the router | [Firmware](#firmware) |
+| get_status |   | Gets status about the router info including wifi statuses and connected devices info | [Status](#status) |
+| get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
+| get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
+| get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
+| set_wifi | wifi: [Connection](#connection), enable: bool | Allow to turn on/of 4 wifi networks |   |
+| send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
+| reboot |   | reboot router |
+| authorize |   | authorize for actions |
+| logout |   | logout after all is done |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -110,7 +110,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | wan_ipv4_gateway | router wan ipv4 gateway | str, None |
 | wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
 | wired_total | Total amount of wired clients | int |
-| wifi_clients_total | Total amount of main wifi clients | int |
+| wifi_clients_total | Total amount of host wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
 | clients_total | Total amount of all connected clients | int |
 | iot_clients_total | Total amount of all iot connected clients | int, None |
@@ -120,18 +120,18 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | iot_6g_enable | Is IoT wifi 6G enabled | bool, None |
-| wifi_2g_enable | Is main wifi 2.4G enabled | bool |
-| wifi_5g_enable | Is main wifi 5G enabled | bool, None |
-| wifi_6g_enable | Is main wifi 6G enabled | bool, None |
+| wifi_2g_enable | Is host wifi 2.4G enabled | bool |
+| wifi_5g_enable | Is host wifi 5G enabled | bool, None |
+| wifi_6g_enable | Is host wifi 6G enabled | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
-| mem_usage | Memory usage | float, None |
-| cpu_usage | CPU usage | float, None |
-| devices | List of all wifi clients | list[[Device](#device)] |
+| mem_usage | Memory usage in percentage between 0 and 1 | float, None |
+| cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
+| devices | List of all connectedd devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
 | Field | Description | Type |
 | --- |---|---|
-| type | client connection type (2.4G or 5G, guest wifi or main wifi) | [Wifi](#wifi) |
+| type | client connection type (2.4G or 5G, guest wifi or host wifi, wired) | [Connection](#connection) |
 | macaddr | client mac address | str |
 | macaddress | client mac address | macaddress |
 | ipaddr | client ip address | str |
@@ -186,16 +186,17 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | remote | router remote | bool, None |
 
 ## Enum
-### <a id="wifi">Wifi</a>
-- Wifi.WIFI_2G - main wifi 2.4G
-- Wifi.WIFI_5G - main wifi 5G
-- Wifi.WIFI_6G - main wifi 5G
-- Wifi.WIFI_GUEST_2G - guest wifi 2.4G
-- Wifi.WIFI_GUEST_5G - guest wifi 5G
-- Wifi.WIFI_GUEST_6G - guest wifi 5G
-- Wifi.WIFI_IOT_2G - IoT wifi 2.4G
-- Wifi.WIFI_IOT_5G - IoT wifi 5G
-- Wifi.WIFI_IOT_6G - IoT wifi 6G
+### <a id="connection">Connection</a>
+- Connection.HOST_2G - host wifi 2.4G
+- Connection.HOST_5G - host wifi 5G
+- Connection.HOST_6G - host wifi 5G
+- Connection.GUEST_2G - guest wifi 2.4G
+- Connection.GUEST_5G - guest wifi 5G
+- Connection.GUEST_6G - guest wifi 5G
+- Connection.IOT_2G - IoT wifi 2.4G
+- Connection.IOT_5G - IoT wifi 5G
+- Connection.IOT_6G - IoT wifi 6G
+- Connection.WIRED - Wired
 
 ## <a id="supports">Supported routers</a>
 ### Fully tested Hardware Versions
@@ -204,6 +205,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX12 v1.0
 - Archer AX20 v1.0
 - Archer AX21 v1.20
+- Archer AX23 v1.0
 - Archer AX50 v1.0
 - Archer AX55 v1.0
 - Archer AX55 V1.60

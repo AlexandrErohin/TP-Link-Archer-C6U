@@ -4,7 +4,7 @@ logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-8s %(m
 import macaddress
 import ipaddress
 from typing import TypeAlias
-from tplinkrouterc6u import Wifi, TplinkRouterProvider
+from tplinkrouterc6u import Connection, TplinkRouterProvider
 from tplinkrouterc6u.dataclass import Status, Device
 from mac_vendor_lookup import MacLookup, BaseMacLookup
 import pprint
@@ -36,7 +36,7 @@ print("testing Device dataclass")
 
 
 def get_device() -> Device:
-    d = Device(Wifi.WIFI_2G, macaddress.EUI48("11-22-33-44-55-66"), ipaddress.IPv4Address("192.168.0.1"), "router")
+    d = Device(Connection.HOST_2G, macaddress.EUI48("11-22-33-44-55-66"), ipaddress.IPv4Address("192.168.0.1"), "router")
     return d
 
 
