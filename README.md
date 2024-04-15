@@ -229,6 +229,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer VR900v
 - Deco M4 2.0
 - Deco M4R 2.0
+- Deco M9 Pro
 - Deco XE75 2.0
 - TL-WA3001 v1.0
 - TL-MR105
