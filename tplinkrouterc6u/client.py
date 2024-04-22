@@ -850,7 +850,7 @@ class TPLinkMRClient(AbstractRouter):
         for item in self._to_list(values.get('1')):
             if int(item['enable']) == 0 and values.get('1').__class__ == list:
                 continue
-            status._wan_macaddr = macaddress.EUI48(item['MACAddress'])
+            status._wan_macaddr = macaddress.EUI48(item['MACAddress']) if item.get('MACAddress') else None
             status._wan_ipv4_addr = ipaddress.IPv4Address(item['externalIPAddress'])
             status._wan_ipv4_gateway = ipaddress.IPv4Address(item['defaultGateway'])
 

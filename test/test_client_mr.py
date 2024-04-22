@@ -328,6 +328,53 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.devices[0].packets_sent, 176)
         self.assertEqual(status.devices[0].packets_received, 467)
 
+    def test_get_status_mr6400(self) -> None:
+        response = '''
+[1,1,0,0,0,0]0
+X_TP_MACAddress=30:DE:3B:15:D0:22
+IPInterfaceIPAddress=192.168.1.1
+[2,1,1,0,0,0]1
+enable=0
+MACAddress=
+externalIPAddress=0.0.0.0
+defaultGateway=0.0.0.0
+[1,1,0,0,0,0]2
+enable=0
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.wan_macaddr, None)
+        self.assertEqual(status.lan_macaddr, '30-DE-3B-15-D0-22')
+        self.assertEqual(status.wan_ipv4_addr, '0.0.0.0')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.1.1')
+        self.assertEqual(status.wan_ipv4_gateway, '0.0.0.0')
+        self.assertEqual(status.wired_total, 0)
+        self.assertEqual(status.wifi_clients_total, 0)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.clients_total, 0)
+        self.assertEqual(status.guest_2g_enable, False)
+        self.assertEqual(status.guest_5g_enable, None)
+        self.assertEqual(status.iot_2g_enable, None)
+        self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.wifi_2g_enable, False)
+        self.assertEqual(status.wifi_5g_enable, None)
+        self.assertEqual(status.wan_ipv4_uptime, None)
+        self.assertEqual(status.mem_usage, None)
+        self.assertEqual(status.cpu_usage, None)
+        self.assertEqual(len(status.devices), 0)
+
     def test_get_status_two_lan_ip(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=f5:e4:3b:e9:bf:c7
