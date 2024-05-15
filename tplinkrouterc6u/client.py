@@ -269,7 +269,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     _perf_status = True
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 10) -> None:
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
@@ -468,7 +468,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
 class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 10) -> None:
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_firmware = 'admin/firmware?form=upgrade'
@@ -478,7 +478,7 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
 
 class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 10) -> None:
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._headers_request = {'Content-Type': 'application/json'}
@@ -751,7 +751,7 @@ class TPLinkMRClient(AbstractRouter):
             self.attrs = attrs
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 10) -> None:
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self.req = requests.Session()
@@ -1251,7 +1251,7 @@ class TPLinkMRClient(AbstractRouter):
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
-                   verify_ssl: bool = True, timeout: int = 10) -> AbstractRouter | None:
+                   verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter | None:
         for client in [TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter, TplinkC1200Router]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
