@@ -246,6 +246,8 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.HOST_5G)
         self.assertEqual(status.devices[0].macaddr, 'CF-51-C9-04-E1-02')
+        self.assertEqual(status.devices[0].down_speed, 3)
+        self.assertEqual(status.devices[0].up_speed, 17)
         self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.IOT_2G)
