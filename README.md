@@ -139,6 +139,8 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 | hostname | client hostname | str |
 | packets_sent | total packets sent | int, None |
 | packets_received | total packets received | int, None |
+| down_speed | download speed | int, None |
+| up_speed | upload speed | int, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -207,6 +209,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX21 v1.20
 - Archer AX23 v1.0
 - Archer AX50 v1.0
+- Archer AX53 v2
 - Archer AX55 v1.0
 - Archer AX55 V1.60
 - Archer AX72 V1
