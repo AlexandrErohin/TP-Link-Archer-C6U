@@ -11,7 +11,7 @@ import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Connection
-from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.dataclass import Firmware, Ledstatus, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
 
@@ -300,11 +300,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
         self.request(path, data)
 
-    def set_led(self, enable: bool) -> None:
-        current_state = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read').get('enable', 'off') == 'on'
-        if current_state != enable:
-            self.request('admin/ledgeneral?form=setting&operation=read', 'operation=write')
-
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 
@@ -322,9 +317,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
-        led_status = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
+        
         status = Status()
-        status.led = led_status.get('enable', 'off') == 'on'
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
         status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
@@ -713,6 +707,20 @@ class TplinkC1200Router(TplinkBaseRouter):
                 self._logger.error(error)
             raise ClientException(error)
 
+    def set_led(self, enable: bool) -> None:
+        current_state = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read').get('enable', 'off') == 'on'
+        if current_state != enable:
+            self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
+
+    def get_led(self) -> Ledstatus:
+        data = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
+        led_status = data.get('enable') if 'enable' in data else None
+        if led_status == 'on':
+            return True
+        elif led_status == 'off':
+            return False
+        else:
+            return None
 
 class TPLinkMRClient(AbstractRouter):
     REQUEST_RETRIES = 3
