@@ -11,6 +11,10 @@ class Firmware:
         self.model = model
         self.firmware_version = firmware
 
+@dataclass
+class Ledstatus:
+    def __init__(self, led_status: str) -> None:
+        self.led: bool | None = None
 
 @dataclass
 class Device:
@@ -21,8 +25,6 @@ class Device:
         self.hostname = hostname
         self.packets_sent: int | None = None
         self.packets_received: int | None = None
-        self.down_speed: int | None = None
-        self.up_speed: int | None = None
 
     @property
     def macaddr(self):
@@ -44,7 +46,6 @@ class Device:
 @dataclass
 class Status:
     def __init__(self) -> None:
-        self.led: bool | None = None
         self._wan_macaddr: macaddress.EUI48 | None = None
         self._lan_macaddr: macaddress
         self._wan_ipv4_addr: ipaddress.IPv4Address | None = None
