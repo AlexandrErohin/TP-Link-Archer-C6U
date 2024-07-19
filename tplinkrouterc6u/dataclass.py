@@ -44,6 +44,7 @@ class Device:
 @dataclass
 class Status:
     def __init__(self) -> None:
+        self.led: bool | None = None
         self._wan_macaddr: macaddress.EUI48 | None = None
         self._lan_macaddr: macaddress
         self._wan_ipv4_addr: ipaddress.IPv4Address | None = None
