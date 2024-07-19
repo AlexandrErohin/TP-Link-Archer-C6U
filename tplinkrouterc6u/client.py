@@ -575,10 +575,13 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 status.iot_clients_total += 1
 
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
-            devices.append(Device(conn,
+            device = Device(conn,
                                   macaddress.EUI48(item['mac']),
                                   ipaddress.IPv4Address(ip),
-                                  base64.b64decode(item['name']).decode()))
+                                  base64.b64decode(item['name']).decode())
+            device.down_speed = item.get('down_speed')
+            device.up_speed = item.get('up_speed')
+            devices.append(device)
 
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (0 if status.iot_clients_total is None else status.iot_clients_total))
