@@ -300,6 +300,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
         self.request(path, data)
 
+    def set_led(self, enable: bool) -> None:
+        current_state = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read').get('enable', 'off') == 'on'
+        if current_state != enable:
+            self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
+
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 
@@ -317,7 +322,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
+        led_status = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
         status = Status()
+        status.led = led_status.get('enable', 'off') == 'on'
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
         status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
@@ -575,13 +582,10 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 status.iot_clients_total += 1
 
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
-            device = Device(conn,
+            devices.append(Device(conn,
                                   macaddress.EUI48(item['mac']),
                                   ipaddress.IPv4Address(ip),
-                                  base64.b64decode(item['name']).decode())
-            device.down_speed = item.get('down_speed')
-            device.up_speed = item.get('up_speed')
-            devices.append(device)
+                                  base64.b64decode(item['name']).decode()))
 
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (0 if status.iot_clients_total is None else status.iot_clients_total))
@@ -1046,7 +1050,7 @@ class TPLinkMRClient(AbstractRouter):
         lines = response.split('\n')
         for l in lines:
             if l.startswith('['):
-                regexp = re.search('\[\d,\d,\d,\d,\d,\d\](\d)', l)
+                regexp = re.search(r'\[\d,\d,\d,\d,\d,\d\](\d)', l)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)
@@ -1236,7 +1240,8 @@ class TPLinkMRClient(AbstractRouter):
         Return value:
             return code (int)
         '''
-        result = re.search('\$\.ret=(.*);', response_text)
+        result = re.search(r'\$\.ret=(.*);', response_text)
+
         assert result is not None
         assert result.group(1).isnumeric()
 
