@@ -11,6 +11,10 @@ class Firmware:
         self.model = model
         self.firmware_version = firmware
 
+@dataclass
+class Ledstatus:
+    def __init__(self, led_status: str) -> None:
+        self.led: bool | None = None
 
 @dataclass
 class Device:
