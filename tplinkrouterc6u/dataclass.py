@@ -25,6 +25,8 @@ class Device:
         self.hostname = hostname
         self.packets_sent: int | None = None
         self.packets_received: int | None = None
+        self.down_speed: int | None = None
+        self.up_speed: int | None = None
 
     @property
     def macaddr(self):
