@@ -722,6 +722,58 @@ class TplinkC1200Router(TplinkBaseRouter):
         else:
             return None
 
+    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None, encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None, hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None, disabled_all: str = None) -> None:
+        values = {
+            Connection.HOST_2G: 'wireless_2g',
+            Connection.HOST_5G: 'wireless_5g',
+            Connection.HOST_6G: 'wireless_6g',
+            Connection.GUEST_2G: 'guest_2g',
+            Connection.GUEST_5G: 'guest_5g',
+            Connection.GUEST_6G: 'guest_6g',
+            Connection.IOT_2G: 'iot_2g',
+            Connection.IOT_5G: 'iot_5g',
+            Connection.IOT_6G: 'iot_6g',
+        }
+        
+        value = values.get(wifi)
+        if not value:
+            raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
+        
+        if enable is None and ssid is None and hidden is None and encryption is None and psk_version is None and psk_cipher is None and psk_key is None and hwmode is None and htmode is None and channel is None and txpower is None and disabled_all is None:
+            raise ValueError("At least one wireless setting must be provided")
+        
+        
+        data = "operation=write"
+        
+        if enable is not None:
+            data += f"&enable={'on' if enable else 'off'}"
+        if ssid is not None:
+            data += f"&ssid={ssid}"
+        if hidden is not None:
+            data += f"&hidden={hidden}"
+        if encryption is not None:
+            data += f"&encryption={encryption}"
+        if psk_version is not None:
+            data += f"&psk_version={psk_version}"
+        if psk_cipher is not None:
+            data += f"&psk_cipher={psk_cipher}"
+        if psk_key is not None:
+            data += f"&psk_key={psk_key}"
+        if hwmode is not None:
+            data += f"&hwmode={hwmode}"
+        if htmode is not None:
+            data += f"&htmode={htmode}"
+        if channel is not None:
+            data += f"&channel={channel}"
+        if txpower is not None:
+            data += f"&txpower={txpower}"
+        if disabled_all is not None:
+            data += f"&disabled_all={disabled_all}"
+        
+        path = f"admin/wireless?form={value}&{data}"
+        
+        self.request(path, data)
+
 class TPLinkMRClient(AbstractRouter):
     REQUEST_RETRIES = 3
 
