@@ -12,11 +12,6 @@ class Firmware:
         self.firmware_version = firmware
 
 @dataclass
-class Ledstatus:
-    def __init__(self, led_status: str) -> None:
-        self.led: bool | None = None
-
-@dataclass
 class Device:
     def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
         self.type = type
