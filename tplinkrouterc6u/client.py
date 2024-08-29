@@ -11,7 +11,7 @@ import ipaddress
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Connection
-from tplinkrouterc6u.dataclass import Firmware, Ledstatus, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
 
@@ -712,7 +712,7 @@ class TplinkC1200Router(TplinkBaseRouter):
         if current_state != enable:
             self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
 
-    def get_led(self) -> Ledstatus:
+    def get_led(self) -> bool:
         data = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
         led_status = data.get('enable') if 'enable' in data else None
         if led_status == 'on':
