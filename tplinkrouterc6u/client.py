@@ -385,6 +385,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                         if status.iot_clients_total is None:
                             status.iot_clients_total = 0
                         status.iot_clients_total += 1
+                
+                devices[item['mac']].down_speed = item['downloadSpeed']
+                devices[item['mac']].up_speed = item['uploadSpeed']
 
         for item in self.request('admin/wireless?form=statistics', 'operation=load'):
             if item['mac'] not in devices:
@@ -579,8 +582,6 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                                   macaddress.EUI48(item['mac']),
                                   ipaddress.IPv4Address(ip),
                                   base64.b64decode(item['name']).decode())
-            device.down_speed = item.get('down_speed')
-            device.up_speed = item.get('up_speed')
             devices.append(device)
 
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
