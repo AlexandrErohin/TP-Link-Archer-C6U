@@ -11,7 +11,6 @@ class Firmware:
         self.model = model
         self.firmware_version = firmware
 
-
 @dataclass
 class Device:
     def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:

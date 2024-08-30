@@ -317,6 +317,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
+        
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
@@ -706,6 +707,20 @@ class TplinkC1200Router(TplinkBaseRouter):
                 self._logger.error(error)
             raise ClientException(error)
 
+    def set_led(self, enable: bool) -> None:
+        current_state = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read').get('enable', 'off') == 'on'
+        if current_state != enable:
+            self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
+
+    def get_led(self) -> bool:
+        data = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
+        led_status = data.get('enable') if 'enable' in data else None
+        if led_status == 'on':
+            return True
+        elif led_status == 'off':
+            return False
+        else:
+            return None
 
 class TPLinkMRClient(AbstractRouter):
     REQUEST_RETRIES = 3
