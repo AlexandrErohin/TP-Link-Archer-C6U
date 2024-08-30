@@ -712,7 +712,9 @@ class TplinkC1200Router(TplinkBaseRouter):
         if current_state != enable:
             self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
 
-    def get_led(self) -> Ledstatus:
+
+    def get_led(self) -> bool:
+
         data = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
         led_status = data.get('enable') if 'enable' in data else None
         if led_status == 'on':

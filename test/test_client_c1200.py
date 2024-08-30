@@ -6,7 +6,6 @@ from tplinkrouterc6u import (
     ClientException
 )
 
-
 class TestTPLinkC1200Client(unittest.TestCase):
 
     def test_set_led_on(self) -> None:
@@ -102,6 +101,7 @@ class TestTPLinkC1200Client(unittest.TestCase):
 
         led_status = client.get_led()
         self.assertTrue(led_status)
+
 
     def test_set_wifi(self) -> None:
 
