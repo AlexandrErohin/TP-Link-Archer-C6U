@@ -317,7 +317,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
-        
+
         status = Status()
         status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
         status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
@@ -386,6 +386,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                         if status.iot_clients_total is None:
                             status.iot_clients_total = 0
                         status.iot_clients_total += 1
+
+                devices[item['mac']].down_speed = item.get('downloadSpeed')
+                devices[item['mac']].up_speed = item.get('uploadSpeed')
 
         for item in self.request('admin/wireless?form=statistics', 'operation=load'):
             if item['mac'] not in devices:
@@ -577,9 +580,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
             device = Device(conn,
-                                  macaddress.EUI48(item['mac']),
-                                  ipaddress.IPv4Address(ip),
-                                  base64.b64decode(item['name']).decode())
+                            macaddress.EUI48(item['mac']),
+                            ipaddress.IPv4Address(ip),
+                            base64.b64decode(item['name']).decode())
             device.down_speed = item.get('down_speed')
             device.up_speed = item.get('up_speed')
             devices.append(device)
@@ -708,10 +711,10 @@ class TplinkC1200Router(TplinkBaseRouter):
             raise ClientException(error)
 
     def set_led(self, enable: bool) -> None:
-        current_state = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read').get('enable', 'off') == 'on'
+        current_state = (self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
+                         .get('enable', 'off') == 'on')
         if current_state != enable:
             self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
-
 
     def get_led(self) -> bool:
 
@@ -724,7 +727,10 @@ class TplinkC1200Router(TplinkBaseRouter):
         else:
             return None
 
-    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None, encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None, hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None, disabled_all: str = None) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
+                 encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
+                 hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
+                 disabled_all: str = None) -> None:
         values = {
             Connection.HOST_2G: 'wireless_2g',
             Connection.HOST_5G: 'wireless_5g',
@@ -736,17 +742,16 @@ class TplinkC1200Router(TplinkBaseRouter):
             Connection.IOT_5G: 'iot_5g',
             Connection.IOT_6G: 'iot_6g',
         }
-        
+
         value = values.get(wifi)
         if not value:
             raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
-        
+
         if enable is None and ssid is None and hidden is None and encryption is None and psk_version is None and psk_cipher is None and psk_key is None and hwmode is None and htmode is None and channel is None and txpower is None and disabled_all is None:
             raise ValueError("At least one wireless setting must be provided")
-        
-        
+
         data = "operation=write"
-        
+
         if enable is not None:
             data += f"&enable={'on' if enable else 'off'}"
         if ssid is not None:
@@ -771,10 +776,11 @@ class TplinkC1200Router(TplinkBaseRouter):
             data += f"&txpower={txpower}"
         if disabled_all is not None:
             data += f"&disabled_all={disabled_all}"
-        
+
         path = f"admin/wireless?form={value}&{data}"
-        
+
         self.request(path, data)
+
 
 class TPLinkMRClient(AbstractRouter):
     REQUEST_RETRIES = 3
