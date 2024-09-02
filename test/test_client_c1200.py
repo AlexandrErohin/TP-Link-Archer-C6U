@@ -2,9 +2,9 @@ import unittest
 import json
 from tplinkrouterc6u import (
     TplinkC1200Router,
+    Connection,
     ClientException
 )
-
 
 class TestTPLinkC1200Client(unittest.TestCase):
 
@@ -101,6 +101,41 @@ class TestTPLinkC1200Client(unittest.TestCase):
 
         led_status = client.get_led()
         self.assertTrue(led_status)
+
+
+    def test_set_wifi(self) -> None:
+
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+
+                self.captured_path = path
+                self.captured_data = data
+
+        client = TPLinkRouterTest('', '')
+        client.set_wifi(
+            Connection.HOST_5G,
+            enable=True,
+            ssid="TestSSID",
+            hidden="no",
+            encryption="WPA3-PSK",
+            psk_version="2",
+            psk_cipher="AES",
+            psk_key="testkey123",
+            hwmode="11ac",
+            htmode="VHT20",
+            channel=36,
+            txpower="20",
+            disabled_all="no"
+        )
+        
+        expected_data = ("operation=write&enable=on&ssid=TestSSID&hidden=no&encryption=WPA3-PSK&"
+                         "psk_version=2&psk_cipher=AES&psk_key=testkey123&hwmode=11ac&"
+                         "htmode=VHT20&channel=36&txpower=20&disabled_all=no")
+        expected_path = f"admin/wireless?form=wireless_5g&{expected_data}"
+        
+        self.assertEqual(client.captured_path, expected_path)
+        self.assertEqual(client.captured_data, expected_data)
 
 if __name__ == '__main__':
     unittest.main()
