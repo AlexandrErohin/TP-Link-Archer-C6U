@@ -211,8 +211,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX23 v1.0
 - Archer AX50 v1.0
 - Archer AX53 v2
-- Archer AX55 v1.0
-- Archer AX55 V1.60
+- Archer AX55 (v1.0, V1.60, v4.0)
 - Archer AX72 V1
 - Archer AX73 V1
 - Archer AX75 V1
@@ -221,21 +220,20 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
+- Archer BE800 v1.0
 - Archer BE805 v1.0
 - Archer C1200 v2.0 (You need to use [web encrypted password](#encrypted_pass))
 - Archer C2300 v1.0 (You need to use [web encrypted password](#encrypted_pass))
-- Archer C6 v2.0
-- Archer C6 v3.0
+- Archer C6 (v2.0, v3.0)
 - Archer C6U v1.0
-- Archer C7 v5.0
-- Archer MR200 v5
-- Archer MR200 v5.3
-- Archer MR600 v1
-- Archer MR600 v3
+- Archer C7 (v4.0, v5.0)
+- Archer MR200 (v5, v5.3)
+- Archer MR600 (v1, v3)
+- Archer VR2100v v1
 - Archer VR900v
 - Deco M4 2.0
 - Deco M4R 2.0
-- Deco M5
+- Deco M5 v3
 - Deco M9 Pro
 - Deco P7
 - Deco X20 
@@ -244,8 +242,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Deco XE75 2.0
 - TL-WA3001 v1.0
 - TL-MR105
-- TL-MR6400 v5
-- TL-MR6400 v5.3
+- TL-MR6400 (v5, v5.3)
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
@@ -261,7 +258,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C900 V1
 - Archer C1200 V3
 - Archer C1900 V2
-- Archer C2300 (V1, V2)
+- Archer C2300 V2
 - Archer C4000 (V2 and V3)
 - Archer C5400 V2
 - Archer C5400X V1
