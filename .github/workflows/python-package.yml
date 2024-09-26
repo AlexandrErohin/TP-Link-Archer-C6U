@@ -1,6 +1,5 @@
 name: Python Package
 on:
-  push:
   pull_request:
 jobs:
   ci:
@@ -26,3 +25,5 @@ jobs:
       - name: Test with unittest
         run: |
           python -m unittest discover -s ./test
+      - name: Run flake8
+        uses: py-actions/flake8@v2

@@ -152,7 +152,7 @@ class TplinkEncryption(TplinkRequest):
         try:
             response.json()
             is_valid_json = True
-        except:
+        except BaseException:
             """Ignore"""
 
         if is_valid_json is False or response.status_code == 403:
@@ -255,8 +255,9 @@ class TplinkEncryption(TplinkRequest):
         data_len = len(encrypted_data)
         hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len, self._logged == False, hash, self.nn,
-                                              self.ee)
+        sign = self._encryption.get_signature(int(self._seq) + data_len,
+                                              True if self._logged is False else False,
+                                              hash, self.nn, self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
 
@@ -346,7 +347,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 performance = self.request('admin/status?form=perf&operation=read', 'operation=read')
                 status.mem_usage = performance.get('mem_usage')
                 status.cpu_usage = performance.get('cpu_usage')
-            except:
+            except BaseException:
                 self._perf_status = False
 
         devices = {}
@@ -653,11 +654,13 @@ class TplinkC6V4Router(AbstractRouter):
         url = '{}/?code=2&asyn=1'.format(self.host)
         try:
             response = requests.post(url, timeout=self.timeout, verify=self._verify_ssl)
-        except:
+        except BaseException:
             return False
         if response.status_code == 401 and response.text.startswith('00'):
-            raise ClientException(
-                'Your router is not supported. Please add your router support to https://github.com/AlexandrErohin/TP-Link-Archer-C6U by implementing methods for TplinkC6V4Router class')
+            raise ClientException(('Your router is not supported. Please add your router support to '
+                                   'https://github.com/AlexandrErohin/TP-Link-Archer-C6U'
+                                   'by implementing methods for TplinkC6V4Router class'
+                                   ))
         return False
 
     def authorize(self) -> None:
@@ -747,7 +750,8 @@ class TplinkC1200Router(TplinkBaseRouter):
         if not value:
             raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
 
-        if enable is None and ssid is None and hidden is None and encryption is None and psk_version is None and psk_cipher is None and psk_key is None and hwmode is None and htmode is None and channel is None and txpower is None and disabled_all is None:
+        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                   htmode, channel, txpower, disabled_all]):
             raise ValueError("At least one wireless setting must be provided")
 
         data = "operation=write"
@@ -1119,9 +1123,9 @@ class TPLinkMRClient(AbstractRouter):
         result = {}
         obj = {}
         lines = response.split('\n')
-        for l in lines:
-            if l.startswith('['):
-                regexp = re.search('\[\d,\d,\d,\d,\d,\d\](\d)', l)
+        for line in lines:
+            if line.startswith('['):
+                regexp = re.search('\[\d,\d,\d,\d,\d,\d\](\d)', line)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)
@@ -1133,8 +1137,8 @@ class TPLinkMRClient(AbstractRouter):
                     else:
                         result[index] = obj
                 continue
-            if '=' in l:
-                keyval = l.split('=')
+            if '=' in line:
+                keyval = line.split('=')
                 assert len(keyval) == 2
 
                 obj[keyval[0]] = keyval[1]
