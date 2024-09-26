@@ -1,7 +1,7 @@
-import unittest
-import json
-import macaddress
-import ipaddress
+from unittest import main, TestCase
+from json import loads
+from macaddress import EUI48
+from ipaddress import IPv4Address
 from tplinkrouterc6u import (
     TPLinkDecoClient,
     Connection,
@@ -12,7 +12,7 @@ from tplinkrouterc6u import (
 )
 
 
-class TestTPLinkDecoClient(unittest.TestCase):
+class TestTPLinkDecoClient(TestCase):
 
     def test_get_status(self) -> None:
         response_network = '''
@@ -81,13 +81,13 @@ class TestTPLinkDecoClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=wan_ipv4':
-                    return json.loads(response_network)['result']
+                    return loads(response_network)['result']
                 elif path == 'admin/network?form=performance':
-                    return json.loads(response_performance)['result']
+                    return loads(response_performance)['result']
                 elif path == 'admin/wireless?form=wlan':
-                    return json.loads(response_wireless)['result']
+                    return loads(response_wireless)['result']
                 elif path == 'admin/client?form=client_list':
-                    return json.loads(response_clients)['result']
+                    return loads(response_clients)['result']
 
         client = TPLinkRouterTest('', '')
         status = client.get_status()
@@ -95,7 +95,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, '44-E1-52-8C-40-36')
         self.assertEqual(status.lan_macaddr, '44-E1-52-8C-40-37')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, '192.168.1.11')
         self.assertEqual(status.lan_ipv4_addr, '192.168.68.1')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.1.1')
@@ -120,9 +120,9 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.HOST_5G)
         self.assertEqual(status.devices[0].macaddr, 'CF-51-C9-04-E1-02')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.68.101')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'wireless1')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
@@ -216,13 +216,13 @@ class TestTPLinkDecoClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=wan_ipv4':
-                    return json.loads(response_network)['result']
+                    return loads(response_network)['result']
                 elif path == 'admin/network?form=performance':
-                    return json.loads(response_performance)['result']
+                    return loads(response_performance)['result']
                 elif path == 'admin/wireless?form=wlan':
-                    return json.loads(response_wireless)['result']
+                    return loads(response_wireless)['result']
                 elif path == 'admin/client?form=client_list':
-                    return json.loads(response_clients)['result']
+                    return loads(response_clients)['result']
 
         client = TPLinkRouterTest('', '')
         status = client.get_status()
@@ -248,7 +248,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertEqual(status.devices[0].macaddr, 'CF-51-C9-04-E1-02')
         self.assertEqual(status.devices[0].down_speed, 3)
         self.assertEqual(status.devices[0].up_speed, 17)
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.IOT_2G)
         self.assertEqual(status.devices[1].macaddr, '5F-F8-08-28-AF-54')
@@ -297,13 +297,13 @@ class TestTPLinkDecoClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=wan_ipv4':
-                    return json.loads(response_network)['result']
+                    return loads(response_network)['result']
                 elif path == 'admin/network?form=performance':
-                    return json.loads(response_performance)['result']
+                    return loads(response_performance)['result']
                 elif path == 'admin/wireless?form=wlan':
-                    return json.loads(response_wireless)['result']
+                    return loads(response_wireless)['result']
                 elif path == 'admin/client?form=client_list':
-                    return json.loads(response_clients)['result']
+                    return loads(response_clients)['result']
 
         client = TPLinkRouterTest('', '')
         status = client.get_status()
@@ -311,7 +311,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, '44-E1-52-8C-40-36')
         self.assertEqual(status.lan_macaddr, '44-E1-52-8C-40-37')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, None)
         self.assertEqual(status.lan_ipv4_addr, '192.168.68.1')
         self.assertEqual(status.wan_ipv4_gateway, None)
@@ -346,7 +346,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=wan_ipv4':
-                    return json.loads(response_network)['result']
+                    return loads(response_network)['result']
 
         client = TPLinkRouterTest('', '')
         result = client.get_ipv4_status()
@@ -385,7 +385,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=wan_ipv4':
-                    return json.loads(response_network)['result']
+                    return loads(response_network)['result']
 
         client = TPLinkRouterTest('', '')
         result = client.get_ipv4_status()
@@ -416,7 +416,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         "device_model": "M4R", "hw_id": "fgtrhxg43rgsdgbfdgbf", "device_type": "HOMEWIFISYSTEM"}]},
 "error_code": 0}
     '''
-        response_firmware = json.loads(response_firmware)
+        response_firmware = loads(response_firmware)
 
         class TPLinkRouterTest(TPLinkDecoClient):
             def request(self, path: str, data: str,
@@ -452,7 +452,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         "signal_level": {"band5": "0", "band2_4": "0"}, "product_level": 100, "device_ip": "192.168.68.1",
         "device_model": "M4R", "hw_id": "jhfjhtyjghjfghj", "device_type": "HOMEWIFISYSTEM"}]}, "error_code": 0}
         '''
-        response_firmware = json.loads(response_firmware)
+        response_firmware = loads(response_firmware)
 
         class TPLinkRouterTest(TPLinkDecoClient):
             def request(self, path: str, data: str,
@@ -530,7 +530,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
                 "device_model": "M4R", "hw_id": "fgtrhxg43rgsdgbfdgbf", "device_type": "HOMEWIFISYSTEM"}]},
         "error_code": 0}
             '''
-        response_firmware = json.loads(response_firmware)
+        response_firmware = loads(response_firmware)
         check_url = ''
         check_data = ''
 
@@ -552,4 +552,4 @@ class TestTPLinkDecoClient(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()
