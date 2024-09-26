@@ -6,6 +6,7 @@ from tplinkrouterc6u import (
     ClientException
 )
 
+
 class TestTPLinkC1200Client(unittest.TestCase):
 
     def test_set_led_on(self) -> None:
@@ -37,11 +38,11 @@ class TestTPLinkC1200Client(unittest.TestCase):
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
-        
+
         client.set_led(True)
 
         expected_path = "admin/ledgeneral?form=setting&operation=write"
-        
+
         self.assertEqual(client.captured_path, expected_path)
 
     def test_set_led_off(self) -> None:
@@ -77,7 +78,7 @@ class TestTPLinkC1200Client(unittest.TestCase):
         client.set_led(False)
 
         expected_path = "admin/ledgeneral?form=setting&operation=write"
-        
+
         self.assertEqual(client.captured_path, expected_path)
 
     def test_led_status(self) -> None:
@@ -89,7 +90,7 @@ class TestTPLinkC1200Client(unittest.TestCase):
             "ledpm_support": "yes"
         }
         '''
-        
+
         class TPLinkRouterTest(TplinkC1200Router):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
@@ -101,7 +102,6 @@ class TestTPLinkC1200Client(unittest.TestCase):
 
         led_status = client.get_led()
         self.assertTrue(led_status)
-
 
     def test_set_wifi(self) -> None:
 
@@ -128,14 +128,15 @@ class TestTPLinkC1200Client(unittest.TestCase):
             txpower="20",
             disabled_all="no"
         )
-        
+
         expected_data = ("operation=write&enable=on&ssid=TestSSID&hidden=no&encryption=WPA3-PSK&"
                          "psk_version=2&psk_cipher=AES&psk_key=testkey123&hwmode=11ac&"
                          "htmode=VHT20&channel=36&txpower=20&disabled_all=no")
         expected_path = f"admin/wireless?form=wireless_5g&{expected_data}"
-        
+
         self.assertEqual(client.captured_path, expected_path)
         self.assertEqual(client.captured_data, expected_data)
+
 
 if __name__ == '__main__':
     unittest.main()

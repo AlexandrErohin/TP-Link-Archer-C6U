@@ -25,7 +25,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
             "mask": "255.255.255.0",
             "gateway": "192.168.1.1",
             "ip": "192.168.1.11"
-            }, 
+            },
         "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
     "lan": {
         "ip_info": {
@@ -38,7 +38,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         response_wireless = '''
 {"result": {
     "band5_1": {"backhaul": {"channel": 44},
-        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
                     "enable": false, "need_set_vlan": false},
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
         "enable": true, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
@@ -161,7 +161,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
     "wan": {
         "ip_info": {
             "mac": "44:e1:52:8c:40:36", "dns2": "0.0.0.0", "dns1": "0.0.0.0", "mask": "", "gateway": "", "ip": ""
-            }, 
+            },
         "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
     "lan": {
         "ip_info": {
@@ -174,12 +174,12 @@ class TestTPLinkDecoClient(unittest.TestCase):
         response_wireless = '''
 {"result": {
     "band5_1": {"backhaul": {"channel": 44},
-        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
                     "enable": false, "need_set_vlan": false},
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
         "enable": false, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
     "band6": {"backhaul": {"channel": 37},
-        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
                     "enable": false, "need_set_vlan": false},
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
         "enable": true, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
@@ -195,17 +195,17 @@ class TestTPLinkDecoClient(unittest.TestCase):
                 "online": true, "name": "d2lyZWxlc3Mx", "enable_priority": false, "remain_time": 0,
                 "owner_id": "", "client_type": "other", "interface": "main"},
         {"mac": "5f:f8:08:28:af:54", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
-                "connection_type": "band2_4", "space_id": "1", "ip": "192.168.68.100", "online": true, "name": "d2lyZWQx",
-                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
-                "interface": "iot"},
+                "connection_type": "band2_4", "space_id": "1", "ip": "192.168.68.100", "online": true,
+                "name": "d2lyZWQx", "enable_priority": false, "remain_time": 0, "owner_id": "",
+                "client_type": "iot_device", "interface": "iot"},
         {"mac": "5f:f8:08:28:af:55", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
-                "connection_type": "band5", "space_id": "1", "ip": "192.168.68.101", "online": true, "name": "d2lyZWQx",
-                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
-                "interface": "iot"},
+                "connection_type": "band5", "space_id": "1", "ip": "192.168.68.101", "online": true,
+                "name": "d2lyZWQx", "enable_priority": false, "remain_time": 0, "owner_id": "",
+                "client_type": "iot_device", "interface": "iot"},
         {"mac": "5f:f8:08:28:af:56", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
-                "connection_type": "band6", "space_id": "1", "ip": "192.168.68.102", "online": true, "name": "d2lyZWQx",
-                "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device",
-                "interface": "iot"},
+                "connection_type": "band6", "space_id": "1", "ip": "192.168.68.102", "online": true,
+                "name": "d2lyZWQx", "enable_priority": false, "remain_time": 0, "owner_id": "",
+                "client_type": "iot_device", "interface": "iot"},
         {"mac": "5f:f8:08:28:af:57", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
                 "space_id": "1", "ip": "192.168.68.103", "online": true, "name": "d2lyZWQx",
                 "enable_priority": false, "remain_time": 0, "owner_id": "", "client_type": "iot_device"}
@@ -268,7 +268,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
     "wan": {
         "ip_info": {
             "mac": "44:e1:52:8c:40:36", "dns2": "0.0.0.0", "dns1": "0.0.0.0", "mask": "", "gateway": "", "ip": ""
-            }, 
+            },
         "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
     "lan": {
         "ip_info": {
@@ -281,7 +281,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
         response_wireless = '''
 {"result": {
     "band5_1": {"backhaul": {"channel": 44},
-        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591, 
+        "guest": {"password": "dGVzdDExMQ==", "ssid": "dGVzdF9HdWVzdA==", "vlan_id": 591,
                     "enable": false, "need_set_vlan": false},
         "host": {"password": "dGVzdDExMQ==", "ssid": "dGVzdA==", "channel": 44,
         "enable": true, "mode": "11ac", "channel_width": "HT80", "enable_hide_ssid": false}}, "is_eg": false,
@@ -332,7 +332,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
                     "mask": "255.255.255.0",
                     "gateway": "192.168.1.1",
                     "ip": "192.168.1.11"
-                    }, 
+                    },
                 "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
             "lan": {
                 "ip_info": {
@@ -371,7 +371,7 @@ class TestTPLinkDecoClient(unittest.TestCase):
     "wan": {
         "ip_info": {
             "mac": "44:e1:52:8c:40:36", "dns2": "0.0.0.0", "dns1": "0.0.0.0", "mask": "", "gateway": "", "ip": ""
-            }, 
+            },
         "dial_type": "dynamic_ip", "info": {}, "enable_auto_dns": true},
     "lan": {
         "ip_info": {
@@ -510,21 +510,22 @@ class TestTPLinkDecoClient(unittest.TestCase):
                 check_data = data
 
         client = TPLinkRouterTest('', '')
-        client.devices = [{'mac': 'test_mac1'}, {'mac': 'test_mac2'}, ]
+        client.devices = [{'mac': 'mac1'}, {'mac': 'mac2'}, ]
         result = client.reboot()
         self.assertIsNone(result)
         self.assertEqual(check_url, 'admin/device?form=system')
         self.assertEqual(check_data,
-                         '{"operation": "reboot", "params": {"mac_list": [{"mac": "test_mac1"}, {"mac": "test_mac2"}]}}')
+                         '{"operation": "reboot", "params": {"mac_list": [{"mac": "mac1"}, {"mac": "mac2"}]}}')
 
     def test_reboot_no_firmware(self) -> None:
         response_firmware = '''
         {"result": {"device_list": [
                 {"nand_flash": false, "hardware_ver": "2.0", "bssid_sta_2g": "",
                 "software_ver": "1.6.1 Build 20231227 Rel. 80438", "role": "master", "bssid_sta_5g": "",
-                "inet_status": "online", "nickname": "bedroom", "oversized_firmware": false, "bssid_5g": "6b:3a:9b:93:f4:15",
-                "set_gateway_support": true, "inet_error_msg": "well", "group_status": "connected", "mac": "84:a0:d0:37:c7:44",
-                "bssid_2g": "5c:c6:06:e7:87:d9", "support_plc": false, "oem_id": "fdfgdfgdgdfgdfg",
+                "inet_status": "online", "nickname": "bedroom", "oversized_firmware": false,
+                "bssid_5g": "6b:3a:9b:93:f4:15", "set_gateway_support": true, "inet_error_msg": "well",
+                "group_status": "connected", "mac": "84:a0:d0:37:c7:44",  "bssid_2g": "5c:c6:06:e7:87:d9",
+                "support_plc": false, "oem_id": "fdfgdfgdgdfgdfg",
                 "signal_level": {"band5": "0", "band2_4": "0"}, "product_level": 100, "device_ip": "192.168.68.1",
                 "device_model": "M4R", "hw_id": "fgtrhxg43rgsdgbfdgbf", "device_type": "HOMEWIFISYSTEM"}]},
         "error_code": 0}
