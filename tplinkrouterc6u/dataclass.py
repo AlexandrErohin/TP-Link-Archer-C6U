@@ -1,6 +1,6 @@
 import macaddress
 import ipaddress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from tplinkrouterc6u.enum import Connection
 
 
@@ -10,6 +10,7 @@ class Firmware:
         self.hardware_version = hardware
         self.model = model
         self.firmware_version = firmware
+
 
 @dataclass
 class Device:

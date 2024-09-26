@@ -425,11 +425,14 @@ class TestTPLinkClient(unittest.TestCase):
         response_game_accelerator = '''
   {
       "data": [
-          {"mac": "06:82:9d:2b:8f:c6", "deviceTag":"2.4G", "isGuest":false, "ip":"192.168.1.186", "deviceName":"name1",
-          "uploadSpeed":12, "downloadSpeed":77},
-          {"mac": "fb:90:b8:2a:8a:b1", "deviceTag":"iot_2.4G", "isGuest":false, "ip":"192.168.1.187", "deviceName":"name2"},
-          {"mac": "54:b3:a2:f7:be:ea", "deviceTag":"iot_5G", "isGuest":false, "ip":"192.168.1.188", "deviceName":"name3"},
-          {"mac": "3c:ae:e1:83:94:9d", "deviceTag":"iot_6G", "isGuest":false, "ip":"192.168.1.189", "deviceName":"name4"}
+          {"mac": "06:82:9d:2b:8f:c6", "deviceTag":"2.4G", "isGuest":false, "ip":"192.168.1.186",
+          "deviceName":"name1", "uploadSpeed":12, "downloadSpeed":77},
+          {"mac": "fb:90:b8:2a:8a:b1", "deviceTag":"iot_2.4G", "isGuest":false, "ip":"192.168.1.187",
+          "deviceName":"name2"},
+          {"mac": "54:b3:a2:f7:be:ea", "deviceTag":"iot_5G", "isGuest":false, "ip":"192.168.1.188",
+          "deviceName":"name3"},
+          {"mac": "3c:ae:e1:83:94:9d", "deviceTag":"iot_6G", "isGuest":false, "ip":"192.168.1.189",
+          "deviceName":"name4"}
       ],
       "timeout": false,
       "success": true

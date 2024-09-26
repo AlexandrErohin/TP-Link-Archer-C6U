@@ -676,8 +676,8 @@ DNSServers=0.0.0.0,0.0.0.0
         client.send_sms('534324724234', 'test sms')
 
         self.assertIn('http:///cgi_gdpr?_=', check_url)
-        self.assertEqual(check_data,
-                         '2\r\n[LTE_SMS_SENDNEWMSG#0,0,0,0,0,0#0,0,0,0,0,0]0,3\r\nindex=1\r\nto=534324724234\r\ntextContent=test sms\r\n')
+        self.assertEqual(check_data, ('2\r\n[LTE_SMS_SENDNEWMSG#0,0,0,0,0,0#0,0,0,0,0,0]0,3\r\nindex=1\r\n'
+                                      'to=534324724234\r\ntextContent=test sms\r\n'))
 
 
 if __name__ == '__main__':
