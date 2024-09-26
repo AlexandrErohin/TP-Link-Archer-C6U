@@ -1,6 +1,6 @@
-import unittest
-import macaddress
-import ipaddress
+from unittest import main, TestCase
+from macaddress import EUI48
+from ipaddress import IPv4Address
 from tplinkrouterc6u import (
     TPLinkMRClient,
     Connection,
@@ -13,7 +13,7 @@ from tplinkrouterc6u import (
 )
 
 
-class TestTPLinkMRClient(unittest.TestCase):
+class TestTPLinkMRClient(TestCase):
     def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=mac1
@@ -160,14 +160,14 @@ X_TP_TotalPacketsReceived=467
 
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, 'BF-75-44-4C-DC-9E')
-        self.assertIsInstance(status.wan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.wan_macaddress, EUI48)
         self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
-        self.assertIsInstance(status.lan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
         self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.30.1')
-        self.assertIsInstance(status.wan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
         self.assertEqual(status.wired_total, 1)
         self.assertEqual(status.wifi_clients_total, 1)
         self.assertEqual(status.guest_clients_total, 0)
@@ -185,18 +185,18 @@ X_TP_TotalPacketsReceived=467
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'host1')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.HOST_5G)
         self.assertEqual(status.devices[1].macaddr, 'F4-A3-86-2D-41-B5')
-        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[1].macaddress, EUI48)
         self.assertEqual(status.devices[1].ipaddr, '192.168.30.11')
-        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'host2')
         self.assertEqual(status.devices[1].packets_sent, 176)
         self.assertEqual(status.devices[1].packets_received, 467)
@@ -258,9 +258,9 @@ active=1
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'host1')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
@@ -408,14 +408,14 @@ name=wlan1
 
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, 'BF-75-44-4C-DC-9E')
-        self.assertIsInstance(status.wan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.wan_macaddress, EUI48)
         self.assertEqual(status.lan_macaddr, 'F5-E4-3B-E9-BF-C7')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
-        self.assertIsInstance(status.lan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
         self.assertEqual(status.lan_ipv4_addr, '192.168.1.1')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.30.1')
-        self.assertIsInstance(status.wan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
         self.assertEqual(status.wired_total, 0)
         self.assertEqual(status.wifi_clients_total, 0)
         self.assertEqual(status.guest_clients_total, 0)
@@ -681,4 +681,4 @@ DNSServers=0.0.0.0,0.0.0.0
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()
