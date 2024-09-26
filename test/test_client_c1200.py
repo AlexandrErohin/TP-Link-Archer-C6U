@@ -1,5 +1,5 @@
-import unittest
-import json
+from unittest import main, TestCase
+from json import loads
 from tplinkrouterc6u import (
     TplinkC1200Router,
     Connection,
@@ -7,7 +7,7 @@ from tplinkrouterc6u import (
 )
 
 
-class TestTPLinkC1200Client(unittest.TestCase):
+class TestTPLinkC1200Client(TestCase):
 
     def test_set_led_on(self) -> None:
 
@@ -31,10 +31,10 @@ class TestTPLinkC1200Client(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/ledgeneral?form=setting&operation=read':
-                    return json.loads(response_led_general_read)
+                    return loads(response_led_general_read)
                 if path == 'admin/ledgeneral?form=setting&operation=write':
                     self.captured_path = path
-                    return json.loads(response_led_general_write)
+                    return loads(response_led_general_write)
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -67,10 +67,10 @@ class TestTPLinkC1200Client(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/ledgeneral?form=setting&operation=read':
-                    return json.loads(response_led_general_read)
+                    return loads(response_led_general_read)
                 elif path == 'admin/ledgeneral?form=setting&operation=write':
                     self.captured_path = path
-                    return json.loads(response_led_general_write)
+                    return loads(response_led_general_write)
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -95,7 +95,7 @@ class TestTPLinkC1200Client(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/ledgeneral?form=setting&operation=read':
-                    return json.loads(response_led_general_read)
+                    return loads(response_led_general_read)
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -139,4 +139,4 @@ class TestTPLinkC1200Client(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()

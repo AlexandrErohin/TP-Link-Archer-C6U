@@ -1,5 +1,5 @@
-import macaddress
-import ipaddress
+from macaddress import EUI48
+from ipaddress import IPv4Address
 from dataclasses import dataclass
 from tplinkrouterc6u.enum import Connection
 
@@ -14,7 +14,7 @@ class Firmware:
 
 @dataclass
 class Device:
-    def __init__(self, type: Connection, macaddr: macaddress, ipaddr: ipaddress, hostname: str) -> None:
+    def __init__(self, type: Connection, macaddr: EUI48, ipaddr: IPv4Address, hostname: str) -> None:
         self.type = type
         self._macaddr = macaddr
         self._ipaddr = ipaddr
@@ -44,11 +44,11 @@ class Device:
 @dataclass
 class Status:
     def __init__(self) -> None:
-        self._wan_macaddr: macaddress.EUI48 | None = None
-        self._lan_macaddr: macaddress
-        self._wan_ipv4_addr: ipaddress.IPv4Address | None = None
-        self._lan_ipv4_addr: ipaddress.IPv4Address | None = None
-        self._wan_ipv4_gateway: ipaddress.IPv4Address | None = None
+        self._wan_macaddr: EUI48 | None = None
+        self._lan_macaddr: EUI48
+        self._wan_ipv4_addr: IPv4Address | None = None
+        self._lan_ipv4_addr: IPv4Address | None = None
+        self._wan_ipv4_gateway: IPv4Address | None = None
         self.wired_total: int = 0
         self.wifi_clients_total: int = 0
         self.guest_clients_total: int = 0
@@ -73,7 +73,7 @@ class Status:
         return str(self._wan_macaddr) if self._wan_macaddr else None
 
     @property
-    def wan_macaddress(self) -> macaddress.EUI48 | None:
+    def wan_macaddress(self) -> EUI48 | None:
         return self._wan_macaddr
 
     @property
@@ -89,7 +89,7 @@ class Status:
         return str(self._wan_ipv4_addr) if self._wan_ipv4_addr else None
 
     @property
-    def wan_ipv4_address(self) -> ipaddress.IPv4Address | None:
+    def wan_ipv4_address(self) -> IPv4Address | None:
         return self._wan_ipv4_addr
 
     @property
@@ -97,7 +97,7 @@ class Status:
         return str(self._lan_ipv4_addr) if self._lan_ipv4_addr else None
 
     @property
-    def lan_ipv4_address(self) -> ipaddress.IPv4Address | None:
+    def lan_ipv4_address(self) -> IPv4Address | None:
         return self._lan_ipv4_addr
 
     @property
@@ -105,13 +105,13 @@ class Status:
         return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway else None
 
     @property
-    def wan_ipv4_gateway_address(self) -> ipaddress.IPv4Address | None:
+    def wan_ipv4_gateway_address(self) -> IPv4Address | None:
         return self._wan_ipv4_gateway
 
 
 @dataclass
 class IPv4Reservation:
-    def __init__(self, macaddr: macaddress, ipaddr: ipaddress, hostname: str, enabled: bool) -> None:
+    def __init__(self, macaddr: EUI48, ipaddr: IPv4Address, hostname: str, enabled: bool) -> None:
         self._macaddr = macaddr
         self._ipaddr = ipaddr
         self.hostname = hostname
@@ -136,7 +136,7 @@ class IPv4Reservation:
 
 @dataclass
 class IPv4DHCPLease:
-    def __init__(self, macaddr: macaddress, ipaddr: ipaddress, hostname: str, lease_time: str) -> None:
+    def __init__(self, macaddr: EUI48, ipaddr: IPv4Address, hostname: str, lease_time: str) -> None:
         self._macaddr = macaddr
         self._ipaddr = ipaddr
         self.hostname = hostname
@@ -162,17 +162,17 @@ class IPv4DHCPLease:
 @dataclass
 class IPv4Status:
     def __init__(self) -> None:
-        self._wan_macaddr: macaddress
-        self._wan_ipv4_ipaddr: ipaddress.IPv4Address | None = None
-        self._wan_ipv4_gateway: ipaddress.IPv4Address | None = None
+        self._wan_macaddr: EUI48
+        self._wan_ipv4_ipaddr: IPv4Address | None = None
+        self._wan_ipv4_gateway: IPv4Address | None = None
         self.wan_ipv4_conntype: str
-        self._wan_ipv4_netmask: ipaddress.IPv4Address | None = None
-        self._wan_ipv4_pridns: ipaddress
-        self._wan_ipv4_snddns: ipaddress
-        self._lan_macaddr: macaddress
-        self._lan_ipv4_ipaddr: ipaddress
+        self._wan_ipv4_netmask: IPv4Address | None = None
+        self._wan_ipv4_pridns: IPv4Address
+        self._wan_ipv4_snddns: IPv4Address
+        self._lan_macaddr: EUI48
+        self._lan_ipv4_ipaddr: IPv4Address
         self.lan_ipv4_dhcp_enable: bool
-        self._lan_ipv4_netmask: ipaddress
+        self._lan_ipv4_netmask: IPv4Address
         self.remote: bool | None = None
 
     @property

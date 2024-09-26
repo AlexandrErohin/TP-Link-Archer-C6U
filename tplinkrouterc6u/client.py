@@ -1,13 +1,14 @@
-import base64
-import hashlib
-import re
-import json
-import time
-import urllib
-import requests
-import datetime
-import macaddress
-import ipaddress
+from base64 import b64decode
+from hashlib import md5
+from re import search
+from json import dumps, loads
+from time import time, sleep
+from urllib.parse import quote
+from requests.packages import urllib3
+from requests import post, Response, Session
+from datetime import timedelta
+from macaddress import EUI48
+from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.enum import Connection
@@ -28,7 +29,7 @@ class AbstractRouter(ABC):
             self.host = "http://{}".format(self.host)
         self._verify_ssl = verify_ssl
         if self._verify_ssl is False:
-            requests.packages.urllib3.disable_warnings()
+            urllib3.disable_warnings()
 
     @abstractmethod
     def supports(self) -> bool:
@@ -76,7 +77,7 @@ class TplinkRequest:
             raise Exception('Not authorised')
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
 
-        response = requests.post(
+        response = post(
             url,
             data=self._prepare_data(data),
             headers=self._headers_request,
@@ -167,7 +168,7 @@ class TplinkEncryption(TplinkRequest):
             data = self._decrypt_response(data)
 
             self._stok = data[self._data_block]['stok']
-            regex_result = re.search(
+            regex_result = search(
                 'sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
             self._logged = True
@@ -183,7 +184,7 @@ class TplinkEncryption(TplinkRequest):
         url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
 
         # If possible implement RSA encryption of password here.
-        response = requests.post(
+        response = post(
             url, params={'operation': 'read'},
             timeout=self.timeout,
             verify=self._verify_ssl,
@@ -208,7 +209,7 @@ class TplinkEncryption(TplinkRequest):
         url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
 
         # If possible implement RSA encryption of password here.
-        response = requests.post(
+        response = post(
             url,
             params={'operation': 'read'},
             timeout=self.timeout,
@@ -231,14 +232,14 @@ class TplinkEncryption(TplinkRequest):
                 self._logger.error(error)
             raise ClientException(error)
 
-    def _try_login(self) -> requests.Response:
+    def _try_login(self) -> Response:
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 
         crypted_pwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
 
         body = self._prepare_data(self._get_login_data(crypted_pwd))
 
-        return requests.post(
+        return post(
             url,
             data=body,
             headers=self._headers_login,
@@ -253,7 +254,7 @@ class TplinkEncryption(TplinkRequest):
     def _prepare_data(self, data: str) -> dict:
         encrypted_data = self._encryption.aes_encrypt(data)
         data_len = len(encrypted_data)
-        hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
+        hash = md5((self.username + self.password).encode()).hexdigest()
 
         sign = self._encryption.get_signature(int(self._seq) + data_len,
                                               True if self._logged is False else False,
@@ -262,7 +263,7 @@ class TplinkEncryption(TplinkRequest):
         return {'sign': sign, 'data': encrypted_data}
 
     def _decrypt_response(self, data: dict) -> dict:
-        return json.loads(self._encryption.aes_decrypt(data['data']))
+        return loads(self._encryption.aes_decrypt(data['data']))
 
 
 class TplinkBaseRouter(AbstractRouter, TplinkRequest):
@@ -320,11 +321,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
 
         status = Status()
-        status._wan_macaddr = macaddress.EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
-        status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
-        status._wan_ipv4_addr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
-        status._lan_ipv4_addr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
-        status._wan_ipv4_gateway = ipaddress.IPv4Address(
+        status._wan_macaddr = EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
+        status._lan_macaddr = EUI48(data['lan_macaddr'])
+        status._wan_ipv4_addr = IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
+        status._lan_ipv4_addr = IPv4Address(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
+        status._wan_ipv4_gateway = IPv4Address(
             data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
@@ -353,8 +354,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         devices = {}
 
         def _add_device(conn: Connection, item: dict) -> None:
-            devices[item['macaddr']] = Device(conn, macaddress.EUI48(item['macaddr']),
-                                              ipaddress.IPv4Address(item['ipaddr']),
+            devices[item['macaddr']] = Device(conn, EUI48(item['macaddr']),
+                                              IPv4Address(item['ipaddr']),
                                               item['hostname'])
 
         for item in data.get('access_devices_wired', []):
@@ -380,8 +381,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for item in smart_network:
                 if item['mac'] not in devices:
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
-                    devices[item['mac']] = Device(conn, macaddress.EUI48(item['mac']),
-                                                  ipaddress.IPv4Address(item['ip']),
+                    devices[item['mac']] = Device(conn, EUI48(item['mac']), IPv4Address(item['ip']),
                                                   item['deviceName'])
                     if conn.is_iot():
                         if status.iot_clients_total is None:
@@ -395,7 +395,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             if item['mac'] not in devices:
                 status.wifi_clients_total += 1
                 type = self._map_wire_type(item.get('type'))
-                devices[item['mac']] = Device(type, macaddress.EUI48(item['mac']), ipaddress.IPv4Address('0.0.0.0'),
+                devices[item['mac']] = Device(type, EUI48(item['mac']), IPv4Address('0.0.0.0'),
                                               '')
             devices[item['mac']].packets_sent = item.get('txpkts')
             devices[item['mac']].packets_received = item.get('rxpkts')
@@ -408,17 +408,17 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
         data = self.request('admin/network?form=status_ipv4&operation=read', 'operation=read')
-        ipv4_status._wan_macaddr = macaddress.EUI48(data['wan_macaddr'])
-        ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(data['wan_ipv4_ipaddr'])
-        ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(data['wan_ipv4_gateway'])
+        ipv4_status._wan_macaddr = EUI48(data['wan_macaddr'])
+        ipv4_status._wan_ipv4_ipaddr = IPv4Address(data['wan_ipv4_ipaddr'])
+        ipv4_status._wan_ipv4_gateway = IPv4Address(data['wan_ipv4_gateway'])
         ipv4_status.wan_ipv4_conntype = data['wan_ipv4_conntype']
-        ipv4_status._wan_ipv4_netmask = ipaddress.IPv4Address(data['wan_ipv4_netmask'])
-        ipv4_status._wan_ipv4_pridns = ipaddress.IPv4Address(data['wan_ipv4_pridns'])
-        ipv4_status._wan_ipv4_snddns = ipaddress.IPv4Address(data['wan_ipv4_snddns'])
-        ipv4_status._lan_macaddr = macaddress.EUI48(data['lan_macaddr'])
-        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(data['lan_ipv4_ipaddr'])
+        ipv4_status._wan_ipv4_netmask = IPv4Address(data['wan_ipv4_netmask'])
+        ipv4_status._wan_ipv4_pridns = IPv4Address(data['wan_ipv4_pridns'])
+        ipv4_status._wan_ipv4_snddns = IPv4Address(data['wan_ipv4_snddns'])
+        ipv4_status._lan_macaddr = EUI48(data['lan_macaddr'])
+        ipv4_status._lan_ipv4_ipaddr = IPv4Address(data['lan_ipv4_ipaddr'])
         ipv4_status.lan_ipv4_dhcp_enable = self._str2bool(data['lan_ipv4_dhcp_enable'])
-        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(data['lan_ipv4_netmask'])
+        ipv4_status._lan_ipv4_netmask = IPv4Address(data['lan_ipv4_netmask'])
         ipv4_status.remote = self._str2bool(data.get('remote'))
 
         return ipv4_status
@@ -429,7 +429,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         for item in data:
             ipv4_reservations.append(
-                IPv4Reservation(macaddress.EUI48(item['mac']), ipaddress.IPv4Address(item['ip']), item['comment'],
+                IPv4Reservation(EUI48(item['mac']), IPv4Address(item['ip']), item['comment'],
                                 self._str2bool(item['enable'])))
 
         return ipv4_reservations
@@ -440,7 +440,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         for item in data:
             dhcp_leases.append(
-                IPv4DHCPLease(macaddress.EUI48(item['macaddr']), ipaddress.IPv4Address(item['ipaddr']), item['name'],
+                IPv4DHCPLease(EUI48(item['macaddr']), IPv4Address(item['ipaddr']), item['name'],
                               item['leasetime']))
 
         return dhcp_leases
@@ -492,7 +492,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self.devices = []
 
     def logout(self) -> None:
-        self.request('admin/system?form=logout', json.dumps({'operation': 'logout'}), True)
+        self.request('admin/system?form=logout', dumps({'operation': 'logout'}), True)
         self._stok = ''
         self._sysauth = ''
         self._logged = False
@@ -512,17 +512,17 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         else:
             params = {'band2_4': {'guest': en}}
 
-        self.request('admin/wireless?form=wlan', json.dumps({'operation': 'write', 'params': params}))
+        self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
 
     def reboot(self) -> None:
         if not self.devices:
             self.get_firmware()
-        self.request('admin/device?form=system', json.dumps({
+        self.request('admin/device?form=system', dumps({
             'operation': 'reboot',
             'params': {'mac_list': [{"mac": item['mac']} for item in self.devices]}}))
 
     def get_firmware(self) -> Firmware:
-        self.devices = self.request('admin/device?form=device_list', json.dumps({"operation": "read"})).get(
+        self.devices = self.request('admin/device?form=device_list', dumps({"operation": "read"})).get(
             'device_list', [])
 
         for item in self.devices:
@@ -535,24 +535,24 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         return firmware
 
     def get_status(self) -> Status:
-        data = self.request('admin/network?form=wan_ipv4', json.dumps({'operation': 'read'}))
+        data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
 
         status = Status()
         element = self._get_value(data, ['wan', 'ip_info', 'mac'])
-        status._wan_macaddr = macaddress.EUI48(element) if element else None
-        status._lan_macaddr = macaddress.EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
+        status._wan_macaddr = EUI48(element) if element else None
+        status._lan_macaddr = EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
         element = self._get_value(data, ['wan', 'ip_info', 'ip'])
-        status._wan_ipv4_addr = ipaddress.IPv4Address(element) if element else None
+        status._wan_ipv4_addr = IPv4Address(element) if element else None
         element = self._get_value(data, ['lan', 'ip_info', 'ip'])
-        status._lan_ipv4_addr = ipaddress.IPv4Address(element) if element else None
+        status._lan_ipv4_addr = IPv4Address(element) if element else None
         element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
-        status._wan_ipv4_gateway = ipaddress.IPv4Address(element) if element else None
+        status._wan_ipv4_gateway = IPv4Address(element) if element else None
 
-        data = self.request('admin/network?form=performance', json.dumps({"operation": "read"}))
+        data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
 
-        data = self.request('admin/wireless?form=wlan', json.dumps({'operation': 'read'}))
+        data = self.request('admin/wireless?form=wlan', dumps({'operation': 'read'}))
         status.wifi_2g_enable = self._get_value(data, ['band2_4', 'host', 'enable'])
         status.guest_2g_enable = self._get_value(data, ['band2_4', 'guest', 'enable'])
         status.wifi_5g_enable = self._get_value(data, ['band5_1', 'host', 'enable'])
@@ -561,7 +561,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         status.guest_6g_enable = self._get_value(data, ['band6', 'guest', 'enable'])
 
         devices = []
-        data = self.request('admin/client?form=client_list', json.dumps(
+        data = self.request('admin/client?form=client_list', dumps(
             {"operation": "read", "params": {"device_mac": "default"}})).get('client_list', [])
 
         for item in data:
@@ -581,9 +581,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
             ip = item['ip'] if item.get('ip') else '0.0.0.0'
             device = Device(conn,
-                            macaddress.EUI48(item['mac']),
-                            ipaddress.IPv4Address(ip),
-                            base64.b64decode(item['name']).decode())
+                            EUI48(item['mac']),
+                            IPv4Address(ip),
+                            b64decode(item['name']).decode())
             device.down_speed = item.get('down_speed')
             device.up_speed = item.get('up_speed')
             devices.append(device)
@@ -596,21 +596,21 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
-        data = self.request('admin/network?form=wan_ipv4', json.dumps({'operation': 'read'}))
-        ipv4_status._wan_macaddr = macaddress.EUI48(self._get_value(data, ['wan', 'ip_info', 'mac']))
+        data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
+        ipv4_status._wan_macaddr = EUI48(self._get_value(data, ['wan', 'ip_info', 'mac']))
         element = self._get_value(data, ['wan', 'ip_info', 'ip'])
-        ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_ipaddr = IPv4Address(element) if element else None
         element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
-        ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_gateway = IPv4Address(element) if element else None
         ipv4_status.wan_ipv4_conntype = self._get_value(data, ['wan', 'dial_type'])
         element = self._get_value(data, ['wan', 'ip_info', 'mask'])
-        ipv4_status._wan_ipv4_netmask = ipaddress.IPv4Address(element) if element else None
-        ipv4_status._wan_ipv4_pridns = ipaddress.IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns1']))
-        ipv4_status._wan_ipv4_snddns = ipaddress.IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns2']))
-        ipv4_status._lan_macaddr = macaddress.EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
-        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(self._get_value(data, ['lan', 'ip_info', 'ip']))
+        ipv4_status._wan_ipv4_netmask = IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_pridns = IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns1']))
+        ipv4_status._wan_ipv4_snddns = IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns2']))
+        ipv4_status._lan_macaddr = EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
+        ipv4_status._lan_ipv4_ipaddr = IPv4Address(self._get_value(data, ['lan', 'ip_info', 'ip']))
         ipv4_status.lan_ipv4_dhcp_enable = False
-        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(self._get_value(data, ['lan', 'ip_info', 'mask']))
+        ipv4_status._lan_ipv4_netmask = IPv4Address(self._get_value(data, ['lan', 'ip_info', 'mask']))
 
         return ipv4_status
 
@@ -643,7 +643,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             "operation": "login",
         }
 
-        return json.dumps(data)
+        return dumps(data)
 
     def _is_valid_response(self, data: dict) -> bool:
         return 'error_code' in data and data['error_code'] == 0
@@ -653,7 +653,7 @@ class TplinkC6V4Router(AbstractRouter):
     def supports(self) -> bool:
         url = '{}/?code=2&asyn=1'.format(self.host)
         try:
-            response = requests.post(url, timeout=self.timeout, verify=self._verify_ssl)
+            response = post(url, timeout=self.timeout, verify=self._verify_ssl)
         except BaseException:
             return False
         if response.status_code == 401 and response.text.startswith('00'):
@@ -692,7 +692,7 @@ class TplinkC1200Router(TplinkBaseRouter):
 
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 
-        response = requests.post(
+        response = post(
             url,
             params={'operation': 'login', 'username': self.username, 'password': self.password},
             headers=self._headers_login,
@@ -702,7 +702,7 @@ class TplinkC1200Router(TplinkBaseRouter):
 
         try:
             self._stok = response.json().get('data').get('stok')
-            regex_result = re.search('sysauth=(.*);', response.headers['set-cookie'])
+            regex_result = search('sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
             self._logged = True
             self._smart_network = False
@@ -837,9 +837,9 @@ class TPLinkMRClient(AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        self.req = requests.Session()
+        self.req = Session()
         self._token = None
-        self._hash = hashlib.md5((self.username + self.password).encode()).hexdigest()
+        self._hash = md5((self.username + self.password).encode()).hexdigest()
         self._nn = None
         self._ee = None
         self._seq = None
@@ -927,15 +927,15 @@ class TPLinkMRClient(AbstractRouter):
         if values['0'].__class__ == list:
             values['0'] = values['0'][0]
 
-        status._lan_macaddr = macaddress.EUI48(values['0']['X_TP_MACAddress'])
-        status._lan_ipv4_addr = ipaddress.IPv4Address(values['0']['IPInterfaceIPAddress'])
+        status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
+        status._lan_ipv4_addr = IPv4Address(values['0']['IPInterfaceIPAddress'])
 
         for item in self._to_list(values.get('1')):
             if int(item['enable']) == 0 and values.get('1').__class__ == list:
                 continue
-            status._wan_macaddr = macaddress.EUI48(item['MACAddress']) if item.get('MACAddress') else None
-            status._wan_ipv4_addr = ipaddress.IPv4Address(item['externalIPAddress'])
-            status._wan_ipv4_gateway = ipaddress.IPv4Address(item['defaultGateway'])
+            status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
+            status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
+            status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
 
         if values['2'].__class__ != list:
             status.wifi_2g_enable = bool(int(values['2']['enable']))
@@ -963,8 +963,8 @@ class TPLinkMRClient(AbstractRouter):
             elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
             devices[val['MACAddress']] = Device(conn,
-                                                macaddress.EUI48(val['MACAddress']),
-                                                ipaddress.IPv4Address(val['IPAddress']),
+                                                EUI48(val['MACAddress']),
+                                                IPv4Address(val['IPAddress']),
                                                 val['hostName'])
 
         for val in self._to_list(values.get('5')):
@@ -972,8 +972,8 @@ class TPLinkMRClient(AbstractRouter):
                 status.wifi_clients_total += 1
                 devices[val['associatedDeviceMACAddress']] = Device(
                     Connection.HOST_2G,
-                    macaddress.EUI48(val['associatedDeviceMACAddress']),
-                    ipaddress.IPv4Address('0.0.0.0'),
+                    EUI48(val['associatedDeviceMACAddress']),
+                    IPv4Address('0.0.0.0'),
                     '')
             devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
             devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
@@ -993,8 +993,8 @@ class TPLinkMRClient(AbstractRouter):
         for item in self._to_list(values):
             ipv4_reservations.append(
                 IPv4Reservation(
-                    macaddress.EUI48(item['chaddr']),
-                    ipaddress.IPv4Address(item['yiaddr']),
+                    EUI48(item['chaddr']),
+                    IPv4Address(item['yiaddr']),
                     '',
                     bool(int(item['enable']))
                 ))
@@ -1012,10 +1012,10 @@ class TPLinkMRClient(AbstractRouter):
             lease_time = item['leaseTimeRemaining']
             dhcp_leases.append(
                 IPv4DHCPLease(
-                    macaddress.EUI48(item['MACAddress']),
-                    ipaddress.IPv4Address(item['IPAddress']),
+                    EUI48(item['MACAddress']),
+                    IPv4Address(item['IPAddress']),
                     item['hostName'],
-                    str(datetime.timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
+                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
                 ))
 
         return dhcp_leases
@@ -1032,22 +1032,22 @@ class TPLinkMRClient(AbstractRouter):
         _, values = self.req_act(acts)
 
         ipv4_status = IPv4Status()
-        ipv4_status._lan_macaddr = macaddress.EUI48(values['0']['X_TP_MACAddress'])
-        ipv4_status._lan_ipv4_ipaddr = ipaddress.IPv4Address(values['0']['IPInterfaceIPAddress'])
-        ipv4_status._lan_ipv4_netmask = ipaddress.IPv4Address(values['0']['IPInterfaceSubnetMask'])
+        ipv4_status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
+        ipv4_status._lan_ipv4_ipaddr = IPv4Address(values['0']['IPInterfaceIPAddress'])
+        ipv4_status._lan_ipv4_netmask = IPv4Address(values['0']['IPInterfaceSubnetMask'])
         ipv4_status.lan_ipv4_dhcp_enable = bool(int(values['1']['DHCPServerEnable']))
 
         for item in self._to_list(values.get('2')):
             if int(item['enable']) == 0 and values.get('2').__class__ == list:
                 continue
-            ipv4_status._wan_macaddr = macaddress.EUI48(item['MACAddress'])
-            ipv4_status._wan_ipv4_ipaddr = ipaddress.IPv4Address(item['externalIPAddress'])
-            ipv4_status._wan_ipv4_gateway = ipaddress.IPv4Address(item['defaultGateway'])
+            ipv4_status._wan_macaddr = EUI48(item['MACAddress'])
+            ipv4_status._wan_ipv4_ipaddr = IPv4Address(item['externalIPAddress'])
+            ipv4_status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
             ipv4_status.wan_ipv4_conntype = item['name']
-            ipv4_status._wan_ipv4_netmask = ipaddress.IPv4Address(item['subnetMask'])
+            ipv4_status._wan_ipv4_netmask = IPv4Address(item['subnetMask'])
             dns = item['DNSServers'].split(',')
-            ipv4_status._wan_ipv4_pridns = ipaddress.IPv4Address(dns[0])
-            ipv4_status._wan_ipv4_snddns = ipaddress.IPv4Address(dns[1])
+            ipv4_status._wan_ipv4_pridns = IPv4Address(dns[0])
+            ipv4_status._wan_ipv4_snddns = IPv4Address(dns[1])
 
         return ipv4_status
 
@@ -1125,7 +1125,7 @@ class TPLinkMRClient(AbstractRouter):
         lines = response.split('\n')
         for line in lines:
             if line.startswith('['):
-                regexp = re.search('\[\d,\d,\d,\d,\d,\d\](\d)', line)
+                regexp = search('\[\d,\d,\d,\d,\d,\d\](\d)', line)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)
@@ -1148,7 +1148,7 @@ class TPLinkMRClient(AbstractRouter):
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         # add timestamp param
         if include_ts:
-            params['_'] = str(round(time.time() * 1000))
+            params['_'] = str(round(time() * 1000))
 
         # format params into a string
         params_arr = []
@@ -1176,7 +1176,7 @@ class TPLinkMRClient(AbstractRouter):
         (code, response) = self._request(url, method='GET')
         assert code == 200
 
-        result = re.search('var token="(.*)";', response)
+        result = search('var token="(.*)";', response)
 
         assert result is not None
         assert result.group(1) != ''
@@ -1198,9 +1198,9 @@ class TPLinkMRClient(AbstractRouter):
         assert self._parse_ret_val(response) == self.HTTP_RET_OK
 
         # parse public key
-        ee = re.search('var ee="(.*)";', response)
-        nn = re.search('var nn="(.*)";', response)
-        seq = re.search('var seq="(.*)";', response)
+        ee = search('var ee="(.*)";', response)
+        nn = search('var nn="(.*)";', response)
+        seq = search('var seq="(.*)";', response)
 
         assert ee and nn and seq
         ee = ee.group(1)
@@ -1228,7 +1228,7 @@ class TPLinkMRClient(AbstractRouter):
         assert len(sign) == 256
 
         data = {
-            'data': urllib.parse.quote(data, safe='~()*!.\''),
+            'data': quote(data, safe='~()*!.\''),
             'sign': sign,
             'Action': 1,
             'LoginStatus': 0,
@@ -1243,7 +1243,7 @@ class TPLinkMRClient(AbstractRouter):
         ret_code = self._parse_ret_val(response)
         error = ''
         if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
-            info = re.search('var currAuthTimes=(.*);\nvar currForbidTime=(.*);', response)
+            info = search('var currAuthTimes=(.*);\nvar currForbidTime=(.*);', response)
             assert info is not None
 
             error = 'TplinkRouter - MR - Login failed, wrong password. Auth times: {}/5, Forbid time: {}'.format(
@@ -1299,7 +1299,7 @@ class TPLinkMRClient(AbstractRouter):
             if r.status_code != 500 and '<title>500 Internal Server Error</title>' not in r.text:
                 break
 
-            time.sleep(0.05)
+            sleep(0.05)
             retry += 1
 
         # decrypt the response, if needed
@@ -1315,7 +1315,7 @@ class TPLinkMRClient(AbstractRouter):
         Return value:
             return code (int)
         '''
-        result = re.search('\$\.ret=(.*);', response_text)
+        result = search('\$\.ret=(.*);', response_text)
         assert result is not None
         assert result.group(1).isnumeric()
 

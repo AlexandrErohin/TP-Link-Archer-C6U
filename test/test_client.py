@@ -1,7 +1,7 @@
-import unittest
-import macaddress
-import ipaddress
-import json
+from unittest import main, TestCase
+from macaddress import EUI48
+from ipaddress import IPv4Address
+from json import loads
 from tplinkrouterc6u import (
     TplinkRouter,
     Connection,
@@ -11,7 +11,7 @@ from tplinkrouterc6u import (
 )
 
 
-class TestTPLinkClient(unittest.TestCase):
+class TestTPLinkClient(TestCase):
     def test_get_status(self) -> None:
         response_status = '''
 {
@@ -206,9 +206,9 @@ class TestTPLinkClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
-                    return json.loads(response_status)['data']
+                    return loads(response_status)['data']
                 elif path == 'admin/wireless?form=statistics':
-                    return json.loads(response_stats)['data']
+                    return loads(response_stats)['data']
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -216,14 +216,14 @@ class TestTPLinkClient(unittest.TestCase):
 
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, 'D6-0B-40-57-DA-60')
-        self.assertIsInstance(status.wan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.wan_macaddress, EUI48)
         self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, '192.168.1.100')
-        self.assertIsInstance(status.lan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
         self.assertEqual(status.lan_ipv4_addr, '192.168.1.100')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.1.254')
-        self.assertIsInstance(status.wan_ipv4_address, ipaddress.IPv4Address)
+        self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
         self.assertEqual(status.wired_total, 2)
         self.assertEqual(status.wifi_clients_total, 2)
         self.assertEqual(status.guest_clients_total, 0)
@@ -242,18 +242,18 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'SERVER')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[1].type, Connection.WIRED)
         self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
-        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[1].macaddress, EUI48)
         self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
-        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[1].packets_sent, None)
         self.assertEqual(status.devices[1].packets_received, None)
@@ -321,9 +321,9 @@ class TestTPLinkClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
-                    return json.loads(response_status)['data']
+                    return loads(response_status)['data']
                 elif path == 'admin/wireless?form=statistics':
-                    return json.loads(response_stats)['data']
+                    return loads(response_stats)['data']
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -332,7 +332,7 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, None)
         self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, None)
         self.assertEqual(status.lan_ipv4_addr, None)
         self.assertEqual(status.wan_ipv4_gateway, None)
@@ -357,27 +357,27 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'SERVER')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.WIRED)
         self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
-        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[1].macaddress, EUI48)
         self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
-        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[1].packets_sent, None)
         self.assertEqual(status.devices[1].packets_received, None)
         self.assertIsInstance(status.devices[2], Device)
         self.assertEqual(status.devices[2].type, Connection.HOST_2G)
         self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
-        self.assertIsInstance(status.devices[2].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[2].macaddress, EUI48)
         self.assertEqual(status.devices[2].ipaddr, '192.168.1.186')
-        self.assertIsInstance(status.devices[2].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[2].ipaddress, IPv4Address)
         self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[2].packets_sent, None)
         self.assertEqual(status.devices[2].packets_received, None)
@@ -466,11 +466,11 @@ class TestTPLinkClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
-                    return json.loads(response_status)['data']
+                    return loads(response_status)['data']
                 elif path == 'admin/smart_network?form=game_accelerator':
-                    return json.loads(response_game_accelerator)['data']
+                    return loads(response_game_accelerator)['data']
                 elif path == 'admin/wireless?form=statistics':
-                    return json.loads(response_stats)['data']
+                    return loads(response_stats)['data']
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -479,7 +479,7 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, None)
         self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, None)
         self.assertEqual(status.lan_ipv4_addr, None)
         self.assertEqual(status.wan_ipv4_gateway, None)
@@ -504,27 +504,27 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
-        self.assertIsInstance(status.devices[0].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
         self.assertEqual(status.devices[0].ipaddr, '192.168.1.228')
-        self.assertIsInstance(status.devices[0].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'SERVER')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.WIRED)
         self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
-        self.assertIsInstance(status.devices[1].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[1].macaddress, EUI48)
         self.assertEqual(status.devices[1].ipaddr, '192.168.1.254')
-        self.assertIsInstance(status.devices[1].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[1].packets_sent, None)
         self.assertEqual(status.devices[1].packets_received, None)
         self.assertIsInstance(status.devices[2], Device)
         self.assertEqual(status.devices[2].type, Connection.HOST_2G)
         self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
-        self.assertIsInstance(status.devices[2].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[2].macaddress, EUI48)
         self.assertEqual(status.devices[2].ipaddr, '192.168.1.186')
-        self.assertIsInstance(status.devices[2].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[2].ipaddress, IPv4Address)
         self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[2].packets_sent, 450333)
         self.assertEqual(status.devices[2].packets_received, 4867482)
@@ -533,36 +533,36 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status.devices[3], Device)
         self.assertEqual(status.devices[3].type, Connection.IOT_2G)
         self.assertEqual(status.devices[3].macaddr, 'FB-90-B8-2A-8A-B1')
-        self.assertIsInstance(status.devices[3].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[3].macaddress, EUI48)
         self.assertEqual(status.devices[3].ipaddr, '192.168.1.187')
-        self.assertIsInstance(status.devices[3].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[3].ipaddress, IPv4Address)
         self.assertEqual(status.devices[3].hostname, 'name2')
         self.assertEqual(status.devices[3].packets_sent, None)
         self.assertEqual(status.devices[3].packets_received, None)
         self.assertIsInstance(status.devices[4], Device)
         self.assertEqual(status.devices[4].type, Connection.IOT_5G)
         self.assertEqual(status.devices[4].macaddr, '54-B3-A2-F7-BE-EA')
-        self.assertIsInstance(status.devices[4].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[4].macaddress, EUI48)
         self.assertEqual(status.devices[4].ipaddr, '192.168.1.188')
-        self.assertIsInstance(status.devices[4].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[4].ipaddress, IPv4Address)
         self.assertEqual(status.devices[4].hostname, 'name3')
         self.assertEqual(status.devices[4].packets_sent, None)
         self.assertEqual(status.devices[4].packets_received, None)
         self.assertIsInstance(status.devices[5], Device)
         self.assertEqual(status.devices[5].type, Connection.IOT_6G)
         self.assertEqual(status.devices[5].macaddr, '3C-AE-E1-83-94-9D')
-        self.assertIsInstance(status.devices[5].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[5].macaddress, EUI48)
         self.assertEqual(status.devices[5].ipaddr, '192.168.1.189')
-        self.assertIsInstance(status.devices[5].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[5].ipaddress, IPv4Address)
         self.assertEqual(status.devices[5].hostname, 'name4')
         self.assertEqual(status.devices[5].packets_sent, None)
         self.assertEqual(status.devices[5].packets_received, None)
         self.assertIsInstance(status.devices[6], Device)
         self.assertEqual(status.devices[6].type, Connection.HOST_5G)
         self.assertEqual(status.devices[6].macaddr, '1F-7A-BD-F7-20-0D')
-        self.assertIsInstance(status.devices[6].macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.devices[6].macaddress, EUI48)
         self.assertEqual(status.devices[6].ipaddr, '0.0.0.0')
-        self.assertIsInstance(status.devices[6].ipaddress, ipaddress.IPv4Address)
+        self.assertIsInstance(status.devices[6].ipaddress, IPv4Address)
         self.assertEqual(status.devices[6].hostname, '')
         self.assertEqual(status.devices[6].packets_sent, 134815)
         self.assertEqual(status.devices[6].packets_received, 2953078)
@@ -599,11 +599,11 @@ class TestTPLinkClient(unittest.TestCase):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
-                    return json.loads(response_status)['data']
+                    return loads(response_status)['data']
                 elif path == 'admin/status?form=perf&operation=read':
-                    return json.loads(perf_stats)['data']
+                    return loads(perf_stats)['data']
                 elif path == 'admin/wireless?form=statistics':
-                    return json.loads(response_stats)['data']
+                    return loads(response_stats)['data']
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -612,7 +612,7 @@ class TestTPLinkClient(unittest.TestCase):
         self.assertIsInstance(status, Status)
         self.assertEqual(status.wan_macaddr, None)
         self.assertEqual(status.lan_macaddr, '06-E6-97-9E-23-F5')
-        self.assertIsInstance(status.lan_macaddress, macaddress.EUI48)
+        self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, None)
         self.assertEqual(status.lan_ipv4_addr, None)
         self.assertEqual(status.wan_ipv4_gateway, None)
@@ -682,4 +682,4 @@ class TestTPLinkClient(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()

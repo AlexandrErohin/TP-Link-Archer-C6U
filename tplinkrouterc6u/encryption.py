@@ -1,28 +1,28 @@
-import base64
+from base64 import b64encode, b64decode
 from Crypto.PublicKey.RSA import construct
 from Crypto.Cipher import PKCS1_v1_5
-import binascii
+from binascii import b2a_hex, hexlify
 from Crypto.Cipher import AES
 from Crypto import Random
 from Crypto.PublicKey import RSA
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Util.Padding import pad, unpad
-import time
-import random
+from time import time
+from random import randint
 
 
 class EncryptionWrapper:
     def __init__(self) -> None:
-        self._iv = binascii.b2a_hex(Random.get_random_bytes(8))
-        self._key = binascii.b2a_hex(Random.get_random_bytes(8))
+        self._iv = b2a_hex(Random.get_random_bytes(8))
+        self._key = b2a_hex(Random.get_random_bytes(8))
 
     def aes_encrypt(self, raw: str) -> str:
         raw = self._pad(raw)
         cipher = AES.new(self._key, AES.MODE_CBC, self._iv)
-        return base64.b64encode(cipher.encrypt(raw.encode())).decode()
+        return b64encode(cipher.encrypt(raw.encode())).decode()
 
     def aes_decrypt(self, enc: str):
-        enc = base64.b64decode(enc)
+        enc = b64decode(enc)
         cipher = AES.new(self._key, AES.MODE_CBC, self._iv)
         decrypted = cipher.decrypt(enc)
         result = self._unpad(decrypted)
@@ -37,7 +37,7 @@ class EncryptionWrapper:
         cipher = PKCS1_v1_5.new(key)
 
         result = cipher.encrypt(data.encode())
-        return binascii.b2a_hex(result).decode()
+        return b2a_hex(result).decode()
 
     def get_signature(self, seq: int, is_login: bool, hash: str, nn: str, ee: str) -> str:
         if is_login:
@@ -71,10 +71,10 @@ class EncryptionWrapperMR:
     AES_IV_LEN = 16
 
     def __init__(self) -> None:
-        ts = str(round(time.time() * 1000))
+        ts = str(round(time() * 1000))
 
-        key = (ts + str(random.randint(100000000, 1000000000 - 1)))[:self.AES_KEY_LEN]
-        iv = (ts + str(random.randint(100000000, 1000000000 - 1)))[:self.AES_IV_LEN]
+        key = (ts + str(randint(100000000, 1000000000 - 1)))[:self.AES_KEY_LEN]
+        iv = (ts + str(randint(100000000, 1000000000 - 1)))[:self.AES_IV_LEN]
 
         assert len(key) == self.AES_KEY_LEN
         assert len(iv) == self.AES_IV_LEN
@@ -91,11 +91,11 @@ class EncryptionWrapperMR:
         encrypted_data_bytes = aes_encryptor.encrypt(data_padded)
 
         # encode encrypted binary data to base64
-        return base64.b64encode(encrypted_data_bytes).decode('utf8')
+        return b64encode(encrypted_data_bytes).decode('utf8')
 
     def aes_decrypt(self, data: str):
         # decode base64 string
-        encrypted_response_data = base64.b64decode(data)
+        encrypted_response_data = b64decode(data)
 
         # decrypt the response using our AES key
         aes_decryptor = self._make_aes_cipher()
@@ -149,7 +149,7 @@ class EncryptionWrapperMR:
                 enc = long_to_bytes(m_int, 1)
 
             # hexlify to string
-            enc_str = binascii.hexlify(enc).decode('utf8')
+            enc_str = hexlify(enc).decode('utf8')
 
             # pad the start with '0' hex char
             while len(enc_str) < rsa_byte_len * 2:
