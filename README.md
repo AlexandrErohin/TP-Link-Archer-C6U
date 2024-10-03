@@ -228,6 +228,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
 - Archer C5400X V1
+- Archer GX90 v1.0
 - Archer MR200 (v5, v5.3)
 - Archer MR600 (v1, v3)
 - Archer VR2100v v1
