@@ -53,6 +53,12 @@ class TestTPLinkClient(TestCase):
                 "macaddr": "06:82:9d:2b:8f:c6",
                 "ipaddr": "192.168.1.186",
                 "hostname": "UNKNOWN"
+            },
+            {
+                "wire_type": "2.4G",
+                "macaddr": "06:55:9d:2b:8f:a7",
+                "ipaddr": "Unknown",
+                "hostname": "Unknown"
             }
         ],
         "guest_5g_psk_key": "",
@@ -225,9 +231,9 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.wan_ipv4_gateway, '192.168.1.254')
         self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
         self.assertEqual(status.wired_total, 2)
-        self.assertEqual(status.wifi_clients_total, 2)
+        self.assertEqual(status.wifi_clients_total, 3)
         self.assertEqual(status.guest_clients_total, 0)
-        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.clients_total, 5)
         self.assertEqual(status.iot_clients_total, None)
         self.assertEqual(status.guest_2g_enable, False)
         self.assertEqual(status.guest_5g_enable, False)
@@ -238,7 +244,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, 0.43)
         self.assertEqual(status.cpu_usage, 0.28)
-        self.assertEqual(len(status.devices), 4)
+        self.assertEqual(len(status.devices), 5)
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.WIRED)
         self.assertEqual(status.devices[0].macaddr, '3D-24-25-24-30-79')
@@ -265,12 +271,19 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[2].packets_sent, 450333)
         self.assertEqual(status.devices[2].packets_received, 4867482)
         self.assertIsInstance(status.devices[3], Device)
-        self.assertEqual(status.devices[3].type, Connection.HOST_5G)
-        self.assertEqual(status.devices[3].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[3].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[3].macaddr, '06-55-9D-2B-8F-A7')
         self.assertEqual(status.devices[3].ipaddr, '0.0.0.0')
-        self.assertEqual(status.devices[3].hostname, '')
-        self.assertEqual(status.devices[3].packets_sent, 134815)
-        self.assertEqual(status.devices[3].packets_received, 2953078)
+        self.assertEqual(status.devices[3].hostname, 'Unknown')
+        self.assertEqual(status.devices[3].packets_sent, None)
+        self.assertEqual(status.devices[3].packets_received, None)
+        self.assertIsInstance(status.devices[4], Device)
+        self.assertEqual(status.devices[4].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[4].macaddr, '1F-7A-BD-F7-20-0D')
+        self.assertEqual(status.devices[4].ipaddr, '0.0.0.0')
+        self.assertEqual(status.devices[4].hostname, '')
+        self.assertEqual(status.devices[4].packets_sent, 134815)
+        self.assertEqual(status.devices[4].packets_received, 2953078)
 
     def test_get_status_ax_55(self) -> None:
         response_status = '''
