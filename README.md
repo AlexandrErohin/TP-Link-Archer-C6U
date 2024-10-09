@@ -203,6 +203,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 ## <a id="supports">Supported routers</a>
 ### Fully tested Hardware Versions
 - Archer A7 V5
+- Archer A9 V6
 - Archer AX10 v1.0
 - Archer AX12 v1.0
 - Archer AX20 v1.0
@@ -215,6 +216,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX72 V1
 - Archer AX73 V1
 - Archer AX75 V1
+- Archer AX90 V1.20
 - Archer AXE75 V1
 - Archer AXE16000
 - Archer AX3000 V1
@@ -253,10 +255,8 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 ### Not fully tested Hardware Versions
 - AD7200 V2
 - Archer A6 (V2 and V3)
-- Archer A9 V6
 - Archer A10 (V1 and V2)
 - Archer A20 (V1, V3)
-- Archer C7 V4
 - Archer C8 (V3 and V4)
 - Archer C9 (V4 and V5)
 - Archer C59 V2
