@@ -353,9 +353,15 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         devices = {}
 
+        def _getIP(ip: str) -> IPv4Address:
+            try:
+                return IPv4Address(ip)
+            except Exception:
+                return IPv4Address('0.0.0.0')
+
         def _add_device(conn: Connection, item: dict) -> None:
             devices[item['macaddr']] = Device(conn, EUI48(item['macaddr']),
-                                              IPv4Address(item['ipaddr']),
+                                              _getIP(item['ipaddr']),
                                               item['hostname'])
 
         for item in data.get('access_devices_wired', []):
@@ -381,7 +387,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for item in smart_network:
                 if item['mac'] not in devices:
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
-                    devices[item['mac']] = Device(conn, EUI48(item['mac']), IPv4Address(item['ip']),
+                    devices[item['mac']] = Device(conn, EUI48(item['mac']), _getIP(item['ip']),
                                                   item['deviceName'])
                     if conn.is_iot():
                         if status.iot_clients_total is None:
