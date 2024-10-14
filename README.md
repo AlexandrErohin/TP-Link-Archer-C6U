@@ -250,6 +250,7 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - TL-MR100 v2.0
 - TL-MR105
 - TL-MR6400 (v5, v5.3)
+- TL-MR6500v
 - TL-WA3001 v1.0
 
 ### Not fully tested Hardware Versions
