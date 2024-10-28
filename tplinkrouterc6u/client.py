@@ -10,8 +10,9 @@ from datetime import timedelta
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
+from tplinkrouterc6u.helper import get_ip
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
-from tplinkrouterc6u.enum import Connection
+from tplinkrouterc6u.package_enum import Connection
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.exception import ClientException, ClientError
 from abc import ABC, abstractmethod
@@ -353,15 +354,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         devices = {}
 
-        def _getIP(ip: str) -> IPv4Address:
-            try:
-                return IPv4Address(ip)
-            except Exception:
-                return IPv4Address('0.0.0.0')
-
         def _add_device(conn: Connection, item: dict) -> None:
             devices[item['macaddr']] = Device(conn, EUI48(item['macaddr']),
-                                              _getIP(item['ipaddr']),
+                                              get_ip(item['ipaddr']),
                                               item['hostname'])
 
         for item in data.get('access_devices_wired', []):
@@ -387,7 +382,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for item in smart_network:
                 if item['mac'] not in devices:
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
-                    devices[item['mac']] = Device(conn, EUI48(item['mac']), _getIP(item['ip']),
+                    devices[item['mac']] = Device(conn, EUI48(item['mac']), get_ip(item['ip']),
                                                   item['deviceName'])
                     if conn.is_iot():
                         if status.iot_clients_total is None:
@@ -585,10 +580,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                     status.iot_clients_total = 0
                 status.iot_clients_total += 1
 
-            ip = item['ip'] if item.get('ip') else '0.0.0.0'
             device = Device(conn,
                             EUI48(item['mac']),
-                            IPv4Address(ip),
+                            get_ip(item.get('ip', '0.0.0.0')),
                             b64decode(item['name']).decode())
             device.down_speed = item.get('down_speed')
             device.up_speed = item.get('up_speed')
@@ -1195,7 +1189,7 @@ class TPLinkMRClient(AbstractRouter):
         lines = response.split('\n')
         for line in lines:
             if line.startswith('['):
-                regexp = search('\[\d,\d,\d,\d,\d,\d\](\d)', line)
+                regexp = search(r'\[\d,\d,\d,\d,\d,\d\](\d)', line)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)
@@ -1385,7 +1379,7 @@ class TPLinkMRClient(AbstractRouter):
         Return value:
             return code (int)
         '''
-        result = search('\$\.ret=(.*);', response_text)
+        result = search(r'\$\.ret=(.*);', response_text)
         assert result is not None
         assert result.group(1).isnumeric()
 

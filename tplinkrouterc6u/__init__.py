@@ -6,7 +6,7 @@ from tplinkrouterc6u.client import (
     AbstractRouter,
     TPLinkDecoClient,
 )
-from tplinkrouterc6u.enum import Connection
+from tplinkrouterc6u.package_enum import Connection
 from tplinkrouterc6u.dataclass import (
     Firmware,
     Status,
