@@ -64,6 +64,24 @@ class EncryptionWrapper:
     def _get_aes_string(self) -> str:
         return 'k={}&i={}'.format(self._key.decode(), self._iv.decode())
 
+    @staticmethod
+    def encrypt_password_C1200(password: str, nn: str, ee: str) -> str:
+        n = int(nn, 16)
+        e = int(ee, 16)
+        key = RSA.construct((n, e))
+
+        modulus_byte_length = (key.size_in_bits() + 7) // 8
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > modulus_byte_length:
+            raise ValueError("Password too long for the RSA key size.")
+
+        padded_password = password_bytes.ljust(modulus_byte_length, b'\x00')
+        message_int = bytes_to_long(padded_password)
+        encrypted_int = pow(message_int, e, n)
+        encrypted_hex = format(encrypted_int, 'x').zfill(256)
+
+        return encrypted_hex
+
 
 class EncryptionWrapperMR:
     RSA_USE_PKCS_V1_5 = False
