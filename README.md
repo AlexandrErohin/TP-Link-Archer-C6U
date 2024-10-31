@@ -31,10 +31,6 @@ router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
 # router = TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
-# If you have the TP-link C1200 V2 or similar, you can use the TplinkC1200Router class instead of the TplinkRouter class.
-# Remember that the password for this router is different, here you need to use the web encrypted password.
-# To get web encrypted password, read Web Encrypted Password section
-# router = TplinkC1200Router('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
 
 try:
     router.authorize()  # authorizing
@@ -63,16 +59,6 @@ finally:
 
 The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
 So before action you need to authorize and after logout
-
-### <a id="encrypted_pass">Web Encrypted Password</a>
-If you got exception - `You need to use web encrypted password instead. Check the documentation!`
-or you have TP-link C1200 V2 or similar router you need to get web encrypted password by these actions:
-1. Go to the login page of your router. (default: 192.168.0.1).
-2. Type in the password you use to login into the password field.
-3. Click somewhere else on the page so that the password field is not selected anymore.
-4. Open the JavaScript console of your browser (usually by pressing F12 and then clicking on "Console").
-5. Type `document.getElementById("login-password").value;`
-6. Copy the returned value as password and use it.
 
 ## Functions
 | Function | Args | Description | Return |
@@ -224,8 +210,8 @@ or you have TP-link C1200 V2 or similar router you need to get web encrypted pas
 - Archer AX11000 V1
 - Archer BE800 v1.0
 - Archer BE805 v1.0
-- Archer C1200 (v1.0, v2.0) (You need to use [web encrypted password](#encrypted_pass))
-- Archer C2300 v1.0 (You need to use [web encrypted password](#encrypted_pass))
+- Archer C1200 (v1.0, v2.0)
+- Archer C2300 v1.0
 - Archer C6 (v2.0, v3.0)
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)

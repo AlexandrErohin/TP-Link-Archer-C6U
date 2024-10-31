@@ -729,7 +729,7 @@ class TplinkC1200Router(TplinkBaseRouter):
             self._logged = True
 
         except Exception as e:
-            error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
+            error = ("TplinkRouter - C1200 - {} - Cannot authorize! Error - {}; Response - {}"
                      .format(self.__class__.__name__, e, data))
             if self._logger:
                 self._logger.error(error)
@@ -752,7 +752,7 @@ class TplinkC1200Router(TplinkBaseRouter):
             self._pwdEE = args[1]
 
         except Exception as e:
-            error = ('TplinkRouter - {} - Unknown error for pwd! Error - {}; Response - {}'
+            error = ('TplinkRouter - C1200 - {} - Unknown error for pwd! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response.text))
             if self._logger:
                 self._logger.error(error)
@@ -1404,4 +1404,7 @@ class TplinkRouterProvider:
             if router.supports():
                 return router
 
-        return None
+        raise ClientException(('Your router is not supported. Please add your router support to '
+                               'https://github.com/AlexandrErohin/TP-Link-Archer-C6U'
+                               'by implementing methods for AbstractRouter class'
+                               ))
