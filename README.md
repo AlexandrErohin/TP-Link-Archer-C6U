@@ -267,7 +267,6 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer C900 V1
 - Archer C1200 V3
 - Archer C1900 V2
-- Archer C2300 V2
 - Archer C4000 (V2 and V3)
 - Archer C5400 V2
 - TL-WR1043N V5
