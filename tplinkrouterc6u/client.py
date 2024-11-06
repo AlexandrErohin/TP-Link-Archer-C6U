@@ -14,7 +14,7 @@ from tplinkrouterc6u.helper import get_ip
 from tplinkrouterc6u.encryption import EncryptionWrapper, EncryptionWrapperMR
 from tplinkrouterc6u.package_enum import Connection
 from tplinkrouterc6u.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
-from tplinkrouterc6u.exception import ClientException, ClientError
+from tplinkrouterc6u.exception import ClientException, ClientError, AuthorizeError
 from abc import ABC, abstractmethod
 
 
@@ -108,7 +108,7 @@ class TplinkRequest:
         error = ('TplinkRouter - {} - Response with error; Request {} - Response {}'
                  .format(self.__class__.__name__, path, data)) if not error else error
         if self._logger:
-            self._logger.error(error)
+            self._logger.debug(error)
         raise ClientError(error)
 
     def _is_valid_response(self, data: dict) -> bool:
@@ -178,7 +178,7 @@ class TplinkEncryption(TplinkRequest):
             error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
                      .format(self.__class__.__name__, e, data))
             if self._logger:
-                self._logger.error(error)
+                self._logger.debug(error)
             raise ClientException(error)
 
     def _request_pwd(self) -> None:
@@ -203,7 +203,7 @@ class TplinkEncryption(TplinkRequest):
             error = ('TplinkRouter - {} - Unknown error for pwd! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response.text))
             if self._logger:
-                self._logger.error(error)
+                self._logger.debug(error)
             raise ClientException(error)
 
     def _request_seq(self) -> None:
@@ -230,7 +230,7 @@ class TplinkEncryption(TplinkRequest):
             error = ('TplinkRouter - {} - Unknown error for seq! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response.text))
             if self._logger:
-                self._logger.error(error)
+                self._logger.debug(error)
             raise ClientException(error)
 
     def _try_login(self) -> Response:
@@ -658,7 +658,7 @@ class TplinkC6V4Router(AbstractRouter):
             return False
         if response.status_code == 401 and response.text.startswith('00'):
             raise ClientException(('Your router is not supported. Please add your router support to '
-                                   'https://github.com/AlexandrErohin/TP-Link-Archer-C6U'
+                                   'https://github.com/AlexandrErohin/TP-Link-Archer-C6U '
                                    'by implementing methods for TplinkC6V4Router class'
                                    ))
         return False
@@ -682,100 +682,36 @@ class TplinkC6V4Router(AbstractRouter):
         raise ClientException('Not Implemented')
 
 
-class TplinkC1200Router(TplinkBaseRouter):
-    username = ''
-    password = ''
-    _pwdNN = ''
-    _pwdEE = ''
-    _encryption = EncryptionWrapper()
-
+class TplinkC5400XRouter(TplinkBaseRouter):
     def supports(self) -> bool:
-        if len(self.password) > 125:
-            return False
-
-        try:
-            self._request_pwd()
-            return True
-        except ClientException:
-            return False
+        return len(self.password) >= 200
 
     def authorize(self) -> None:
-        if self._pwdNN == '':
-            self._request_pwd()
+        if len(self.password) < 200:
+            raise Exception('You need to use web encrypted password instead. Check the documentation!')
 
-        response = self._try_login()
-
-        is_valid_json = False
-        try:
-            response.json()
-            is_valid_json = True
-        except BaseException:
-            """Ignore"""
-
-        if is_valid_json is False or response.status_code == 403:
-            self._logged = False
-            self._request_pwd()
-            response = self._try_login()
-
-        data = response.text
-        try:
-            data = response.json()
-            data = self._decrypt_response(data)
-
-            self._stok = data[self._data_block]['stok']
-            regex_result = search(
-                'sysauth=(.*);', response.headers['set-cookie'])
-            self._sysauth = regex_result.group(1)
-            self._logged = True
-
-        except Exception as e:
-            error = ("TplinkRouter - C1200 - {} - Cannot authorize! Error - {}; Response - {}"
-                     .format(self.__class__.__name__, e, data))
-            if self._logger:
-                self._logger.error(error)
-            raise ClientException(error)
-
-    def _request_pwd(self) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+
         response = post(
-            url, params={'operation': 'read'},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
-
-        try:
-            data = response.json()
-
-            args = data[self._data_block]['password']
-
-            self._pwdNN = args[0]
-            self._pwdEE = args[1]
-
-        except Exception as e:
-            error = ('TplinkRouter - C1200 - {} - Unknown error for pwd! Error - {}; Response - {}'
-                     .format(self.__class__.__name__, e, response.text))
-            if self._logger:
-                self._logger.error(error)
-            raise ClientException(error)
-
-    def _try_login(self) -> Response:
-        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
-
-        crypted_pwd = self._encryption.encrypt_password_C1200(self.password, self._pwdNN, self._pwdEE)
-
-        body = self._get_login_data(crypted_pwd)
-
-        return post(
             url,
-            data=body,
+            params={'operation': 'login', 'username': self.username, 'password': self.password},
             headers=self._headers_login,
             timeout=self.timeout,
             verify=self._verify_ssl,
         )
 
-    @staticmethod
-    def _get_login_data(crypted_pwd: str) -> str:
-        return 'operation=login&password={}'.format(crypted_pwd)
+        try:
+            self._stok = response.json().get('data').get('stok')
+            regex_result = search('sysauth=(.*);', response.headers['set-cookie'])
+            self._sysauth = regex_result.group(1)
+            self._logged = True
+            self._smart_network = False
+
+        except Exception as e:
+            error = "TplinkRouter - C5400X - Cannot authorize! Error - {}; Response - {}".format(e, response.text)
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
 
     def set_led(self, enable: bool) -> None:
         current_state = (self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
@@ -848,6 +784,103 @@ class TplinkC1200Router(TplinkBaseRouter):
         path = f"admin/wireless?form={value}&{data}"
 
         self.request(path, data)
+
+
+class TplinkC1200Router(TplinkC5400XRouter):
+    username = ''
+    password = ''
+    _pwdNN = ''
+    _pwdEE = ''
+    _encryption = EncryptionWrapper()
+
+    def supports(self) -> bool:
+        if len(self.password) > 125:
+            return False
+
+        try:
+            self._request_pwd()
+            return True
+        except ClientException:
+            return False
+
+    def authorize(self) -> None:
+        if self._pwdNN == '':
+            self._request_pwd()
+
+        response = self._try_login()
+
+        is_valid_json = False
+        try:
+            response.json()
+            is_valid_json = True
+        except BaseException:
+            """Ignore"""
+
+        if is_valid_json is False or response.status_code == 403:
+            self._logged = False
+            self._request_pwd()
+            response = self._try_login()
+
+        data = response.text
+        try:
+            data = response.json()
+            data = self._decrypt_response(data)
+
+            self._stok = data[self._data_block]['stok']
+            regex_result = search(
+                'sysauth=(.*);', response.headers['set-cookie'])
+            self._sysauth = regex_result.group(1)
+            self._logged = True
+
+        except Exception as e:
+            error = ("TplinkRouter - C1200 - Cannot authorize! Error - {}; Response - {}".format(e, data))
+            if self._logger:
+                self._logger.debug(error)
+            if 'data' in vars() and data.get('errorcode') == 'login failed':
+                raise AuthorizeError(error)
+            raise ClientException(error)
+
+    def _request_pwd(self) -> None:
+        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+        response = post(
+            url, params={'operation': 'read'},
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        try:
+            data = response.json()
+
+            args = data[self._data_block]['password']
+
+            self._pwdNN = args[0]
+            self._pwdEE = args[1]
+
+        except Exception as e:
+            error = ('TplinkRouter - C1200 - {} - Unknown error for pwd! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response.text))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+
+    def _try_login(self) -> Response:
+        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+
+        crypted_pwd = self._encryption.encrypt_password_C1200(self.password, self._pwdNN, self._pwdEE)
+
+        body = self._get_login_data(crypted_pwd)
+
+        return post(
+            url,
+            data=body,
+            headers=self._headers_login,
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+    @staticmethod
+    def _get_login_data(crypted_pwd: str) -> str:
+        return 'operation=login&password={}'.format(crypted_pwd)
 
 
 class TPLinkMRClient(AbstractRouter):
@@ -1168,7 +1201,7 @@ class TPLinkMRClient(AbstractRouter):
         if code != 200:
             error = 'TplinkRouter - MR -  Response with error; Request {} - Response {}'.format(data, response)
             if self._logger:
-                self._logger.error(error)
+                self._logger.debug(error)
             raise ClientError(error)
 
         result = self._merge_response(response)
@@ -1319,7 +1352,7 @@ class TPLinkMRClient(AbstractRouter):
 
         if error:
             if self._logger:
-                self._logger.error(error)
+                self._logger.debug(error)
             raise ClientException(error)
 
     def _request(self, url, method='POST', data_str=None, encrypt=False):
@@ -1398,13 +1431,19 @@ class TPLinkMRClient(AbstractRouter):
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
-                   verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter | None:
-        for client in [TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter, TplinkC1200Router]:
+                   verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
+        for client in [TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
 
-        raise ClientException(('Your router is not supported. Please add your router support to '
-                               'https://github.com/AlexandrErohin/TP-Link-Archer-C6U'
-                               'by implementing methods for AbstractRouter class'
-                               ))
+        router = TplinkC1200Router(host, password, username, logger, verify_ssl, timeout)
+        try:
+            router.authorize()
+        except AuthorizeError as e:
+            logger.error(e.__str__())
+            raise ClientException(('Login failed! Please check if your router local password is correct or '
+                                   'try to use web encrypted password instead. Check the documentation!'
+                                   ))
+
+        raise ClientException('You need to use web encrypted password instead. Check the documentation!')
