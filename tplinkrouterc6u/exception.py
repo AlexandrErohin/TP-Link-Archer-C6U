@@ -4,3 +4,7 @@ class ClientException(Exception):
 
 class ClientError(ClientException):
     pass
+
+
+class AuthorizeError(ClientException):
+    pass
