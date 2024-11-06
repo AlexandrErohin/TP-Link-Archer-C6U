@@ -1440,8 +1440,10 @@ class TplinkRouterProvider:
         router = TplinkC1200Router(host, password, username, logger, verify_ssl, timeout)
         try:
             router.authorize()
+            return router
         except AuthorizeError as e:
-            logger.error(e.__str__())
+            if logger:
+                logger.error(e.__str__())
             raise ClientException(('Login failed! Please check if your router local password is correct or '
                                    'try to use web encrypted password instead. Check the documentation!'
                                    ))
