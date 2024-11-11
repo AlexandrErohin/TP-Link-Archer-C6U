@@ -1,4 +1,4 @@
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from hashlib import md5
 from re import search
 from json import dumps, loads
@@ -6,6 +6,7 @@ from time import time, sleep
 from urllib.parse import quote
 from requests.packages import urllib3
 from requests import post, Response, Session
+from requests.exceptions import RequestException, ConnectionError, Timeout
 from datetime import timedelta
 from macaddress import EUI48
 from ipaddress import IPv4Address
@@ -1428,11 +1429,509 @@ class TPLinkMRClient(AbstractRouter):
         return signature, encrypted_data
 
 
+class TPLinkEXClient(AbstractRouter):
+    REQUEST_RETRIES = 3
+
+    HEADERS = {
+        'Accept': '*/*',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0',
+        'Referer': 'http://192.168.0.1/'  # updated on the fly
+    }
+
+    HTTP_RET_OK = 0
+    HTTP_ERR_CGI_INVALID_ANSI = 71017
+    HTTP_ERR_USER_PWD_NOT_CORRECT = 71233
+    HTTP_ERR_USER_BAD_REQUEST = 71234
+
+    CLIENT_TYPES = {
+        0: Connection.WIRED,
+        1: Connection.HOST_2G,
+        3: Connection.HOST_5G,
+        2: Connection.GUEST_2G,
+        4: Connection.GUEST_5G,
+    }
+
+    WIFI_SET = {
+        Connection.HOST_2G: '1,0,0,0,0,0',
+        Connection.HOST_5G: '2,0,0,0,0,0',
+        Connection.GUEST_2G: '1,0,0,0,0,0',
+        Connection.GUEST_5G: '2,0,0,0,0,0',
+    }
+
+    class ActItem:
+        
+
+        GET = 'go'
+        GO = 'go'
+        SET = 'so'
+        ADD = 'add'
+        DEL = 'del'
+        GL = 'gl'
+        GS = 'gs'
+        OP = 'op'
+        CGI = 'cgi'
+
+        def __init__(self, type: int, oid: str, stack: str = '0,0,0,0,0,0', pstack: str = '0,0,0,0,0,0',
+                     attrs: list = []):
+            self.type = type
+            self.oid = oid
+            self.stack = stack
+            self.pstack = pstack
+            self.attrs = attrs
+
+    def __init__(self, host: str, password: str, username: str = 'user', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+
+        # Temporarily forcing username because HA integration forces admin user
+        self.username = 'user'
+
+        self.req = Session()
+        self._token = None
+        self._hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
+        self._nn = None
+        self._ee = None
+        self._seq = None
+
+        self._encryption = EncryptionWrapperMR()
+
+    def supports(self) -> bool:
+        try:
+            self._req_rsa_key()
+            return True
+        except AssertionError:
+            return False
+
+    def authorize(self) -> None:
+        '''
+        Establishes a login session to the host using provided credentials
+        '''
+        # request the RSA public key from the host
+        self._nn, self._ee, self._seq = self._req_rsa_key()
+
+        # authenticate
+        self._req_login()
+
+        # request TokenID
+        self._token = self._req_token()
+
+    def logout(self) -> None:
+        '''
+        Logs out from the host
+        '''
+        acts = [
+            self.ActItem(self.ActItem.CGI, '/cgi/logout')
+        ]
+
+        response, _ = self.req_act(acts)
+        
+        if response == '':
+            self._token = None
+
+    def get_firmware(self) -> Firmware:
+        acts = [
+            self.ActItem(self.ActItem.GET, 'DEV2_DEV_INFO', attrs=[
+                'hardwareVersion',
+                'modelName',
+                'softwareVersion'
+            ])
+        ]
+        _, values = self.req_act(acts)
+
+        if not values:
+            raise ValueError('No firmware information received.')
+
+        firmware = Firmware(
+            values[0].get('hardwareVersion', ''),
+            values[0].get('modelName', ''),
+            values[0].get('softwareVersion', '')
+        )
+
+        return firmware
+    
+    def get_status(self) -> Status:
+        status = Status()
+        acts = [
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN', attrs=['MACAddress', 'IPAddress']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
+                         attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON', attrs=[]),
+            self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY', attrs=[]),
+            self.ActItem(self.ActItem.GO, 'DEV2_MEM_STATUS', attrs=['total', 'free']),
+            self.ActItem(self.ActItem.GO, 'DEV2_PROC_STATUS', attrs=['CPUUsage']),
+        ]
+
+        _, values = self.req_act(acts)
+
+        if values[0].__class__ == list:
+            values[0] = values[0][0]
+
+        status._lan_macaddr = EUI48(values[0]['MACAddress'])
+        status._lan_ipv4_addr = IPv4Address(values[0]['IPAddress'])
+
+        for item in values[1]:
+            if int(item['enable']) == 0 and values[1].__class__ == list:
+                continue
+            status._wan_macaddr = (item['MACAddr']) if item['MACAddr'] else None
+            status._wan_ipv4_addr = (item['connIPv4Address'])
+            status._wan_ipv4_gateway = (item['connIPv4Gateway'])
+        
+        if values[2].__class__ != list:
+            status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
+        else:
+            status.wifi_2g_enable = bool(int(values[2][0]['primaryEnable']))
+            status.wifi_5g_enable = bool(int(values[2][1]['primaryEnable']))
+
+        if values[2].__class__ != list:
+            status.guest_2g_enable = bool(int(values[2]['guestEnable']))
+        else:
+            status.guest_2g_enable = bool(int(values[2][0]['guestEnable']))
+            status.guest_5g_enable = bool(int(values[2][1]['guestEnable']))
+
+        devices = {}
+        for val in self._to_list(values[3]):
+            if int(val['active']) == 0:
+                continue
+            conn = self.CLIENT_TYPES.get(int(val['X_TP_LanConnType']))
+            if conn is None:
+                continue
+            elif conn == Connection.WIRED:
+                status.wired_total += 1
+            elif conn.is_guest_wifi():
+                status.guest_clients_total += 1
+            elif conn.is_host_wifi():
+                status.wifi_clients_total += 1
+            devices[val['physAddress']] = Device(conn,
+                                                EUI48(val['physAddress']),
+                                                IPv4Address(val['IPAddress']),
+                                                val['hostName'])
+            
+       
+        
+        total = int(values[4]['total'])
+        free = int(values[4]["free"])
+        status.mem_usage = ((total - free) / total) * 100
+
+        status.cpu_usage = int(values[5]['CPUUsage'])
+
+        status.devices = list(devices.values())
+        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+
+        return status
+    
+    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'DEV2_DHCPV4_POOL_STATICADDR', attrs=['enable', 'chaddr', 'yiaddr']),
+        ]
+        _, values = self.req_act(acts)
+
+        ipv4_reservations = []
+        for item in values[0]:
+            ipv4_reservations.append(
+                IPv4Reservation(
+                    EUI48(item['chaddr']),
+                    IPv4Address(item['yiaddr']),
+                    '',
+                    bool(int(item['enable']))
+                ))
+
+        return ipv4_reservations
+
+    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY', attrs=['IPAddress', 'physAddress', 'hostName', 'leaseTimeRemaining']),
+        ]
+        _, values = self.req_act(acts)
+
+        dhcp_leases = []
+        for item in values[0]:
+            lease_time = item['leaseTimeRemaining']
+            dhcp_leases.append(
+                IPv4DHCPLease(
+                    EUI48(item['physAddress']),
+                    IPv4Address(item['IPAddress']),
+                    item['hostName'],
+                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
+                ))
+
+        return dhcp_leases
+    
+    def get_ipv4_status(self) -> IPv4Status:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN',
+                         attrs=['MACAddress', 'IPAddress', 'IPSubnetMask', 'DHCPv4Enable']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
+                         attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway', 'name', 'connIPv4SubnetMask',
+                                'connIPv4DnsServer']),
+        ]
+        _, values = self.req_act(acts)
+
+    
+        if values[0].__class__ == list:
+            values[0] = values[0][0]
+
+        ipv4_status = IPv4Status()
+        ipv4_status._lan_macaddr = EUI48(values[0]['MACAddress'])
+        ipv4_status._lan_ipv4_ipaddr = IPv4Address(values[0]['IPAddress'])
+        ipv4_status._lan_ipv4_netmask = IPv4Address(values[0]['IPSubnetMask'])
+        ipv4_status.lan_ipv4_dhcp_enable = bool(int(values[0]['DHCPv4Enable']))
+
+        for item in values[1]:
+            if int(item['enable']) == 0 and values[1].__class__ == list:
+                continue
+            ipv4_status._wan_macaddr = EUI48(item['MACAddr'])
+            ipv4_status._wan_ipv4_ipaddr = IPv4Address(item['connIPv4Address'])
+            ipv4_status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway'])
+            ipv4_status.wan_ipv4_conntype = item['name']
+            ipv4_status._wan_ipv4_netmask = IPv4Address(item['connIPv4SubnetMask'])
+            dns = item['connIPv4DnsServer'].split(',')
+            ipv4_status._wan_ipv4_pridns = IPv4Address(dns[0])
+            ipv4_status._wan_ipv4_snddns = IPv4Address(dns[1])
+
+        return ipv4_status
+
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET,
+                'DEV2_ADT_WIFI_COMMON',
+                self.WIFI_SET[wifi],
+                attrs=[f'"primaryEnable":"{int(enable)}"' if 'GUEST' not in str(wifi) else f'"guestEnable":"{int(enable)}"']),
+        ]
+        self.req_act(acts)
+
+    def reboot(self) -> None:
+        acts = [
+            self.ActItem(self.ActItem.OP, 'ACT_REBOOT')
+        ]
+        self.req_act(acts)
+
+    def req_act(self, acts: list):
+        '''
+        Requests ACTs via the cgi_gdpr proxy
+        '''
+
+        if self._token is None:
+            raise RuntimeError('User not logged in!')
+        
+        all_responses = []
+        url = self._get_url('cgi_gdpr?9')
+
+        for act in acts:
+            attrs_str = ', '.join([attr if ':' in attr else f'"{attr}":""' for attr in act.attrs])
+            tp_data = (f'{{"data":{{"stack":"{act.stack}","pstack":"{act.pstack}"{ "," + attrs_str if attrs_str else "" }}},"operation":"{act.type}","oid":"{act.oid}"}}')
+
+            code, response = self._request(url, data_str=tp_data, encrypt=True)
+            response = response.replace("\r", "").replace("\n", "").replace("\t", "")
+            
+            if code != 200:
+                error = 'TplinkRouter - EX -  Response with error; Request {} - Response {}'.format(tp_data, response)
+                if self._logger:
+                    self._logger.debug(error)
+                raise ClientError(error)
+
+            try:
+                if len(response):
+                    json_data = loads(response)
+                    if 'data' in json_data:
+                        all_responses.append(json_data['data'])
+            except ValueError:
+               raise ClientError(f"Error trying to convert response to JSON: {response}")
+
+        return response, all_responses
+
+    @staticmethod
+    def _to_list(response: dict | list | None) -> list:
+        if response is None:
+            return []
+
+        return [response] if response.__class__ != list else response
+
+    def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
+        # add timestamp param
+        if include_ts:
+            params['_'] = str(round(time() * 1000))
+
+        # format params into a string
+        params_arr = []
+        for attr, value in params.items():
+            params_arr.append('{}={}'.format(attr, value))
+
+        # format url
+        return '{}/{}{}{}'.format(
+            self.host,
+            endpoint,
+            '?' if len(params_arr) > 0 else '',
+            '&'.join(params_arr)
+        )
+
+    def _req_token(self):
+        '''
+        Requests the TokenID, used for CGI authentication (together with cookies)
+            - token is inlined as JS var in the index (/) html page
+              e.g.: <script type="text/javascript">var token="086724f57013f16e042e012becf825";</script>
+
+        Return value:
+            TokenID string
+        '''
+        url = self._get_url('')
+        (code, response) = self._request(url, method='GET')
+        assert code == 200
+
+        result = search('var token="(.*)";', response)
+
+        assert result is not None
+        assert result.group(1) != ''
+
+        return result.group(1)
+
+    def _req_rsa_key(self):
+        '''
+        Requests the RSA public key from the host
+
+        Return value:
+            ((n, e), seq) tuple
+        '''
+        url = self._get_url('cgi/getGDPRParm')
+        (code, response) = self._request(url)
+        assert code == 200
+
+        # assert return code
+        assert self._parse_ret_val(response) == self.HTTP_RET_OK
+
+        # parse public key
+        ee = search('var ee="(.*)";', response)
+        nn = search('var nn="(.*)";', response)
+        seq = search('var seq="(.*)";', response)
+
+        assert ee and nn and seq
+        ee = ee.group(1)
+        nn = nn.group(1)
+        seq = seq.group(1)
+        assert len(ee) == 6
+        assert len(nn) == 128
+        assert seq.isnumeric()
+
+        return nn, ee, int(seq)
+
+    def _req_login(self) -> None:
+        login_data = '{"data":{"UserName":"%s","Passwd":"%s","Action": "1","stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0"},"operation":"cgi","oid":"/cgi/login"}' % (
+            b64encode(bytes(self.username, "utf-8")).decode("utf-8"), 
+            b64encode(bytes(self.password, "utf-8")).decode("utf-8")
+        )
+
+        sign, data = self._prepare_data(login_data, True)
+        assert len(sign) == 256
+
+        request_data = f"sign={sign}\r\ndata={data}\r\n"
+
+        url = f"{self.host}/cgi_gdpr?9"
+        (code, response) = self._request(url, data_str=request_data)
+        response = self._encryption.aes_decrypt(response)
+
+        # parse and match return code
+        ret_code = self._parse_ret_val(response)
+        error = ''
+        if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
+            error = 'TplinkRouter - EX - Login failed, wrong user or password.'
+        elif ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
+            error = 'TplinkRouter - EX - Login failed. Generic error code: {}'.format(ret_code)
+        elif ret_code != self.HTTP_RET_OK:
+            error = 'TplinkRouter - EX - Login failed. Unknown error code: {}'.format(ret_code)
+
+        if error:
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+
+    def _request(self, url, method='POST', data_str=None, encrypt=False):
+        '''
+        Prepares and sends an HTTP request to the host
+            - sets up the headers, handles token auth
+            - encrypts/decrypts the data, if needed
+
+        Return value:
+            (status_code, response_text) tuple
+        '''
+        headers = self.HEADERS
+
+        # add referer to request headers,
+        # otherwise we get 403 Forbidden
+        headers['Referer'] = self.host
+
+        # add token to request headers,
+        # used for CGI auth (together with JSESSIONID cookie)
+        if self._token is not None:
+            headers['TokenID'] = self._token
+
+        # encrypt request data if needed (for the /cgi_gdpr endpoint)
+        if encrypt:
+            sign, data = self._prepare_data(data_str, False)
+            data = 'sign={}\r\ndata={}\r\n'.format(sign, data)
+        else:
+            data = data_str
+
+        try:
+            retry = 0
+            while retry < self.REQUEST_RETRIES:
+                
+                # send the request
+                if method == 'POST':
+                    r = self.req.post(url, data=data, headers=headers, timeout=self.timeout, verify=self._verify_ssl)
+                elif method == 'GET':
+                    r = self.req.get(url, data=data, headers=headers, timeout=self.timeout, verify=self._verify_ssl)
+                else:
+                    raise Exception('Unsupported method ' + str(method))
+                
+                # sometimes we get 500 here, not sure why... just retry the request
+                if r.status_code != 500 and '<title>500 Internal Server Error</title>' not in r.text:
+                    break
+
+                sleep(0.05)
+                retry += 1
+        except ConnectionError:
+            return 401, "Erro de conexão: A conexão foi abortada ou não pôde ser estabelecida."
+
+        except Timeout:
+            return 408, "Erro: O tempo de conexão ou resposta expirou."
+
+        except RequestException as e:
+            return 403,  f"Erro ao fazer a requisição: {e}"
+
+        # decrypt the response, if needed
+        if encrypt and (r.status_code == 200) and (r.text != ''):
+            return r.status_code, self._encryption.aes_decrypt(r.text)
+        else:
+            return r.status_code, r.text
+
+    def _parse_ret_val(self, response_text):
+        '''
+        Parses $.ret value from the response text
+
+        Return value:
+            return code (int)
+        '''
+        result = search(r'\$\.ret=(.*);', response_text)
+        assert result is not None
+        assert result.group(1).isnumeric()
+
+        return int(result.group(1))
+
+    def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
+        encrypted_data = self._encryption.aes_encrypt(data)
+        data_len = len(encrypted_data)
+        # get encrypted signature
+        signature = self._encryption.get_signature(int(self._seq) + data_len, is_login, self._hash, self._nn, self._ee)
+
+        # format expected raw request data
+        return signature, encrypted_data
+
+
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
+        for client in [TPLinkEXClient, TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
