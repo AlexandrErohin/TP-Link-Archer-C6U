@@ -1610,9 +1610,9 @@ class TPLinkEXClient(AbstractRouter):
         
         total = int(values[4]['total'])
         free = int(values[4]["free"])
-        status.mem_usage = ((total - free) / total) * 100
+        status.mem_usage = ((total - free) / total)
 
-        status.cpu_usage = int(values[5]['CPUUsage'])
+        status.cpu_usage = int(values[5]['CPUUsage']) / 100
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
