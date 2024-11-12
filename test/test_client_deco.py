@@ -70,7 +70,7 @@ class TestTPLinkDecoClient(TestCase):
                 "connection_type": "band5", "space_id": "1", "ip": "192.168.68.104", "client_mesh": true,
                 "online": true, "name": "d2lyZWxlc3M0", "enable_priority": false, "remain_time": 0, "owner_id": "",
                 "client_type": "other", "interface": "guest"},
-        {"mac": "56:32:c3:de:ce:f0", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
+        {"mac": "", "up_speed": 3, "down_speed": 1, "wire_type": "wireless", "access_host": "1",
                 "connection_type": "band2_4", "space_id": "1", "ip": "UNKNOWN", "client_mesh": true,
                 "online": true, "name": "d2lyZWxlc3M1", "enable_priority": false, "remain_time": 0, "owner_id": "",
                 "client_type": "other", "interface": "guest"}
@@ -149,7 +149,7 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(status.devices[3].packets_received, None)
         self.assertIsInstance(status.devices[4], Device)
         self.assertEqual(status.devices[4].type, Connection.GUEST_2G)
-        self.assertEqual(status.devices[4].macaddr, '56-32-C3-DE-CE-F0')
+        self.assertEqual(status.devices[4].macaddr, '00-00-00-00-00-00')
         self.assertEqual(status.devices[4].ipaddr, '0.0.0.0')
         self.assertEqual(status.devices[4].hostname, 'wireless5')
         self.assertEqual(status.devices[4].packets_sent, None)
