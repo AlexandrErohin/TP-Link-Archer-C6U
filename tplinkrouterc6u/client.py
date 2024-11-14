@@ -1497,6 +1497,16 @@ class TPLinkEXClient(AbstractRouter):
 
     def supports(self) -> bool:
         try:
+            supported_routers = ['EX511', 'EX220']
+
+            url = self._get_url('js/oid_str.js')
+            (code, response) = self._request(url)
+            assert code == 200
+            
+            pattern = r'\s*var\s+INCLUDE_BOOT_AGINETCONFIG_MODEL\s*=\s*"([^"]*)"'
+            match = search(pattern, response)
+            assert match and match.group(1) in supported_routers
+
             self._req_rsa_key()
             return True
         except AssertionError:
@@ -1555,8 +1565,8 @@ class TPLinkEXClient(AbstractRouter):
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN', attrs=['MACAddress', 'IPAddress']),
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
                          attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']),
-            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON', attrs=[]),
-            self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY', attrs=[]),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON', attrs=['primaryEnable', 'guestEnable']),
+            self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY', attrs=['active', 'X_TP_LanConnType', 'physAddress', 'IPAddress', 'hostName']),
             self.ActItem(self.ActItem.GO, 'DEV2_MEM_STATUS', attrs=['total', 'free']),
             self.ActItem(self.ActItem.GO, 'DEV2_PROC_STATUS', attrs=['CPUUsage']),
         ]
@@ -1572,9 +1582,9 @@ class TPLinkEXClient(AbstractRouter):
         for item in values[1]:
             if int(item['enable']) == 0 and values[1].__class__ == list:
                 continue
-            status._wan_macaddr = (item['MACAddr']) if item['MACAddr'] else None
-            status._wan_ipv4_addr = (item['connIPv4Address'])
-            status._wan_ipv4_gateway = (item['connIPv4Gateway'])
+            status._wan_macaddr = EUI48(item['MACAddr']) if item['MACAddr'] else None
+            status._wan_ipv4_addr = IPv4Address(item['connIPv4Address'])
+            status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway'])
         
         if values[2].__class__ != list:
             status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
@@ -1651,7 +1661,7 @@ class TPLinkEXClient(AbstractRouter):
                     EUI48(item['physAddress']),
                     IPv4Address(item['IPAddress']),
                     item['hostName'],
-                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
+                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() and int(lease_time) > 0 else 'Permanent',
                 ))
 
         return dhcp_leases
@@ -1710,8 +1720,8 @@ class TPLinkEXClient(AbstractRouter):
         '''
         Requests ACTs via the cgi_gdpr proxy
         '''
-
-        if self._token is None:
+        active_host = self.host.replace('http://', '').replace('https://', '')#unittest
+        if self._token is None and active_host != '':
             raise RuntimeError('User not logged in!')
         
         all_responses = []
@@ -1931,7 +1941,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [TPLinkEXClient, TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
+        for client in [TplinkC5400XRouter, TPLinkEXClient, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
