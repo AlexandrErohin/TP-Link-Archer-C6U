@@ -1437,7 +1437,7 @@ class TPLinkXDR3010Client(AbstractRouter):
         self._session = Session()
 
     def supports(self) -> bool:
-        response = self._session.get(self.host)
+        response = self._session.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
         return response.text.index('TL-XDR3010') >= 0
 
     def authorize(self) -> None:
@@ -1446,7 +1446,7 @@ class TPLinkXDR3010Client(AbstractRouter):
             'login': {
                 'password': self._encode_password(self.password),
             }
-        })
+        }, timeout=self.timeout, verify=self._verify_ssl)
         try:
             data = response.json()
             self._stok = data['stok']
