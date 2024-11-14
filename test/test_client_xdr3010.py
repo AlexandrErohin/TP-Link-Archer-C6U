@@ -12,6 +12,24 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkXDR3010Client(TestCase):
+    def test_logout(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDR3010ClientTest(TPLinkXDR3010Client):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDR3010ClientTest('', '')
+        client.logout()
+
+        self.assertEqual(check_payload['method'], 'do')
+        self.assertIn('system', check_payload)
+        self.assertIn('logout', check_payload['system'])
+        self.assertEqual(check_payload['system']['logout'], None)
+
     def test_get_firmware(self) -> None:
         mock_data = json.loads('''
 {
@@ -266,6 +284,78 @@ class TestTPLinkXDR3010Client(TestCase):
         self.assertEqual(status.devices[1].ipaddr, '192.168.1.201')
         self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'midea_ac_0361')
+
+    def test_reboot(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDR3010ClientTest(TPLinkXDR3010Client):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDR3010ClientTest('', '')
+        client.reboot()
+
+        self.assertEqual(check_payload['method'], 'do')
+        self.assertIn('system', check_payload)
+        self.assertIn('reboot', check_payload['system'])
+        self.assertEqual(check_payload['system']['reboot'], None)
+
+    def test_set_wifi_enable_guest_2g(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDR3010ClientTest(TPLinkXDR3010Client):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDR3010ClientTest('', '')
+        client.set_wifi(Connection.GUEST_2G, True)
+
+        self.assertEqual(check_payload['method'], 'set')
+        self.assertIn('guest_network', check_payload)
+        self.assertIn('guest_2g', check_payload['guest_network'])
+        self.assertEqual(check_payload['guest_network']['guest_2g']['enable'], '1')
+
+    def test_set_wifi_enable_host_2g(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDR3010ClientTest(TPLinkXDR3010Client):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDR3010ClientTest('', '')
+        client.set_wifi(Connection.HOST_2G, True)
+
+        self.assertEqual(check_payload['method'], 'set')
+        self.assertIn('wireless', check_payload)
+        self.assertIn('wlan_host_2g', check_payload['wireless'])
+        self.assertEqual(check_payload['wireless']['wlan_host_2g']['enable'], 1)
+
+    def test_set_wifi_disable_host_5g(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDR3010ClientTest(TPLinkXDR3010Client):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDR3010ClientTest('', '')
+        client.set_wifi(Connection.HOST_5G, False)
+
+        self.assertEqual(check_payload['method'], 'set')
+        self.assertIn('wireless', check_payload)
+        self.assertIn('wlan_host_5g', check_payload['wireless'])
+        self.assertEqual(check_payload['wireless']['wlan_host_5g']['enable'], 0)
 
 
 if __name__ == '__main__':

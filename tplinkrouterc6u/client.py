@@ -1456,7 +1456,16 @@ class TPLinkXDR3010Client(AbstractRouter):
             raise ClientException(error)
 
     def logout(self) -> None:
-        raise ClientException('Not Implemented')
+        data = self._request({
+            'method': 'do',
+            'system': {
+                'logout': None,
+            },
+        })
+        if data['error_code'] != 0:
+            raise ClientException('TplinkRouter - {} - logout failed, code - {}'.
+                                  format(self.__class__, data['error_code']))
+        self._stok = ''
 
     def get_firmware(self) -> Firmware:
         data = self._request({
@@ -1515,10 +1524,51 @@ class TPLinkXDR3010Client(AbstractRouter):
         return status
 
     def reboot(self) -> None:
-        raise ClientException('Not Implemented')
+        data = self._request({
+            'method': 'do',
+            'system': {
+                'reboot': None,
+            },
+        })
+        self._stok = ''
+        if data['error_code'] != 0:
+            raise ClientException('TplinkRouter - {} - reboot failed, code - {}'.
+                                  format(self.__class__, data['error_code']))
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        raise ClientException('Not Implemented')
+        payload_map = {
+            Connection.HOST_2G: {
+                'method': 'set',
+                'wireless': {
+                    'wlan_host_2g': {
+                        'enable': 1 if enable else 0,
+                    },
+                },
+            },
+            Connection.HOST_5G: {
+                'method': 'set',
+                'wireless': {
+                    'wlan_host_5g': {
+                        'enable': 1 if enable else 0,
+                    },
+                },
+            },
+            Connection.GUEST_2G: {
+                'method': 'set',
+                'guest_network': {
+                    'guest_2g': {
+                        'enable': '1' if enable else '0',
+                    },
+                },
+            },
+        }
+        if wifi not in payload_map:
+            raise ClientException('Not supported')
+        payload = payload_map[wifi]
+        data = self._request(payload)
+        if data['error_code'] != 0:
+            raise ClientException('TplinkRouter - {} - set wifi failed, code - {}'.
+                                  format(self.__class__, data['error_code']))
 
     def _request(self, payload: dict) -> dict:
         url = '{}/stok={}/ds'.format(self.host, self._stok)
