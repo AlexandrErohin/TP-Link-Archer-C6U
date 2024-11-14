@@ -3,7 +3,7 @@ from hashlib import md5
 from re import search
 from json import dumps, loads
 from time import time, sleep
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from requests.packages import urllib3
 from requests import post, Response, Session
 from datetime import timedelta
@@ -1428,11 +1428,136 @@ class TPLinkMRClient(AbstractRouter):
         return signature, encrypted_data
 
 
+class TPLinkXDR3010Client(AbstractRouter):
+    _stok = ''
+
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        self._session = Session()
+
+    def supports(self) -> bool:
+        response = self._session.get(self.host)
+        return response.text.index('TL-XDR3010') >= 0
+
+    def authorize(self) -> None:
+        response = self._session.post(self.host, json={
+            'method': 'do',
+            'login': {
+                'password': self._encode_password(self.password),
+            }
+        })
+        try:
+            data = response.json()
+            self._stok = data['stok']
+        except Exception as e:
+            error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'.
+                     format(self.__class__.__name__, e, response))
+            raise ClientException(error)
+
+    def logout(self) -> None:
+        raise ClientException('Not Implemented')
+
+    def get_firmware(self) -> Firmware:
+        data = self._request({
+            'method': 'get',
+            'device_info': {
+                'name': 'info',
+            },
+        })
+        dev_info = data['device_info']['info']
+        return Firmware(dev_info['hw_version'], dev_info['device_model'], dev_info['sw_version'])
+
+    def get_status(self) -> Status:
+        data = self._request({
+            'method': 'get',
+            'hosts_info': {
+                'table': 'host_info',
+            },
+            'network': {
+                'name': [
+                    'wan_status',
+                    'lan',
+                ],
+            },
+            'wireless': {
+                'name': [
+                    'wlan_bs',
+                    'wlan_host_2g',
+                    'wlan_wds_2g',
+                    'wlan_host_5g',
+                    'wlan_wds_5g',
+                ]
+            },
+            'guest_network': {
+                'name': [
+                    'guest_2g',
+                ]
+            }
+        })
+
+        status = Status()
+        status._wan_ipv4_addr = get_ip(data['network']['wan_status']['ipaddr'])
+        status._lan_ipv4_addr = get_ip(data['network']['lan']['ipaddr'])
+        status._lan_macaddr = get_mac(data['network']['lan']['macaddr'])
+        status.wifi_2g_enable = data['wireless']['wlan_host_2g']['enable'] == '1'
+        status.wifi_5g_enable = (data['wireless']['wlan_host_5g']['enable'] == '1' or
+                                 data['wireless']['wlan_bs']['bs_enable'] == '1')
+        status.guest_2g_enable = data['guest_network']['guest_2g']['enable'] == '1'
+
+        for item_map in data['hosts_info']['host_info']:
+            item = item_map[next(iter(item_map))]
+            dev = Device(Connection.WIRED if item['type'] == '0' else Connection.UNKNOWN, get_mac(item['mac']),
+                         get_ip(item['ip']), unquote(item['hostname']))
+            dev.up_speed = item['up_speed']
+            dev.down_speed = item['down_speed']
+            status.devices.append(dev)
+        return status
+
+    def reboot(self) -> None:
+        raise ClientException('Not Implemented')
+
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        raise ClientException('Not Implemented')
+
+    def _request(self, payload: dict) -> dict:
+        url = '{}/stok={}/ds'.format(self.host, self._stok)
+        response = self._session.post(url, json=payload, timeout=self.timeout, verify=self._verify_ssl)
+        return response.json()
+
+    @staticmethod
+    def _encode_password(pwd: str) -> str:
+        return TPLinkXDR3010Client._security_encode(
+            pwd,
+            'RDpbLfCPsJZ7fiv',
+            'yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70TOoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW',
+        )
+
+    @staticmethod
+    def _security_encode(data1: str, data2: str, char_dict: str) -> str:
+        data1_len = len(data1)
+        data2_len = len(data2)
+        dict_len = len(char_dict)
+        res = ''
+        for c in range(max(data1_len, data2_len)):
+            a = b = 187
+            if c >= data1_len:
+                a = ord(data2[c])
+            elif c >= data2_len:
+                b = ord(data1[c])
+            else:
+                b = ord(data1[c])
+                a = ord(data2[c])
+            res += char_dict[(b ^ a) % dict_len]
+        return res
+
+
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient, TplinkRouter]:
+        for client in [TPLinkXDR3010Client, TplinkC5400XRouter, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient,
+                       TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
