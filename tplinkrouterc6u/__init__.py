@@ -4,6 +4,7 @@ from tplinkrouterc6u.client import (
     TplinkC1200Router,
     TplinkC5400XRouter,
     TPLinkMRClient,
+    TPLinkEXClient,
     AbstractRouter,
     TPLinkDecoClient,
 )
