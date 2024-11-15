@@ -7,10 +7,10 @@ from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.common.exception import ClientException, ClientError
-from tplinkrouterc6u.client.mr import TPLinkMRClient
+from tplinkrouterc6u.client.mr import TPLinkMRClientBase
 
 
-class TPLinkEXClient(TPLinkMRClient):
+class TPLinkEXClient(TPLinkMRClientBase):
     WIFI_SET = {
         Connection.HOST_2G: '1,0,0,0,0,0',
         Connection.HOST_5G: '2,0,0,0,0,0',
