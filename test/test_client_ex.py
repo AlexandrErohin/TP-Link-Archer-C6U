@@ -1,4 +1,3 @@
-import sys
 from unittest import main, TestCase
 from macaddress import EUI48
 from ipaddress import IPv4Address
@@ -17,10 +16,13 @@ from tplinkrouterc6u import (
 
 class TestTPLinkEXClient(TestCase):
     def test_firmware(self) -> None:
-        response = '{\n\t"data":\t{\n\t\t"hardwareVersion":\t"EX511 v2.0 00000000",\n\t\t"modelName":\t"EX511",\n\t\t"softwareVersion":\t"0.7.0 3.0.0 v607e.0 Build 240930 Rel.11206n",\n\t\t"stack":\t"0,0,0,0,0,0"\n\t},\n\t"operation":\t"go",\n\t"oid":\t"DEV2_DEV_INFO",\n\t"success":\ttrue\n}'
+        response = ('{"data":{"hardwareVersion":"EX511 v2.0 00000000","modelName":"EX511",'
+                    '"softwareVersion":"0.7.0 3.0.0 v607e.0 Build 240930 Rel.11206n","stack":"0,0,0,0,0,0"},'
+                    '"operation":"go","oid":"DEV2_DEV_INFO","success":true}')
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -34,14 +36,27 @@ class TestTPLinkEXClient(TestCase):
 
     def test_get_status_with_5G(self) -> None:
 
-        DEV2_ADT_LAN = '{\n\t"data":\t[{\n\t\t\t"MACAddress":\t"a0:28:84:de:dd:5c",\n\t\t\t"IPAddress":\t"192.168.4.1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_LAN",\n\t"success":\ttrue\n}'
-        DEV2_ADT_WAN = '{\n\t"data":\t[{\n\t\t\t"enable":\t"1",\n\t\t\t"MACAddr":\t"BF-75-44-4C-DC-9E",\n\t\t\t"connIPv4Address":\t"192.168.30.55",\n\t\t\t"connIPv4Gateway":\t"192.168.30.1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_WAN",\n\t"success":\ttrue\n}'
-        DEV2_ADT_WIFI_COMMON = '{\n\t"data":\t[{\n\t\t\t"primaryEnable":\t"1",\n\t\t\t"guestEnable":\t"0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}, {\n\t\t\t"primaryEnable":\t"0",\n\t\t\t"guestEnable":\t"1",\n\t\t\t"stack":\t"2,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_WIFI_COMMON",\n\t"success":\ttrue\n}'
-        DEV2_HOST_ENTRY = '{\n\t"data":\t[{\n\t\t\t"active":\t"1",\n\t\t\t"X_TP_LanConnType":\t"0",\n\t\t\t"physAddress":\t"66-E2-02-BD-B5-1B",\n\t\t\t"IPAddress":\t"192.168.30.10",\n\t\t\t"hostName":\t"host1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}, {\n\t\t\t"active":\t"1",\n\t\t\t"X_TP_LanConnType":\t"1",\n\t\t\t"physAddress":\t"F4-A3-86-2D-41-B5",\n\t\t\t"IPAddress":\t"192.168.30.11",\n\t\t\t"hostName":\t"host2",\n\t\t\t"stack":\t"2,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_HOST_ENTRY",\n\t"success":\ttrue\n}'
-        DEV2_MEM_STATUS = '{\n\t"data":\t{\n\t\t"total":\t"192780",\n\t\t"free":\t"78400",\n\t\t"stack":\t"0,0,0,0,0,0"\n\t},\n\t"operation":\t"go",\n\t"oid":\t"DEV2_MEM_STATUS",\n\t"success":\ttrue\n}'
-        DEV2_PROC_STATUS = '{\n\t"data":\t{\n\t\t"CPUUsage":\t"47",\n\t\t"stack":\t"0,0,0,0,0,0"\n\t},\n\t"operation":\t"go",\n\t"oid":\t"DEV2_PROC_STATUS",\n\t"success":\ttrue\n}'
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"192.168.30.55",'
+                        '"connIPv4Gateway":"192.168.30.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"},'
+                                '{"primaryEnable":"0","guestEnable":"1","stack":"2,0,0,0,0,0"}],"operation":"gl",'
+                                '"oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"0","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.30.10","hostName":"host1","stack":"1,0,0,0,0,0"},'
+                           '{"active":"1","X_TP_LanConnType":"1","physAddress":"F4-A3-86-2D-41-B5",'
+                           '"IPAddress":"192.168.30.11","hostName":"host2","stack":"2,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+        DEV2_MEM_STATUS = ('{"data":{"total":"192780","free":"78400","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"47","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
@@ -102,14 +117,17 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.devices[1].ipaddr, '192.168.30.11')
         self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'host2')
-        self.assertEqual(status.devices[1].packets_sent, None) #TODO
-        self.assertEqual(status.devices[1].packets_received, None) #TODO
+        self.assertEqual(status.devices[1].packets_sent, None)  # TODO
+        self.assertEqual(status.devices[1].packets_received, None)  # TODO
 
     def test_get_ipv4_reservations(self) -> None:
 
-        response = '{\n\t"data":\t[{\n\t\t\t"enable":\t"1",\n\t\t\t"chaddr":\t"bf:75:44:4c:dc:9e",\n\t\t\t"yiaddr":\t"192.168.8.21",\n\t\t\t"stack":\t"1,1,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_DHCPV4_POOL_STATICADDR",\n\t"success":\ttrue\n}'
+        response = ('{"data":[{"enable":"1","chaddr":"bf:75:44:4c:dc:9e","yiaddr":"192.168.8.21",'
+                    '"stack":"1,1,0,0,0,0"}],"operation":"gl","oid":"DEV2_DHCPV4_POOL_STATICADDR","success":true}')
+
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -128,10 +146,11 @@ class TestTPLinkEXClient(TestCase):
 [error]0
 
 '''
-        response = '{\n\t"data":\t[],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_DHCPV4_POOL_STATICADDR",\n\t"success":\ttrue\n}'
+        response = '{"data":[],"operation":"gl","oid":"DEV2_DHCPV4_POOL_STATICADDR","success":true}'
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -142,10 +161,11 @@ class TestTPLinkEXClient(TestCase):
 
     def test_get_ipv4_dhcp_leases_no_leases(self) -> None:
 
-        response = '{\n\t"data":\t[],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_HOST_ENTRY",\n\t"success":\ttrue\n}'
+        response = '{"data":[],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -156,10 +176,18 @@ class TestTPLinkEXClient(TestCase):
 
     def test_get_ipv4_dhcp_leases(self) -> None:
 
-        response = '{\n\t"data":\t[{\n\t\t\t"alias":\t"",\n\t\t\t"physAddress":\t"bf:75:44:4c:dc:9e",\n\t\t\t"IPAddress":\t"192.168.32.175",\n\t\t\t"addressSource":\t"Static",\n\t\t\t"leaseTimeRemaining":\t"85841",\n\t\t\t"X_TP_IPv6Address":\t"",\n\t\t\t"X_TP_IPv6LinkLocal":\t"",\n\t\t\t"layer1Interface":\t"",\n\t\t\t"X_TP_Layer2Interface":\t"Device.WiFi.AccessPoint.1.",\n\t\t\t"vendorClassID":\t"",\n\t\t\t"clientID":\t"",\n\t\t\t"hostName":\t"name1",\n\t\t\t"interfaceType":\t"Wi-Fi",\n\t\t\t"X_TP_LanConnType":\t"1",\n\t\t\t"X_TP_LanConnDev":\t"br0",\n\t\t\t"active":\t"1",\n\t\t\t"IPv4AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_Vendor":\t"",\n\t\t\t"X_TP_ClientType":\t"Other",\n\t\t\t"X_TP_DevphyAddress":\t"",\n\t\t\t"IPv6AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_NetworkReadyTime":\t"0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_HOST_ENTRY",\n\t"success":\ttrue\n}'
+        response = ('{"data":[{"alias":"","physAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.32.175",'
+                    '"addressSource":"Static","leaseTimeRemaining":"85841","X_TP_IPv6Address":"",'
+                    '"X_TP_IPv6LinkLocal":"","layer1Interface":"",'
+                    '"X_TP_Layer2Interface":"Device.WiFi.AccessPoint.1.","vendorClassID":"","clientID":"",'
+                    '"hostName":"name1","interfaceType":"Wi-Fi","X_TP_LanConnType":"1","X_TP_LanConnDev":"br0",'
+                    '"active":"1","IPv4AddressNumberOfEntries":"0","X_TP_Vendor":"","X_TP_ClientType":"Other",'
+                    '"X_TP_DevphyAddress":"","IPv6AddressNumberOfEntries":"0","X_TP_NetworkReadyTime":"0",'
+                    '"stack":"1,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}')
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -175,9 +203,25 @@ class TestTPLinkEXClient(TestCase):
 
     def test_get_ipv4_dhcp_leases_permanent(self) -> None:
 
-        response = '{\n\t"data":\t[{\n\t\t\t"alias":\t"",\n\t\t\t"physAddress":\t"bf:75:44:4c:dc:9e",\n\t\t\t"IPAddress":\t"192.168.32.175",\n\t\t\t"addressSource":\t"Static",\n\t\t\t"leaseTimeRemaining":\t"0",\n\t\t\t"X_TP_IPv6Address":\t"",\n\t\t\t"X_TP_IPv6LinkLocal":\t"",\n\t\t\t"layer1Interface":\t"",\n\t\t\t"X_TP_Layer2Interface":\t"Device.WiFi.AccessPoint.1.",\n\t\t\t"vendorClassID":\t"",\n\t\t\t"clientID":\t"",\n\t\t\t"hostName":\t"name1",\n\t\t\t"interfaceType":\t"Wi-Fi",\n\t\t\t"X_TP_LanConnType":\t"1",\n\t\t\t"X_TP_LanConnDev":\t"br0",\n\t\t\t"active":\t"1",\n\t\t\t"IPv4AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_Vendor":\t"",\n\t\t\t"X_TP_ClientType":\t"Other",\n\t\t\t"X_TP_DevphyAddress":\t"",\n\t\t\t"IPv6AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_NetworkReadyTime":\t"0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t},{\n\t\t\t"alias":\t"",\n\t\t\t"physAddress":\t"a0:28:84:de:dd:5c",\n\t\t\t"IPAddress":\t"192.168.32.176",\n\t\t\t"addressSource":\t"Static",\n\t\t\t"leaseTimeRemaining":\t"86372",\n\t\t\t"X_TP_IPv6Address":\t"",\n\t\t\t"X_TP_IPv6LinkLocal":\t"",\n\t\t\t"layer1Interface":\t"",\n\t\t\t"X_TP_Layer2Interface":\t"Device.WiFi.AccessPoint.1.",\n\t\t\t"vendorClassID":\t"",\n\t\t\t"clientID":\t"",\n\t\t\t"hostName":\t"name2",\n\t\t\t"interfaceType":\t"Wi-Fi",\n\t\t\t"X_TP_LanConnType":\t"1",\n\t\t\t"X_TP_LanConnDev":\t"br0",\n\t\t\t"active":\t"1",\n\t\t\t"IPv4AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_Vendor":\t"",\n\t\t\t"X_TP_ClientType":\t"Other",\n\t\t\t"X_TP_DevphyAddress":\t"",\n\t\t\t"IPv6AddressNumberOfEntries":\t"0",\n\t\t\t"X_TP_NetworkReadyTime":\t"0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_HOST_ENTRY",\n\t"success":\ttrue\n}'
+        response = ('{"data":[{"alias":"","physAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.32.175",'
+                    '"addressSource":"Static","leaseTimeRemaining":"0","X_TP_IPv6Address":"",'
+                    '"X_TP_IPv6LinkLocal":"","layer1Interface":"","X_TP_Layer2Interface":"Device.WiFi.AccessPoint.1.",'
+                    '"vendorClassID":"","clientID":"","hostName":"name1","interfaceType":"Wi-Fi",'
+                    '"X_TP_LanConnType":"1","X_TP_LanConnDev":"br0","active":"1","IPv4AddressNumberOfEntries":"0",'
+                    '"X_TP_Vendor":"","X_TP_ClientType":"Other","X_TP_DevphyAddress":"",'
+                    '"IPv6AddressNumberOfEntries":"0","X_TP_NetworkReadyTime":"0","stack":"1,0,0,0,0,0"},'
+                    '{"alias":"","physAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.32.176",'
+                    '"addressSource":"Static","leaseTimeRemaining":"86372","X_TP_IPv6Address":"",'
+                    '"X_TP_IPv6LinkLocal":"","layer1Interface":"","X_TP_Layer2Interface":"Device.WiFi.AccessPoint.1.",'
+                    '"vendorClassID":"","clientID":"","hostName":"name2","interfaceType":"Wi-Fi",'
+                    '"X_TP_LanConnType":"1","X_TP_LanConnDev":"br0","active":"1","IPv4AddressNumberOfEntries":"0",'
+                    '"X_TP_Vendor":"","X_TP_ClientType":"Other","X_TP_DevphyAddress":"",'
+                    '"IPv6AddressNumberOfEntries":"0","X_TP_NetworkReadyTime":"0","stack":"1,0,0,0,0,0"}],'
+                    '"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}')
+
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 return 200, response
 
@@ -195,12 +239,18 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result[1].lease_time, '23:59:32')
 
     def test_get_ipv4_status(self) -> None:
-        
-        DEV2_ADT_LAN = '{\n\t"data":\t[{\n\t\t\t"MACAddress":\t"bf:75:44:4c:dc:9e",\n\t\t\t"IPAddress":\t"192.168.5.1",\n\t\t\t"IPSubnetMask":\t"255.255.255.0",\n\t\t\t"DHCPv4Enable":\t"1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_LAN",\n\t"success":\ttrue\n}'
-        DEV2_ADT_WAN = '{\n\t"data":\t[{\n\t\t\t"enable":\t"1",\n\t\t\t"MACAddr":\t"a0:28:84:de:dd:5c",\n\t\t\t"connIPv4Address":\t"10.10.11.5",\n\t\t\t"connIPv4Gateway":\t"11.11.11.11",\n\t\t\t"name":\t"ipoe_0_0_d",\n\t\t\t"connIPv4SubnetMask":\t"1.1.1.1",\n\t\t\t"connIPv4DnsServer":\t"8.8.8.8,8.8.4.4",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_WAN",\n\t"success":\ttrue\n}'
+
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.5.1",'
+                        '"IPSubnetMask":"255.255.255.0","DHCPv4Enable":"1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"a0:28:84:de:dd:5c","connIPv4Address":"10.10.11.5",'
+                        '"connIPv4Gateway":"11.11.11.11","name":"ipoe_0_0_d","connIPv4SubnetMask":"1.1.1.1",'
+                        '"connIPv4DnsServer":"8.8.8.8,8.8.4.4","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
@@ -226,12 +276,18 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result.remote, None)
 
     def test_get_ipv4_status_one_wlan(self) -> None:
-        
-        DEV2_ADT_LAN = '{\n\t"data":\t[{\n\t\t\t"MACAddress":\t"bf:75:44:4c:dc:9e",\n\t\t\t"IPAddress":\t"192.168.5.1",\n\t\t\t"IPSubnetMask":\t"255.255.255.0",\n\t\t\t"DHCPv4Enable":\t"1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_LAN",\n\t"success":\ttrue\n}'
-        DEV2_ADT_WAN = '{\n\t"data":\t[{\n\t\t\t"enable":\t"1",\n\t\t\t"MACAddr":\t"ba:7a:a4:4a:dc:7e",\n\t\t\t"connIPv4Address":\t"0.0.0.0",\n\t\t\t"connIPv4Gateway":\t"0.0.0.0",\n\t\t\t"name":\t"ipoe_0_0_d",\n\t\t\t"connIPv4SubnetMask":\t"0.0.0.0",\n\t\t\t"connIPv4DnsServer":\t"0.0.0.0,0.0.0.0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_ADT_WAN",\n\t"success":\ttrue\n}'
+
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.5.1",'
+                        '"IPSubnetMask":"255.255.255.0","DHCPv4Enable":"1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"ba:7a:a4:4a:dc:7e","connIPv4Address":"0.0.0.0",'
+                        '"connIPv4Gateway":"0.0.0.0","name":"ipoe_0_0_d","connIPv4SubnetMask":"0.0.0.0",'
+                        '"connIPv4DnsServer":"0.0.0.0,0.0.0.0","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
@@ -241,7 +297,6 @@ class TestTPLinkEXClient(TestCase):
 
         client = TPLinkEXClientTest('', '')
         result = client.get_ipv4_status()
-        # print(result.wan_ipv4_ipaddr)
 
         self.assertIsInstance(result, IPv4Status)
         self.assertEqual(result.wan_macaddr, 'BA-7A-A4-4A-DC-7E')
@@ -265,6 +320,7 @@ class TestTPLinkEXClient(TestCase):
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
+
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 nonlocal check_url, check_data
                 check_url = url
@@ -275,7 +331,8 @@ class TestTPLinkEXClient(TestCase):
         client.set_wifi(Connection.HOST_2G, True)
 
         self.assertIn('http:///cgi_gdpr?9?_=', check_url)
-        self.assertEqual(check_data, '{"data":{"stack":"1,0,0,0,0,0","pstack":"0,0,0,0,0,0","primaryEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
+        self.assertEqual(check_data, '{"data":{"stack":"1,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
+                                     '"primaryEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
 
 
 if __name__ == '__main__':

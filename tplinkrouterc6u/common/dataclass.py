@@ -1,7 +1,7 @@
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from dataclasses import dataclass
-from tplinkrouterc6u.package_enum import Connection
+from tplinkrouterc6u.common.package_enum import Connection
 
 
 @dataclass
