@@ -86,6 +86,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
 | set_wifi | wifi: [Connection](#connection), enable: bool | Allow to turn on/of 4 wifi networks |   |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
+| send_ussd | command: str | Send USSD command for LTE routers | str |
+| get_sms | | Get sms messages from the first page for LTE routers | [[SMS]](#sms) |
+| set_sms_read | sms: [SMS](#sms) | Set sms message read from the first page for LTE routers |   |
+| delete_sms | sms: [SMS](#sms) | Delete sms message from the first page for LTE routers |   |
 | reboot |   | reboot router |
 | authorize |   | authorize for actions |
 | logout |   | logout after all is done |
@@ -188,6 +192,15 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | lan_ipv4_netmask | router LAN gateway IP netmask | str |
 | lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
 | remote | router remote | bool, None |
+
+### <a id="sms">SMS</a>
+| Field | Description | Type |
+| --- |---|---|
+| id | message index | int |
+| sender| sender | str |
+| content| sms text | str |
+| received_at| received datetime | datetime |
+| unread| is message unread | bool |
 
 ## Enum
 ### <a id="connection">Connection</a>

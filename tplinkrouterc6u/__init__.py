@@ -15,5 +15,6 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    SMS,
 )
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

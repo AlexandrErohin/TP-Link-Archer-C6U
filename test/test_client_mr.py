@@ -1,6 +1,7 @@
 from unittest import main, TestCase
 from macaddress import EUI48
 from ipaddress import IPv4Address
+from datetime import datetime
 from tplinkrouterc6u import (
     TPLinkMRClient,
     Connection,
@@ -10,6 +11,8 @@ from tplinkrouterc6u import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    ClientError,
+    SMS,
 )
 
 
@@ -678,6 +681,188 @@ DNSServers=0.0.0.0,0.0.0.0
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, ('2\r\n[LTE_SMS_SENDNEWMSG#0,0,0,0,0,0#0,0,0,0,0,0]0,3\r\nindex=1\r\n'
                                       'to=534324724234\r\ntextContent=test sms\r\n'))
+
+    def test_send_ussd(self) -> None:
+        responses = ['''[error]0
+
+''', '''[0,0,0,0,0,0]0
+sessionStatus=1
+sendResult=1
+response=
+ussdStatus=0
+[error]0
+
+''', '''[0,0,0,0,0,0]0
+sessionStatus=0
+sendResult=1
+response=some text
+ussdStatus=1
+[error]0
+
+''']
+
+        check_url = []
+        check_data = []
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url.append(url)
+                check_data.append(data_str)
+                return 200, responses.pop(0)
+
+        client = TPLinkMRClientTest('', '')
+
+        self.assertEqual('some text', client.send_ussd('534324724234'))
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url.pop(0))
+        self.assertEqual(check_data.pop(0),
+                         '2\r\n[LTE_USSD#0,0,0,0,0,0#0,0,0,0,0,0]0,2\r\naction=1\r\nreqContent=534324724234\r\n')
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url.pop(0))
+        self.assertEqual(check_data.pop(0),
+                         ('1\r\n[LTE_USSD#0,0,0,0,0,0#0,0,0,0,0,0]0,4\r\nsessionStatus\r\n'
+                          'sendResult\r\nresponse\r\nussdStatus\r\n'))
+
+    def test_send_ussd_error(self) -> None:
+        responses = ['''[error]0
+
+''', '''[0,0,0,0,0,0]0
+sessionStatus=1
+sendResult=1
+response=
+ussdStatus=0
+[error]0
+
+''', '''[0,0,0,0,0,0]0
+sessionStatus=0
+sendResult=1
+response=
+ussdStatus=2
+[error]0
+
+''']
+
+        check_url = []
+        check_data = []
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url.append(url)
+                check_data.append(data_str)
+                return 200, responses.pop(0)
+
+        client = TPLinkMRClientTest('', '')
+
+        with self.assertRaises(ClientError) as context:
+            client.send_ussd('534324724234')
+
+        self.assertTrue('Cannot send USSD!' in str(context.exception))
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url.pop(0))
+        self.assertEqual(check_data.pop(0),
+                         '2\r\n[LTE_USSD#0,0,0,0,0,0#0,0,0,0,0,0]0,2\r\naction=1\r\nreqContent=534324724234\r\n')
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url.pop(0))
+        self.assertEqual(check_data.pop(0),
+                         ('1\r\n[LTE_USSD#0,0,0,0,0,0#0,0,0,0,0,0]0,4\r\nsessionStatus\r\nsendResult\r\n'
+                          'response\r\nussdStatus\r\n'))
+
+    def test_get_sms(self) -> None:
+        response = '''[1,0,0,0,0,0]1
+index=3
+from=sender1
+content=text second
+receivedTime=2024-11-15 22:28:09
+unread=1
+[2,0,0,0,0,0]1
+index=2
+from=sender2
+content=text first
+receivedTime=2024-11-15 22:23:59
+unread=0
+[error]0
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual(len(messages), 2)
+        self.assertIsInstance(messages[0], SMS)
+        self.assertEqual(messages[0].id, 1)
+        self.assertEqual(messages[0].sender, 'sender1')
+        self.assertEqual(messages[0].content, 'text second')
+        self.assertEqual(messages[0].received_at, datetime.fromisoformat('2024-11-15 22:28:09'))
+        self.assertEqual(messages[0].unread, True)
+        self.assertIsInstance(messages[1], SMS)
+        self.assertEqual(messages[1].id, 2)
+        self.assertEqual(messages[1].sender, 'sender2')
+        self.assertEqual(messages[1].content, 'text first')
+        self.assertEqual(messages[1].received_at, datetime.fromisoformat('2024-11-15 22:23:59'))
+        self.assertEqual(messages[1].unread, False)
+
+    def test_get_sms_empty(self) -> None:
+        response = '''[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual([], messages)
+
+    def test_set_sms_read(self) -> None:
+        response = '''
+[error]0
+
+'''
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url = url
+                check_data = data_str
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        client.set_sms_read(SMS(2, '', '', datetime.now(), True))
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url)
+        self.assertEqual(check_data, '2\r\n[LTE_SMS_RECVMSGENTRY#2,0,0,0,0,0#0,0,0,0,0,0]0,1\r\nunread=0\r\n')
+
+    def test_delete_sms(self) -> None:
+        response = '''
+[error]0
+
+'''
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url = url
+                check_data = data_str
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        client.delete_sms(SMS(2, '', '', datetime.now(), True))
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url)
+        self.assertEqual(check_data, '4\r\n[LTE_SMS_RECVMSGENTRY#2,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n\r\n')
 
 
 if __name__ == '__main__':

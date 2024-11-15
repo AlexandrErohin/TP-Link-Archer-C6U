@@ -3,13 +3,21 @@ from re import search
 from time import time, sleep
 from urllib.parse import quote
 from requests import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.common.dataclass import (
+    Firmware,
+    Status,
+    Device,
+    IPv4Reservation,
+    IPv4DHCPLease,
+    IPv4Status,
+    SMS,
+)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
@@ -484,7 +492,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
 
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
         acts = [
-            self.ActItem(5, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr']),
+            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr']),
         ]
         _, values = self.req_act(acts)
 
@@ -502,7 +510,8 @@ class TPLinkMRClient(TPLinkMRClientBase):
 
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         acts = [
-            self.ActItem(5, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName', 'leaseTimeRemaining']),
+            self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName',
+                                                                   'leaseTimeRemaining']),
         ]
         _, values = self.req_act(acts)
 
@@ -570,3 +579,67 @@ class TPLinkMRClient(TPLinkMRClientBase):
                 ]),
         ]
         self.req_act(acts)
+
+    def get_sms(self) -> [SMS]:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'LTE_SMS_RECVMSGBOX', attrs=['PageNumber=1']),
+            self.ActItem(
+                self.ActItem.GL, 'LTE_SMS_RECVMSGENTRY', attrs=['index', 'from', 'content', 'receivedTime',
+                                                                'unread']),
+        ]
+        _, values = self.req_act(acts)
+
+        messages = []
+        if values:
+            i = 1
+            for item in self._to_list(values.get('1')):
+                messages.append(
+                    SMS(
+                        i, item['from'], item['content'], datetime.fromisoformat(item['receivedTime']),
+                        True if item['unread'] == '1' else False
+                    )
+                )
+                i += 1
+
+        return messages
+
+    def set_sms_read(self, sms: SMS) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0', attrs=['unread=0']),
+        ]
+        self.req_act(acts)
+
+    def delete_sms(self, sms: SMS) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.DEL, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0'),
+        ]
+        self.req_act(acts)
+
+    def send_ussd(self, command: str) -> str:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'LTE_USSD', attrs=[
+                    'action=1',
+                    f"reqContent={command}",
+                ]),
+        ]
+        self.req_act(acts)
+
+        status = '0'
+        while status == '0':
+            sleep(1)
+            acts = [
+                self.ActItem(
+                    self.ActItem.GET, 'LTE_USSD', attrs=['sessionStatus', 'sendResult', 'response', 'ussdStatus']),
+            ]
+            _, values = self.req_act(acts)
+
+            status = values.get('ussdStatus', '2')
+
+            if status == '1':
+                return values.get('response')
+            elif status == '2':
+                raise ClientError('Cannot send USSD!')
