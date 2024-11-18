@@ -25,7 +25,7 @@ class TPLinkXDRClient(AbstractRouter):
 
     def supports(self) -> bool:
         response = self._session.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
-        return response.text.index('TL-XDR') >= 0
+        return 'TL-XDR' in response.text
 
     def authorize(self) -> None:
         response = self._session.post(self.host, json={

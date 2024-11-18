@@ -13,6 +13,54 @@ from tplinkrouterc6u.common.package_enum import Connection
 
 
 class TestTPLinkXDRClient(TestCase):
+
+    def test_supports_false(self) -> None:
+        class SessionTest:
+            def get(self, host, timeout, verify):
+                class ResponseTest:
+                    def __init__(self):
+                        self.text = 'text'
+
+                return ResponseTest()
+
+        client = TPLinkXDRClient('', '')
+        client._session = SessionTest()
+
+        self.assertEqual(client.supports(), False)
+
+    def test_supports_true(self) -> None:
+        response = '''<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>TL-XDR3010易展版</title>
+<meta name="MobileOptimized" content="240" />
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, minimum-scale=0.5,
+maximum-scale=2.0, user-scalable=yes" />
+<link rel="shortcut Icon" href="../web-static/images/icon.ico" type="image/x-icon" />
+<link rel="stylesheet" href="../web-static/dynaform/class.css">
+<script type="text/javascript" src="../web-static/dynaform/class.js"></script>
+<script type="text/javascript" src="../web-static/dynaform/jtopo.js"></script>
+</head>
+<body><div id="Error"></div><div id="Confirm"></div><div id="Con"></div><div id="Help"></div><div id="Cover"></div>
+<div id="Login"></div><script type="text/javascript">var gBeInCNA = "NO";var proName="TL-XDR3010易展版";pageOnload();
+</script>
+</body>
+</html>
+'''
+
+        class SessionTest:
+            def get(self, host, timeout, verify):
+                class ResponseTest:
+                    def __init__(self):
+                        self.text = response
+
+                return ResponseTest()
+
+        client = TPLinkXDRClient('', '')
+        client._session = SessionTest()
+
+        self.assertEqual(client.supports(), True)
+
     def test_logout(self) -> None:
         mock_data = json.loads('''{"error_code":0}''')
         check_payload = {}
