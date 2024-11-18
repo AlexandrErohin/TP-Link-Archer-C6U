@@ -1431,6 +1431,14 @@ class TPLinkMRClient(AbstractRouter):
 class TPLinkXDR3010Client(AbstractRouter):
     _stok = ''
 
+    CLIENT_TYPES = {
+        0: Connection.WIRED,
+        1: Connection.HOST_2G,
+        3: Connection.HOST_5G,
+        2: Connection.GUEST_2G,
+        4: Connection.GUEST_5G,
+    }
+
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
@@ -1516,8 +1524,15 @@ class TPLinkXDR3010Client(AbstractRouter):
 
         for item_map in data['hosts_info']['host_info']:
             item = item_map[next(iter(item_map))]
-            dev = Device(Connection.WIRED if item['type'] == '0' else Connection.UNKNOWN, get_mac(item['mac']),
-                         get_ip(item['ip']), unquote(item['hostname']))
+            conn_type = Connection.UNKNOWN
+            if item['type'] == '0':
+                conn_type = Connection.WIRED
+            elif item['type'] == '1' and item['wifi_mode'] == '0':
+                conn_type = Connection.HOST_2G
+            elif item['type'] == '1' and item['wifi_mode'] == '1':
+                conn_type = Connection.HOST_5G
+
+            dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
             dev.up_speed = item['up_speed']
             dev.down_speed = item['down_speed']
             status.devices.append(dev)
