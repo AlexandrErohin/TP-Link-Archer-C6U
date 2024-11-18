@@ -89,6 +89,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | reboot |   | reboot router |
 | authorize |   | authorize for actions |
 | logout |   | logout after all is done |
+| get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
+| set_vpn | vpn: [VPNStatus](#vpn_status), enable: bool | Allow to turn on/of VPN |   |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
 | send_ussd | command: str | Send USSD command for LTE routers | str |
 | get_sms | | Get sms messages from the first page for LTE routers | [[SMS]](#sms) |
