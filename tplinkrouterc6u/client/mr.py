@@ -599,7 +599,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
                 messages.append(
                     SMS(
                         i, item['from'], item['content'], datetime.fromisoformat(item['receivedTime']),
-                        True if item['unread'] == '1' else False
+                        item['unread'] == '1'
                     )
                 )
                 i += 1
@@ -691,8 +691,8 @@ class TPLinkMRClient(TPLinkMRClientBase):
         ]
         _, values = self.req_act(acts)
 
-        status.openvpn_enable = True if values['0']['enable'] == '1' else False
-        status.pptpvpn_enable = True if values['1']['enable'] == '1' else False
+        status.openvpn_enable = values['0']['enable'] == '1'
+        status.pptpvpn_enable = values['1']['enable'] == '1'
 
         for item in values['2']:
             if item['connAct'] == '1':
