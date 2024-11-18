@@ -1,9 +1,18 @@
+from datetime import timedelta
+from ipaddress import IPv4Address
 from logging import Logger
+from urllib.parse import unquote
 
+from macaddress import EUI48
 from requests import Session
-from tplinkrouterc6u import (AbstractRouter, ClientException, Connection,
-                             Device, Firmware, Status)
+
+from tplinkrouterc6u.client_abstract import AbstractRouter
+from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
+                                              IPv4Reservation, IPv4Status,
+                                              Status)
+from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.package_enum import Connection
 
 
 class TPLinkXDRClient(AbstractRouter):
@@ -107,6 +116,70 @@ class TPLinkXDRClient(AbstractRouter):
             dev.down_speed = item['down_speed']
             status.devices.append(dev)
         return status
+
+    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+        data = self._request({
+            'method': 'get',
+            'ip_mac_bind': {
+                'table': 'user_bind',
+            },
+        })
+
+        ipv4_reservations = []
+        for item_map in data['ip_mac_bind']['user_bind']:
+            item = item_map[next(iter(item_map))]
+            ipv4_reservations.append(IPv4Reservation(
+                EUI48(item['mac']),
+                IPv4Address(item['ip']),
+                item['hostname'],
+                True,
+            ))
+        return ipv4_reservations
+
+    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+        data = self._request({
+            'method': 'get',
+            'dhcpd': {
+                'table': 'dhcp_clients',
+            },
+        })
+
+        dhcp_leases = []
+        for item_map in data['dhcpd']['dhcp_clients']:
+            item = item_map[next(iter(item_map))]
+            dhcp_leases.append(IPv4DHCPLease(
+                get_mac(item['mac']),
+                get_ip(item['ip']),
+                item['hostname'],
+                str(timedelta(seconds=int(item['expires']))) if item['expires'] != '4294967295' else 'Permanent',
+            ))
+        return dhcp_leases
+
+    def get_ipv4_status(self) -> IPv4Status:
+        data = self._request({
+            'method': 'get',
+            'dhcpd': {
+                'name': 'udhcpd',
+            },
+            'network': {
+                'name': [
+                    'lan',
+                    'wan_status',
+                ],
+            },
+        })
+
+        ipv4_status = IPv4Status()
+        ipv4_status._wan_ipv4_ipaddr = get_ip(data['network']['wan_status']['ipaddr'])
+        ipv4_status._wan_ipv4_gateway = get_ip(data['network']['wan_status']['gateway'])
+        ipv4_status._wan_ipv4_netmask = get_ip(data['network']['wan_status']['netmask'])
+        ipv4_status._wan_ipv4_pridns = get_ip(data['network']['wan_status']['pri_dns'])
+        ipv4_status._wan_ipv4_snddns = get_ip(data['network']['wan_status']['snd_dns'])
+        ipv4_status._lan_macaddr = get_mac(data['network']['lan']['macaddr'])
+        ipv4_status._lan_ipv4_ipaddr = get_ip(data['network']['lan']['ipaddr'])
+        ipv4_status.lan_ipv4_dhcp_enable = data['dhcpd']['udhcpd']['enable'] == '1'
+        ipv4_status._lan_ipv4_netmask = get_ip(data['network']['lan']['netmask'])
+        return ipv4_status
 
     def reboot(self) -> None:
         data = self._request({
