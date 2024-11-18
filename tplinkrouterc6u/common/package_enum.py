@@ -44,3 +44,8 @@ class Connection(Enum):
         elif self == Connection.WIRED:
             band = 'wired'
         return band
+
+
+class VPN(Enum):
+    OPEN_VPN = 'OPENVPN'
+    PPTP_VPN = 'PPTPVPN'

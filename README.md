@@ -23,6 +23,7 @@ from tplinkrouterc6u import (
     TplinkC5400XRouter,
     TPLinkMRClient,
     TPLinkEXClient,
+    TPLinkXDRClient,
     TPLinkDecoClient,
     Connection
 )
@@ -85,14 +86,15 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
 | set_wifi | wifi: [Connection](#connection), enable: bool | Allow to turn on/of 4 wifi networks |   |
+| reboot |   | reboot router |
+| authorize |   | authorize for actions |
+| logout |   | logout after all is done |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
 | send_ussd | command: str | Send USSD command for LTE routers | str |
 | get_sms | | Get sms messages from the first page for LTE routers | [[SMS]](#sms) |
 | set_sms_read | sms: [SMS](#sms) | Set sms message read from the first page for LTE routers |   |
 | delete_sms | sms: [SMS](#sms) | Delete sms message from the first page for LTE routers |   |
-| reboot |   | reboot router |
-| authorize |   | authorize for actions |
-| logout |   | logout after all is done |
+| get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -147,6 +149,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | packets_received | total packets received | int, None |
 | down_speed | download speed | int, None |
 | up_speed | upload speed | int, None |
+| signal | Signal strength | int, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -193,6 +196,14 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
 | remote | router remote | bool, None |
 
+### <a id="vpn_status">VPNStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| openvpn_enable | OpenVPN is enabled | bool |
+| pptpvpn_enable | PPTPVPN is enabled | bool |
+| openvpn_clients_total | OpenVPN clients connected | int |
+| pptpvpn_clients_total | PPTPVPN clients connected | int |
+
 ### <a id="sms">SMS</a>
 | Field | Description | Type |
 | --- |---|---|
@@ -201,6 +212,23 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | content| sms text | str |
 | received_at| received datetime | datetime |
 | unread| is message unread | bool |
+
+### <a id="lte_status">LTEStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | is enabled | int |
+| connect_status | connect status | int |
+| network_type | network type | int |
+| sim_status | sim status | int |
+| total_statistics | total statistics in bytes | int |
+| cur_rx_speed | current download speed in bytes per second  | int |
+| cur_tx_speed | current upload speed in bytes per second  | int |
+| sms_unread_count | sms unread amount  | int |
+| sig_level | signal level  | int |
+| rsrp | RSRP  | int |
+| rsrq | RSRQ  | int |
+| snr | SNR  | int |
+| isp_name | ISP name  | str |
 
 ## Enum
 ### <a id="connection">Connection</a>
@@ -214,6 +242,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Connection.IOT_5G - IoT wifi 5G
 - Connection.IOT_6G - IoT wifi 6G
 - Connection.WIRED - Wired
+
+### <a id="vpn">VPN</a>
+- VPN.OPEN_VPN
+- VPN.PPTP_VPN
 
 ## <a id="supports">Supported routers</a>
 ### Fully tested Hardware Versions
@@ -269,6 +301,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR105
 - TL-MR6400 (v5, v5.3)
 - TL-MR6500v
+- TL-XDR3010 V2
 - TL-WA3001 v1.0
 
 ### Not fully tested Hardware Versions

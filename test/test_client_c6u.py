@@ -445,7 +445,7 @@ class TestTPLinkClient(TestCase):
           {"mac": "54:b3:a2:f7:be:ea", "deviceTag":"iot_5G", "isGuest":false, "ip":"192.168.1.188",
           "deviceName":"name3"},
           {"mac": "3c:ae:e1:83:94:9d", "deviceTag":"iot_6G", "isGuest":false, "ip":"192.168.1.189",
-          "deviceName":"name4"}
+          "deviceName":"name4", "signal": -52}
       ],
       "timeout": false,
       "success": true
@@ -570,6 +570,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[5].hostname, 'name4')
         self.assertEqual(status.devices[5].packets_sent, None)
         self.assertEqual(status.devices[5].packets_received, None)
+        self.assertEqual(status.devices[5].signal, -52)
         self.assertIsInstance(status.devices[6], Device)
         self.assertEqual(status.devices[6].type, Connection.HOST_5G)
         self.assertEqual(status.devices[6].macaddr, '1F-7A-BD-F7-20-0D')

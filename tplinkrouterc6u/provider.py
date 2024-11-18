@@ -2,7 +2,7 @@ from logging import Logger
 
 from tplinkrouterc6u import TPLinkXDRClient
 from tplinkrouterc6u.common.exception import ClientException, AuthorizeError
-from tplinkrouterc6u.client.api_cgi_bin import TplinkRouter
+from tplinkrouterc6u.client.c6u import TplinkRouter
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.mr import TPLinkMRClient
