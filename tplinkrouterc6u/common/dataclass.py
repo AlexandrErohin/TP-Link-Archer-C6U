@@ -24,6 +24,7 @@ class Device:
         self.packets_received: int | None = None
         self.down_speed: int | None = None
         self.up_speed: int | None = None
+        self.signal: int | None = None
 
     @property
     def macaddr(self):
@@ -257,3 +258,30 @@ class SMS:
         self.content = content
         self.received_at = received_at
         self.unread = unread
+
+
+@dataclass
+class LTEStatus:
+    def __init__(self) -> None:
+        self.enable: int
+        self.connect_status: int
+        self.network_type: int
+        self.sim_status: int
+        self.total_statistics: int
+        self.cur_rx_speed: int
+        self.cur_tx_speed: int
+        self.sms_unread_count: int
+        self.sig_level: int
+        self.rsrp: int
+        self.rsrq: int
+        self.snr: int
+        self.isp_name: str
+
+
+@dataclass
+class VPNStatus:
+    def __init__(self) -> None:
+        self.openvpn_enable: bool
+        self.pptpvpn_enable: bool
+        self.openvpn_clients_total: int = 0
+        self.pptpvpn_clients_total: int = 0

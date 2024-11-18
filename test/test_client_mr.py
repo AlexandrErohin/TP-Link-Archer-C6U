@@ -13,6 +13,9 @@ from tplinkrouterc6u import (
     IPv4Status,
     ClientError,
     SMS,
+    LTEStatus,
+    VPNStatus,
+    VPN,
 )
 
 
@@ -863,6 +866,183 @@ unread=0
 
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, '4\r\n[LTE_SMS_RECVMSGENTRY#2,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n\r\n')
+
+    def test_get_lte_status(self) -> None:
+        response = '''[2,1,0,0,0,0]0
+enable=1
+connectStatus=4
+networkType=3
+roamingStatus=0
+simStatus=3
+[2,0,0,0,0,0]1
+dataLimit=0
+enablePaymentDay=0
+curStatistics=0
+totalStatistics=32779416.0000
+enableDataLimit=0
+limitation=0
+curRxSpeed=85
+curTxSpeed=1492
+[2,1,0,0,0,0]2
+smsUnreadCount=0
+ussdStatus=0
+smsSendResult=3
+sigLevel=0
+rfInfoRsrp=-105
+rfInfoRsrq=-20
+rfInfoSnr=-44
+[2,1,0,0,0,0]3
+spn=Full name
+ispName=Name
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_lte_status()
+
+        self.assertIsInstance(status, LTEStatus)
+        self.assertEqual(status.enable, 1)
+        self.assertEqual(status.connect_status, 4)
+        self.assertEqual(status.network_type, 3)
+        self.assertEqual(status.sim_status, 3)
+        self.assertEqual(status.total_statistics, 32779416)
+        self.assertEqual(status.cur_rx_speed, 85)
+        self.assertEqual(status.cur_tx_speed, 1492)
+        self.assertEqual(status.sms_unread_count, 0)
+        self.assertEqual(status.sig_level, 0)
+        self.assertEqual(status.rsrp, -105)
+        self.assertEqual(status.rsrq, -20)
+        self.assertEqual(status.snr, -44)
+        self.assertEqual(status.isp_name, 'Name')
+
+    def test_get_lte_status_wrong(self) -> None:
+        response = '''[2,1,0,0,0,0]0
+enable=1
+connectStatus=1
+networkType=2
+roamingStatus=0
+simStatus=1
+[2,0,0,0,0,0]1
+dataLimit=0
+enablePaymentDay=0
+curStatistics=0
+totalStatistics=32779416.0000
+enableDataLimit=0
+limitation=0
+curRxSpeed=0
+curTxSpeed=0
+[2,1,0,0,0,0]2
+smsUnreadCount=0
+ussdStatus=0
+smsSendResult=3
+sigLevel=2
+rfInfoRsrp=0
+rfInfoRsrq=0
+rfInfoSnr=0
+[2,1,0,0,0,0]3
+spn=Full name
+ispName=Name
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_lte_status()
+
+        self.assertIsInstance(status, LTEStatus)
+
+    def test_get_vpn_status(self) -> None:
+        response = '''[0,0,0,0,0,0]0
+enable=1
+[0,0,0,0,0,0]1
+enable=0
+[1,0,0,0,0,0]2
+connAct=0
+[2,0,0,0,0,0]2
+connAct=0
+[3,0,0,0,0,0]2
+connAct=0
+[4,0,0,0,0,0]2
+connAct=0
+[5,0,0,0,0,0]2
+connAct=1
+[6,0,0,0,0,0]2
+connAct=1
+[7,0,0,0,0,0]2
+connAct=0
+[8,0,0,0,0,0]2
+connAct=0
+[9,0,0,0,0,0]2
+connAct=0
+[10,0,0,0,0,0]2
+connAct=0
+[1,0,0,0,0,0]3
+connAct=0
+[2,0,0,0,0,0]3
+connAct=0
+[3,0,0,0,0,0]3
+connAct=0
+[4,0,0,0,0,0]3
+connAct=0
+[5,0,0,0,0,0]3
+connAct=0
+[6,0,0,0,0,0]3
+connAct=0
+[7,0,0,0,0,0]3
+connAct=0
+[8,0,0,0,0,0]3
+connAct=0
+[9,0,0,0,0,0]3
+connAct=0
+[10,0,0,0,0,0]3
+connAct=0
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_vpn_status()
+
+        self.assertIsInstance(status, VPNStatus)
+        self.assertEqual(status.openvpn_enable, True)
+        self.assertEqual(status.pptpvpn_enable, False)
+        self.assertEqual(status.openvpn_clients_total, 2)
+        self.assertEqual(status.pptpvpn_clients_total, 0)
+
+    def test_set_vpn(self) -> None:
+        response = '''
+[error]0
+
+'''
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url = url
+                check_data = data_str
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        client.set_vpn(VPN.OPEN_VPN, True)
+
+        self.assertIn('http:///cgi_gdpr?_=', check_url)
+        self.assertEqual(check_data, '2\r\n[OPENVPN#0,0,0,0,0,0#0,0,0,0,0,0]0,1\r\nenable=1\r\n')
 
 
 if __name__ == '__main__':

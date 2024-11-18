@@ -8,7 +8,7 @@ from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR
-from tplinkrouterc6u.common.package_enum import Connection
+from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
@@ -17,6 +17,8 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     SMS,
+    LTEStatus,
+    VPNStatus,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -643,3 +645,68 @@ class TPLinkMRClient(TPLinkMRClientBase):
                 return values.get('response')
             elif status == '2':
                 raise ClientError('Cannot send USSD!')
+
+    def get_lte_status(self) -> LTEStatus:
+        status = LTEStatus()
+        acts = [
+            self.ActItem(self.ActItem.GET, 'WAN_LTE_LINK_CFG', '2,1,0,0,0,0',
+                         attrs=['enable', 'connectStatus', 'networkType', 'roamingStatus', 'simStatus']),
+            self.ActItem(self.ActItem.GET, 'WAN_LTE_INTF_CFG', '2,0,0,0,0,0',
+                         attrs=['dataLimit', 'enablePaymentDay', 'curStatistics', 'totalStatistics', 'enableDataLimit',
+                                'limitation',
+                                'curRxSpeed', 'curTxSpeed']),
+            self.ActItem(self.ActItem.GET, 'LTE_NET_STATUS', '2,1,0,0,0,0',
+                         attrs=['smsUnreadCount', 'ussdStatus', 'smsSendResult', 'sigLevel', 'rfInfoRsrp',
+                                'rfInfoRsrq', 'rfInfoSnr']),
+            self.ActItem(self.ActItem.GET, 'LTE_PROF_STAT', '2,1,0,0,0,0', attrs=['spn', 'ispName']),
+        ]
+        _, values = self.req_act(acts)
+
+        status.enable = int(values['0']['enable'])
+        status.connect_status = int(values['0']['connectStatus'])
+        status.network_type = int(values['0']['networkType'])
+        status.sim_status = int(values['0']['simStatus'])
+
+        status.total_statistics = int(float(values['1']['totalStatistics']))
+        status.cur_rx_speed = int(values['1']['curRxSpeed'])
+        status.cur_tx_speed = int(values['1']['curTxSpeed'])
+
+        status.sms_unread_count = int(values['2']['smsUnreadCount'])
+        status.sig_level = int(values['2']['sigLevel'])
+        status.rsrp = int(values['2']['rfInfoRsrp'])
+        status.rsrq = int(values['2']['rfInfoRsrq'])
+        status.snr = int(values['2']['rfInfoSnr'])
+
+        status.isp_name = values['3']['ispName']
+
+        return status
+
+    def get_vpn_status(self) -> VPNStatus:
+        status = VPNStatus()
+        acts = [
+            self.ActItem(self.ActItem.GET, 'OPENVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GET, 'PPTPVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GL, 'OVPN_CLIENT', attrs=['connAct']),
+            self.ActItem(self.ActItem.GL, 'PVPN_CLIENT', attrs=['connAct']),
+        ]
+        _, values = self.req_act(acts)
+
+        status.openvpn_enable = True if values['0']['enable'] == '1' else False
+        status.pptpvpn_enable = True if values['1']['enable'] == '1' else False
+
+        for item in values['2']:
+            if item['connAct'] == '1':
+                status.openvpn_clients_total += 1
+
+        for item in values['3']:
+            if item['connAct'] == '1':
+                status.pptpvpn_clients_total += 1
+
+        return status
+
+    def set_vpn(self, vpn: VPN, enable: bool) -> None:
+        acts = [
+            self.ActItem(self.ActItem.SET, vpn.value, attrs=['enable={}'.format(int(enable))])
+        ]
+
+        self.req_act(acts)

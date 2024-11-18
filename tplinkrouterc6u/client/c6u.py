@@ -344,6 +344,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
                 devices[item['mac']].down_speed = item.get('downloadSpeed')
                 devices[item['mac']].up_speed = item.get('uploadSpeed')
+                devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
 
         for item in self.request('admin/wireless?form=statistics', 'operation=load'):
             if item['mac'] not in devices:

@@ -7,7 +7,7 @@ from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status
 from tplinkrouterc6u.client_abstract import AbstractRouter
-from tplinkrouterc6u.client.api_cgi_bin import TplinkEncryption
+from tplinkrouterc6u.client.c6u import TplinkEncryption
 
 
 class TPLinkDecoClient(TplinkEncryption, AbstractRouter):

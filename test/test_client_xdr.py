@@ -74,8 +74,7 @@ class TestTPLinkXDRClient(TestCase):
         self.assertEqual(firmware.model, 'TL-XDR3010易展版')
 
     def test_get_status(self) -> None:
-        mock_data = json.loads('''
-{
+        mock_data = json.loads('''{
   "hosts_info": {
     "host_info": [
       {
@@ -96,9 +95,7 @@ class TestTPLinkXDRClient(TestCase):
           "ssid": "",
           "forbid_domain": "",
           "limit_time": "",
-          "plan_rule": [
-            
-          ]
+          "plan_rule": []
         }
       },
       {
@@ -119,9 +116,7 @@ class TestTPLinkXDRClient(TestCase):
           "ssid": "",
           "forbid_domain": "",
           "limit_time": "",
-          "plan_rule": [
-            
-          ]
+          "plan_rule": []
         }
       }
     ]
@@ -359,19 +354,12 @@ class TestTPLinkXDRClient(TestCase):
         self.assertEqual(check_payload['wireless']['wlan_host_5g']['enable'], 0)
 
     def test_get_ipv4_reservations(self):
-        mock_data = json.loads('''
-{
-	"ip_mac_bind": {
-		"user_bind": [{
-			"user_bind_3": {
-				"mac": "24-59-E5-D0-21-8C",
-				"ip": "192.168.2.202",
-				"hostname": "midea_ac_0361"
-			}
-		}]
-	},
-	"error_code": 0
-}''')
+        mock_data = json.loads('''{
+"ip_mac_bind": {
+    "user_bind": [{"user_bind_3": {"mac": "24-59-E5-D0-21-8C", "ip": "192.168.2.202", "hostname": "midea_ac_0361"}}]
+},
+"error_code": 0}
+''')
         check_payload = {}
 
         class TPLinkXDRClientTest(TPLinkXDRClient):
