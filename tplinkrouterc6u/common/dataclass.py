@@ -1,7 +1,8 @@
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from dataclasses import dataclass
-from tplinkrouterc6u.package_enum import Connection
+from datetime import datetime
+from tplinkrouterc6u.common.package_enum import Connection
 
 
 @dataclass
@@ -246,3 +247,13 @@ class IPv4Status:
     @property
     def lan_ipv4_netmask_address(self):
         return self._lan_ipv4_netmask
+
+
+@dataclass
+class SMS:
+    def __init__(self, index: int, sender: str, content: str, received_at: datetime, unread: bool) -> None:
+        self.id = index
+        self.sender = sender
+        self.content = content
+        self.received_at = received_at
+        self.unread = unread
