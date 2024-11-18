@@ -1,4 +1,6 @@
 from logging import Logger
+
+from tplinkrouterc6u import TPLinkXDRClient
 from tplinkrouterc6u.common.exception import ClientException, AuthorizeError
 from tplinkrouterc6u.client.api_cgi_bin import TplinkRouter
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
@@ -15,7 +17,7 @@ class TplinkRouterProvider:
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
         for client in [TplinkC5400XRouter, TPLinkEXClient, TPLinkMRClient, TplinkC6V4Router, TPLinkDecoClient,
-                       TplinkRouter]:
+                       TPLinkXDRClient, TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
