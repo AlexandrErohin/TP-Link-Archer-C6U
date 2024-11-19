@@ -4,8 +4,8 @@ from datetime import timedelta
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
-from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.common.package_enum import Connection, VPN
+from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status, VPNStatus
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase
 
@@ -293,3 +293,33 @@ class TPLinkEXClient(TPLinkMRClientBase):
             if self._logger:
                 self._logger.debug(error)
             raise ClientException(error)
+
+    def get_vpn_status(self) -> VPNStatus:
+        status = VPNStatus()
+        acts = [
+            self.ActItem(self.ActItem.GET, 'DEV2_OPENVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GET, 'DEV2_PPTPVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GL, 'DEV2_OVPN_CLIENT', attrs=['connAct']),
+            self.ActItem(self.ActItem.GL, 'DEV2_PVPN_CLIENT', attrs=['connAct']),
+        ]
+        _, values = self.req_act(acts)
+
+        status.openvpn_enable = values[0]['enable'] == '1'
+        status.pptpvpn_enable = values[1]['enable'] == '1'
+
+        for item in values[2]:
+            if item['connAct'] == '1':
+                status.openvpn_clients_total += 1
+
+        for item in values[3]:
+            if item['connAct'] == '1':
+                status.pptpvpn_clients_total += 1
+
+        return status
+
+    def set_vpn(self, vpn: VPN, enable: bool) -> None:
+        acts = [
+            self.ActItem(self.ActItem.SET, "DEV2_" + vpn.value, attrs=[f'"enable":"{int(enable)}"'])
+        ]
+
+        self.req_act(acts)
