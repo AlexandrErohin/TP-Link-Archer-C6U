@@ -11,6 +11,8 @@ from tplinkrouterc6u import (
     IPv4DHCPLease,
     IPv4Status,
     ClientException,
+    VPNStatus,
+    VPN,
 )
 
 
@@ -333,6 +335,65 @@ class TestTPLinkEXClient(TestCase):
         self.assertIn('http:///cgi_gdpr?9?_=', check_url)
         self.assertEqual(check_data, '{"data":{"stack":"1,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
                                      '"primaryEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
+
+    def test_get_vpn_status(self) -> None:
+        DEV2_OPENVPN = ('{"data":{"enable":"1","stack":"0,0,0,0,0,0"},'
+                        '"operation":"go","oid":"DEV2_OPENVPN","success":true}')
+        DEV2_PPTPVPN = ('{"data":{"enable":"0","stack":"0,0,0,0,0,0"},'
+                        '"operation":"go","oid":"DEV2_PPTPVPN","success":true}')
+        DEV2_OVPN_CLIENT = ('{"data":[{"connAct":"1","stack":"1,0,0,0,0,0"}, {"connAct":"1","stack":"2,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"3,0,0,0,0,0"}, {"connAct":"0","stack":"4,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"5,0,0,0,0,0"}, {"connAct":"0","stack":"6,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"7,0,0,0,0,0"}, {"connAct":"0","stack":"8,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"9,0,0,0,0,0"}, {"connAct":"0","stack":"10,0,0,0,0,0"}],'
+                            '"operation":"gl","oid":"DEV2_OVPN_CLIENT","success":true}')
+        DEV2_PVPN_CLIENT = ('{"data":[{"connAct":"0","stack":"1,0,0,0,0,0"}, {"connAct":"0","stack":"2,0,0,0,0,0"},'
+                            '{"connAct":"1","stack":"3,0,0,0,0,0"}, {"connAct":"0","stack":"4,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"5,0,0,0,0,0"}, {"connAct":"0","stack":"6,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"7,0,0,0,0,0"}, {"connAct":"0","stack":"8,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"9,0,0,0,0,0"}, {"connAct":"0","stack":"10,0,0,0,0,0"}],'
+                            '"operation":"gl","oid":"DEV2_PVPN_CLIENT","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_OPENVPN' in data_str:
+                    return 200, DEV2_OPENVPN
+                elif 'DEV2_PPTPVPN' in data_str:
+                    return 200, DEV2_PPTPVPN
+                elif 'DEV2_OVPN_CLIENT' in data_str:
+                    return 200, DEV2_OVPN_CLIENT
+                elif 'DEV2_PVPN_CLIENT' in data_str:
+                    return 200, DEV2_PVPN_CLIENT
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_vpn_status()
+
+        self.assertIsInstance(status, VPNStatus)
+        self.assertEqual(status.openvpn_enable, True)
+        self.assertEqual(status.pptpvpn_enable, False)
+        self.assertEqual(status.openvpn_clients_total, 2)
+        self.assertEqual(status.pptpvpn_clients_total, 1)
+
+    def test_set_vpn(self) -> None:
+        response = '{"success":true, "errorcode":0}'
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url = url
+                check_data = data_str
+                return 200, response
+
+        client = TPLinkEXClientTest('', '')
+        client.set_vpn(VPN.OPEN_VPN, True)
+
+        self.assertIn('http:///cgi_gdpr?9?_=', check_url)
+        self.assertEqual(check_data, '{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
+                                     '"enable":"1"},"operation":"so","oid":"DEV2_OPENVPN"}')
 
 
 if __name__ == '__main__':
