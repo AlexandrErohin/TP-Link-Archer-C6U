@@ -337,10 +337,23 @@ class TestTPLinkEXClient(TestCase):
                                      '"primaryEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
 
     def test_get_vpn_status(self) -> None:
-        DEV2_OPENVPN = '{\n\t"data":\t{\n\t\t"enable":\t"1",\n\t\t"stack":\t"0,0,0,0,0,0"\n\t},\n\t"operation":\t"go",\n\t"oid":\t"DEV2_OPENVPN",\n\t"success":\ttrue\n}'
-        DEV2_PPTPVPN = '{\n\t"data":\t{\n\t\t"enable":\t"0",\n\t\t"stack":\t"0,0,0,0,0,0"\n\t},\n\t"operation":\t"go",\n\t"oid":\t"DEV2_PPTPVPN",\n\t"success":\ttrue\n}'
-        DEV2_OVPN_CLIENT = '{\n\t"data":\t[{\n\t\t\t"connAct":\t"1",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"1",\n\t\t\t"stack":\t"2,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"3,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"4,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"5,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"6,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"7,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"8,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"9,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"10,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_OVPN_CLIENT",\n\t"success":\ttrue\n}'
-        DEV2_PVPN_CLIENT = '{\n\t"data":\t[{\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"1,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"2,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"1",\n\t\t\t"stack":\t"3,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"4,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"5,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"6,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"7,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"8,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"9,0,0,0,0,0"\n\t\t}, {\n\t\t\t"connAct":\t"0",\n\t\t\t"stack":\t"10,0,0,0,0,0"\n\t\t}],\n\t"operation":\t"gl",\n\t"oid":\t"DEV2_PVPN_CLIENT",\n\t"success":\ttrue\n}'
+        DEV2_OPENVPN = ('{"data":{"enable":"1","stack":"0,0,0,0,0,0"},'
+                        '"operation":"go","oid":"DEV2_OPENVPN","success":true}')
+        DEV2_PPTPVPN = ('{"data":{"enable":"0","stack":"0,0,0,0,0,0"},'
+                        '"operation":"go","oid":"DEV2_PPTPVPN","success":true}')
+        DEV2_OVPN_CLIENT = ('{"data":[{"connAct":"1","stack":"1,0,0,0,0,0"}, {"connAct":"1","stack":"2,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"3,0,0,0,0,0"}, {"connAct":"0","stack":"4,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"5,0,0,0,0,0"}, {"connAct":"0","stack":"6,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"7,0,0,0,0,0"}, {"connAct":"0","stack":"8,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"9,0,0,0,0,0"}, {"connAct":"0","stack":"10,0,0,0,0,0"}],'
+                            '"operation":"gl","oid":"DEV2_OVPN_CLIENT","success":true}')
+        DEV2_PVPN_CLIENT = ('{"data":[{"connAct":"0","stack":"1,0,0,0,0,0"}, {"connAct":"0","stack":"2,0,0,0,0,0"},'
+                            '{"connAct":"1","stack":"3,0,0,0,0,0"}, {"connAct":"0","stack":"4,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"5,0,0,0,0,0"}, {"connAct":"0","stack":"6,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"7,0,0,0,0,0"}, {"connAct":"0","stack":"8,0,0,0,0,0"},'
+                            '{"connAct":"0","stack":"9,0,0,0,0,0"}, {"connAct":"0","stack":"10,0,0,0,0,0"}],'
+                            '"operation":"gl","oid":"DEV2_PVPN_CLIENT","success":true}')
+
         class TPLinkEXClientTest(TPLinkEXClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 if 'DEV2_OPENVPN' in data_str:
@@ -381,6 +394,7 @@ class TestTPLinkEXClient(TestCase):
         self.assertIn('http:///cgi_gdpr?9?_=', check_url)
         self.assertEqual(check_data, '{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
                                      '"enable":"1"},"operation":"so","oid":"DEV2_OPENVPN"}')
+
 
 if __name__ == '__main__':
     main()
