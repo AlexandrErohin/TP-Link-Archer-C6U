@@ -5,7 +5,14 @@ from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection, VPN
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status, VPNStatus
+from tplinkrouterc6u.common.dataclass import (
+    Firmware,
+    Status,
+    Device,
+    IPv4Reservation,
+    IPv4DHCPLease,
+    IPv4Status,
+    VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase
 
