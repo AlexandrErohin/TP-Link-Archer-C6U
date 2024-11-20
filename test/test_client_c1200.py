@@ -160,15 +160,16 @@ class TestTPLinkC1200Client(TestCase):
         "remoteip": "10.0.0.11-20"
     }
         """
-        respone_vpnconn_openvpn = """[{"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"openvpn","key":"7450"},
-        {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"openvpn","key":"7450"}]
-        """
+        respone_vpnconn_openvpn = """[
+            {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"openvpn","key":"7450"},
+            {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"openvpn","key":"7450"}
+        ]"""
 
-        respone_vpnconn_pptpvpn = """[{"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"},
-        {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"},
-        {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"}]
-        """
-
+        respone_vpnconn_pptpvpn = """[
+            {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"},
+            {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"},
+            {"username":"admin","remote_ip":"192.168.0.200","ipaddr":"10.0.0.11","extra":"7450","vpntype":"pptp","key":"7450"}
+        ]"""
 
         class TPLinkRouterTest(TplinkC1200Router):
             def request(self, path: str, data: str,
@@ -202,6 +203,7 @@ class TestTPLinkC1200Client(TestCase):
         "port": "1194",
         "serverip": "10.8.0.0"
         }"""
+
         class TPLinkRouterTest(TplinkC1200Router):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
@@ -217,6 +219,7 @@ class TestTPLinkC1200Client(TestCase):
         expected_path = "/admin/openvpn?form=config&operation=write&enabled=on&proto=udp&access=home&cert_exist=True&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
 
         self.assertEqual(client.captured_path, expected_path)
+
 
 if __name__ == '__main__':
     main()
