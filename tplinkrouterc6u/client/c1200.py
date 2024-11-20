@@ -119,7 +119,7 @@ class TplinkC1200Router(TplinkC5400XRouter):
 
         if isinstance(values[2], list):
             status.openvpn_clients_total = len(values[2])
-            status.pptpvpn_clients_total = len(values[2])
+            status.pptpvpn_clients_total = len(values[3])
         else:
             status.openvpn_clients_total = 0
             status.pptpvpn_clients_total = 0
