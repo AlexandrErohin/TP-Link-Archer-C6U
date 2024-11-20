@@ -214,9 +214,11 @@ class TestTPLinkC1200Client(TestCase):
         client = TPLinkRouterTest('', '')
         client.set_vpn(VPN.OPEN_VPN, True)
 
-        expected_path = """
-            /admin/openvpn?form=config&operation=write&enabled=on&proto=udp&access=home&cert_exist=True&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
-        """
+        expected_path = (
+    "/admin/openvpn?form=config&operation=write&enabled=on"
+    "&proto=udp&access=home&cert_exist=True"
+    "&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
+)
         self.assertEqual(client.captured_path, expected_path)
 
 
