@@ -110,9 +110,9 @@ class TplinkC1200Router(TplinkC5400XRouter):
         values = [
             self.request("/admin/openvpn?form=config&operation=read", "operation=read"),
             self.request("/admin/pptpd?form=config&operation=read", "operation=read"),
-            self.request("/admin/vpnconn?form=config&operation=list&vpntype=openvpn", 
+            self.request("/admin/vpnconn?form=config&operation=list&vpntype=openvpn",
                          "operation=list&operation=list&vpntype=openvpn"),
-            self.request("/admin/vpnconn?form=config&operation=list&vpntype=pptp", 
+            self.request("/admin/vpnconn?form=config&operation=list&vpntype=pptp",
                          "operation=list&operation=list&vpntype=pptp"),
         ]
 
