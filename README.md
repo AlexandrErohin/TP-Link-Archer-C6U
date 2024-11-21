@@ -306,6 +306,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR6500v
 - TL-XDR3010 V2
 - TL-WA3001 v1.0
+- NX510v v1.0
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
