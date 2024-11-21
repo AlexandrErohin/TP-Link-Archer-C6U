@@ -49,3 +49,8 @@ class Connection(Enum):
 class VPN(Enum):
     OPEN_VPN = 'OPENVPN'
     PPTP_VPN = 'PPTPVPN'
+
+    @property
+    def lowercase(self) -> str:
+        """Returns the lowercase version of the enum value. Needed for the c1200 router."""
+        return self.value.lower()
