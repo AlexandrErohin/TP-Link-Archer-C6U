@@ -48,7 +48,6 @@ class TPLinkEXClient(TPLinkMRClientBase):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        self.username = 'user'
         self._url_rsa_key = 'cgi/getGDPRParm'
 
     def logout(self) -> None:
