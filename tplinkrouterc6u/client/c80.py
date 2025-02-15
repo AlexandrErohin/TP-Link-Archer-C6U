@@ -27,6 +27,10 @@ class TplinkC80Router(AbstractRouter):
     eeRSA = ''
     seq = ''
 
+    keyAES = ''
+    ivAES = ''
+    stringAES = ''
+
     token = ''
     _encryption = EncryptionWrapper()
    
@@ -41,10 +45,9 @@ class TplinkC80Router(AbstractRouter):
         return 'modelName Archer%20C80' in response.text
 
     def authorize(self) -> None:
-        authInfoUrl = '{}/?code=2&asyn=1'.format(self.host)
-        RSAKeyUrl = '{}/?code=16&asyn=0'.format(self.host)
-        AESSetKeyUrl = lambda token : '{}/?code=16&asyn=0&id={}'.format(self.host, token)
-
+        authInfoUrl = self._build_url(2, 1)
+        RSAKeyUrl = self._build_url(16, 0)
+        
         encodedPassword = self._encrypt(self.password)
 
         # Get token encryption strings and encrypt the password
@@ -61,38 +64,48 @@ class TplinkC80Router(AbstractRouter):
         TplinkC80Router.seq = responseText[3]
 
         # Generate key and initialization vector
-        key = "0000000000000000"
-        iv = "0000000000000000"
-        aes_string = f'k={key}&i={iv}'
+        TplinkC80Router.keyAES = "0000000000000000"
+        TplinkC80Router.ivAES = "0000000000000000"
+        TplinkC80Router.stringAES = f'k={TplinkC80Router.keyAES}&i={TplinkC80Router.ivAES}'
 
         # Encrypt AES string 
-        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(aes_string, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(TplinkC80Router.stringAES, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
         # Sync AES string for decryption on server side
-        response = self._session.post(AESSetKeyUrl(TplinkC80Router.token), data='set ' + aes_string_encrypted)
+        response = self._session.post(self._build_url(16, 0, TplinkC80Router.token), data='set ' + aes_string_encrypted)
+        self._handle_error(response)
+        
+        response = self._session.post(self._build_url(7, 0, TplinkC80Router.token))
         self._handle_error(response)
 
-        text = '4|1,0,0#10|1,0,0'
-        # text = '13|1,0,0'
-        sign, data = self._encrypt_data(key, iv, aes_string, text, TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
-
-        body = f'sign={sign}\r\ndata={data}'
-        response = self._session.post('{}/?code=2&asyn=1&id={}'.format(self.host, TplinkC80Router.token), data=body)
+        self.get_devices()
+        print(self.get_firmware())
 
         try:
             # print(response.status_code)
-            # print(response.text)
-            print(self._decrypt_data(key, iv, response.text))
-
+            print(response.text)
         except Exception as e:
             error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'.
                      format(self.__class__.__name__, e, response))
             raise ClientException(error)
 
     def logout(self) -> None:
-        raise ClientException('Not Implemented')
+        logoutUrl = lambda token : '{}/?code=11&asyn=0&id={}'.format(self.host, token)
+        response = self._session.post(logoutUrl(TplinkC80Router.token))
+        self._handle_error(response)
 
     def get_firmware(self) -> Firmware:
-        raise ClientException('Not Implemented')
+        text = '0|1,0,0'
+        
+        sign, data = self._encrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, TplinkC80Router.stringAES, text, 
+                                        TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+
+        body = f'sign={sign}\r\ndata={data}'
+
+        response = self._session.post('{}/?code=2&asyn=1&id={}'.format(self.host, TplinkC80Router.token), data = body)
+        response_text = self._decrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, response.text)
+        device_datamap = dict(line.split(" ", 1) for line in response_text.split("\r\n")[1:-1])
+
+        return Firmware(parse.unquote(device_datamap.get('hardVer')), parse.unquote(device_datamap.get('modelName')), parse.unquote(device_datamap.get('hardVer')))
 
     def get_status(self) -> Status:
         raise ClientException('Not Implemented')
@@ -102,6 +115,32 @@ class TplinkC80Router(AbstractRouter):
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         raise ClientException('Not Implemented')
+    
+    def get_devices(self):
+        text = '13|1,0,0'
+        sign, data = self._encrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, TplinkC80Router.stringAES, text, 
+                                        TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+
+        body = f'sign={sign}\r\ndata={data}'
+        response = self._session.post('{}/?code=2&asyn=1&id={}'.format(self.host, TplinkC80Router.token), data=body)
+        response_text = self._decrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, response.text)
+
+        result = []
+        online_devices = []
+        for line in response_text.split('\r\n'):
+            parts = line.split(' ')
+            if parts[0] == "name" and len(parts) > 2 and parts[2]:  # ensure name exists
+                result.append((parts[1], parts[2]))
+            
+            if parts[0] == "online" and parts[2] == '1':  # ensure name exists
+                online_devices.append(parts[1])
+            
+        for id, name in result:
+            if id in online_devices:
+                print(f"{id} {name} online")
+            else:
+                print(f"{id} {name}")
+
 
     @staticmethod
     def _encrypt(pwd, key: str = KEY, encoding: str = ENCODING):
@@ -160,3 +199,9 @@ class TplinkC80Router(AbstractRouter):
             error = ('TplinkRouter - {} - Cannot authorize! Error - {}'.
                      format(self.__class__.__name__, 'Failed to set router AES keys ("Prohibited operation")'))
             raise ClientException(error)
+        
+    def _build_url(self, code: int, asyn: int, token: str = None) -> str:
+        url = f"{self.host}/?code={code}&asyn={asyn}"
+        if token:
+            url += f"&id={token}"
+        return url
