@@ -7,7 +7,7 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 
 class TplinkC6V4Router(AbstractRouter):
     def supports(self) -> bool:
-        url = '{}/?code=2&asyn=1'.format(self.host)
+        url = '{}/?code=16&asyn=0'.format(self.host)
         try:
             response = post(url, timeout=self.timeout, verify=self._verify_ssl)
         except BaseException:
@@ -20,7 +20,45 @@ class TplinkC6V4Router(AbstractRouter):
         return False
 
     def authorize(self) -> None:
-        raise ClientException('Not Implemented')
+        if self._pwdNN == '':
+            self._request_pwd()
+
+        if self._seq == '':
+            self._request_seq()
+
+        response = self._try_login()
+
+        is_valid_json = False
+        try:
+            response.json()
+            is_valid_json = True
+        except BaseException:
+            """Ignore"""
+
+        if is_valid_json is False or response.status_code == 403:
+            self._logged = False
+            self._request_pwd()
+            self._request_seq()
+            response = self._try_login()
+
+        data = response.text
+        try:
+            data = response.json()
+            data = self._decrypt_response(data)
+
+            self._stok = data[self._data_block]['stok']
+            regex_result = search(
+                'sysauth=(.*);', response.headers['set-cookie'])
+            self._sysauth = regex_result.group(1)
+            self._logged = True
+
+        except Exception as e:
+            error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
+                     .format(self.__class__.__name__, e, data))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+        
 
     def logout(self) -> None:
         raise ClientException('Not Implemented')
