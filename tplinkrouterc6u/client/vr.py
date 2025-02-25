@@ -15,7 +15,33 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
         self._url_rsa_key = 'cgi/getGDPRParm'
 
     def supports(self):
-        return self._verify_router() and super().supports()
+        is_supported = self._verify_router() and super().supports()
+        if is_supported:
+            try:        
+                # Test authorization API
+                self.authorize()
+                # Test status API
+                status = self.get_status()
+                # Assert status is not none
+                assert status
+                
+            except AssertionError as e:
+                if self._logger is not None:
+                    self._logger.error("Error while getting status: {}".format(e))
+                is_supported = False
+            except Exception as e:
+                if self._logger is not None:
+                    self._logger.error("Error while authorizing: {}".format(e))
+                is_supported = False
+            finally:
+                try:
+                    # Test logout
+                    self.logout()
+                except Exception as e:
+                    if self._logger is not None:
+                        self._logger.error("Error while logging out: {}".format(e))
+                    is_supported = False
+        return is_supported
     
     def _verify_router(self) -> bool:
         """
@@ -85,7 +111,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
         if response == '[cgi]0\n[error]0\n':
             self._token = None
-            
+
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         params_dict = {}
         params_arr = []
