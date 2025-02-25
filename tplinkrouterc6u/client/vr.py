@@ -73,7 +73,19 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
             #modem is not VR
             return False
         
-    
+    def logout(self) -> None:
+        '''
+        Logs out from the host
+        '''
+        acts = [
+            self.ActItem(self.ActItem.CGI, '/cgi/logout')
+        ]
+
+        response, _ = self.req_act(acts)
+
+        if response == '[cgi]0\n[error]0\n':
+            self._token = None
+            
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         params_dict = {}
         params_arr = []
@@ -202,3 +214,5 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 class TPLinkVRClient(TPLinkVRClientBase, TPLinkMRClient):
     def __init__(self, host, username, password, logger=None, verify_ssl=True, timeout=30):
         super().__init__(host, username, password, logger, verify_ssl, timeout)
+    
+    
