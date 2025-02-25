@@ -1,6 +1,5 @@
 import base64
-import requests
-from abc import abstractmethod
+from http import HTTPStatus
 from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientBase
 from tplinkrouterc6u.common.exception import ClientException
 from time import time, sleep
@@ -16,20 +15,65 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
         self._url_rsa_key = 'cgi/getGDPRParm'
 
     def supports(self):
-        return self._verify_modem() and self._req_rsa_key()
+        return self._verify_router() and super().supports()
     
-    def _verify_modem(self):
-        
-        response = requests.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
-        return self._get_expected_modem_model() in response.text
-        
-    @abstractmethod
-    def _get_expected_modem_model(self):
+    def _verify_router(self) -> bool:
         """
-        Returns the model of the DSL modem (e.g. VR1600v, VR600v, etc.)
-        """
-        pass
+        Verifies if the connected router is a supported TP-Link VR model.
 
+        This function checks if the router is a TP-Link VR model by sending a GET request
+        to the host and analyzing the response. It verifies the presence of specific 
+        keywords and endpoints in the response to determine the model type.
+
+        Returns:
+            bool: True if the router is a supported TP-Link VR model and supports the RSA key endpoint, 
+                otherwise False.
+
+        Raises:
+            Exception: If an error occurs during the request process, it logs the error
+                    and returns False.
+        """
+
+        is_VR = False
+        has_url_rsa_endpoint = False
+
+        status_code = None
+        response = None
+
+        try:
+            status_code, response = self._request(self.host, method='GET')
+        except:
+            if self._logger is not None:
+                self._logger.error("Error while checking modem: {}".format(e))
+
+            return False
+
+        if status_code ==  HTTPStatus.OK:
+            is_VR = "Archer VR" in response
+            has_url_rsa_endpoint = self._url_rsa_key in response
+
+        if has_url_rsa_endpoint and is_VR:
+            return True
+        elif is_VR:
+            #check if lib.js is present. If response code is 200, it is okay. Check if self._url_rsa_key is present
+            try:
+                status_code, response = self._request("{}/js/lib.js".format(self.host), method='GET')
+            except Exception as e:
+                if self._logger is not None:
+                    self._logger.error("Error while checking if lib.js is present in modem: {}".format(e))
+
+                #if lib.js is not present, return False. Are API not compatible to this class?
+                return False
+            
+            if status_code == HTTPStatus.OK:
+                has_url_rsa_endpoint = (self._url_rsa_key in response)
+
+            return is_VR and has_url_rsa_endpoint
+        else:
+            #modem is not VR
+            return False
+        
+    
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         params_dict = {}
         params_arr = []
@@ -155,9 +199,6 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
 
 
-class TPLinkVR1200Client(TPLinkVRClientBase, TPLinkMRClient):
+class TPLinkVRClient(TPLinkVRClientBase, TPLinkMRClient):
     def __init__(self, host, username, password, logger=None, verify_ssl=True, timeout=30):
         super().__init__(host, username, password, logger, verify_ssl, timeout)
-
-    def _get_expected_modem_model(self):
-        return "VR1200"
