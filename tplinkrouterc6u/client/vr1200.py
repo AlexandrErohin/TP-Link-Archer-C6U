@@ -1,4 +1,6 @@
 import base64
+import requests
+from abc import abstractmethod
 from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientBase
 from tplinkrouterc6u.common.exception import ClientException
 from time import time, sleep
@@ -12,6 +14,21 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
                  verify_ssl: bool = True, timeout: int = 30):
         super().__init__(host, password, username, logger, verify_ssl, timeout) 
         self._url_rsa_key = 'cgi/getGDPRParm'
+
+    def supports(self):
+        return self._verify_modem() and self._req_rsa_key()
+    
+    def _verify_modem(self):
+        
+        response = requests.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
+        return self._get_expected_modem_model() in response.text
+        
+    @abstractmethod
+    def _get_expected_modem_model(self):
+        """
+        Returns the model of the DSL modem (e.g. VR1600v, VR600v, etc.)
+        """
+        pass
 
     def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
         params_dict = {}
@@ -59,8 +76,6 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
             return
 
         if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
-            #info = search('var currAuthTimes=(.*);\nvar currForbidTime=(.*);', response)
-            #assert info is not None
 
             error = 'TplinkRouter - MR - Login failed, wrong password.'
             if self._logger:
@@ -79,13 +94,11 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
                 self._logger.debug(error)
             raise ClientException(error)
 
-        if ret_code != self.HTTP_RET_OK:
-            error = 'TplinkRouter - MR - Login failed. Unknown error code: {}'.format(ret_code)
-            if self._logger:
-                self._logger.debug(error)
-            raise ClientException(error)
-        
-        return
+        # unknown error
+        error = 'TplinkRouter - MR - Login failed. Unknown error code: {}'.format(ret_code)
+        if self._logger:
+            self._logger.debug(error)
+        raise ClientException(error)
 
     def _request(self, url, method='POST', data_str=None, encrypt=False):
         '''
@@ -144,4 +157,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
 class TPLinkVR1200Client(TPLinkVRClientBase, TPLinkMRClient):
     def __init__(self, host, username, password, logger=None, verify_ssl=True, timeout=30):
-        super().__init__(host, username, password, logger, verify_ssl, timeout) 
+        super().__init__(host, username, password, logger, verify_ssl, timeout)
+
+    def _get_expected_modem_model(self):
+        return "VR1200"
