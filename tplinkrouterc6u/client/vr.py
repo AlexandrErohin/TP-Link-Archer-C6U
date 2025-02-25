@@ -13,8 +13,10 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
                  verify_ssl: bool = True, timeout: int = 30):
         super().__init__(host, password, username, logger, verify_ssl, timeout) 
         self._url_rsa_key = 'cgi/getGDPRParm'
+        self.SPECIAL_SUPPORT_WARNING_MESSAGE = "Since we are checking for support, it will be ignored."
 
     def supports(self):
+
         is_supported = self._verify_router() and super().supports()
         if is_supported:
             try:        
@@ -24,14 +26,13 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
                 status = self.get_status()
                 # Assert status is not none
                 assert status
-                
             except AssertionError as e:
                 if self._logger is not None:
-                    self._logger.error("Error while getting status: {}".format(e))
+                    self._logger.warning("Error while getting status: {}. {}".format(e, self.SPECIAL_SUPPORT_WARNING_MESSAGE))
                 is_supported = False
             except Exception as e:
                 if self._logger is not None:
-                    self._logger.error("Error while authorizing: {}".format(e))
+                    self._logger.warning("Error while authorizing: {}. {}".format(e, self.SPECIAL_SUPPORT_WARNING_MESSAGE))
                 is_supported = False
             finally:
                 try:
@@ -39,7 +40,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
                     self.logout()
                 except Exception as e:
                     if self._logger is not None:
-                        self._logger.error("Error while logging out: {}".format(e))
+                        self._logger.warning("Error while logging out: {}. {}".format(e, self.SPECIAL_SUPPORT_WARNING_MESSAGE))
                     is_supported = False
         return is_supported
     
