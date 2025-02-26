@@ -3,7 +3,7 @@ from json import dumps
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -67,14 +67,14 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
 
         status = Status()
-        element = self._get_value(data, ['wan', 'ip_info', 'mac'])
+        element = get_value(data, ['wan', 'ip_info', 'mac'])
         status._wan_macaddr = EUI48(element) if element else None
-        status._lan_macaddr = EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
-        element = self._get_value(data, ['wan', 'ip_info', 'ip'])
+        status._lan_macaddr = EUI48(get_value(data, ['lan', 'ip_info', 'mac']))
+        element = get_value(data, ['wan', 'ip_info', 'ip'])
         status._wan_ipv4_addr = IPv4Address(element) if element else None
-        element = self._get_value(data, ['lan', 'ip_info', 'ip'])
+        element = get_value(data, ['lan', 'ip_info', 'ip'])
         status._lan_ipv4_addr = IPv4Address(element) if element else None
-        element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
+        element = get_value(data, ['wan', 'ip_info', 'gateway'])
         status._wan_ipv4_gateway = IPv4Address(element) if element else None
 
         data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
@@ -82,12 +82,12 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         status.cpu_usage = data.get('cpu_usage')
 
         data = self.request('admin/wireless?form=wlan', dumps({'operation': 'read'}))
-        status.wifi_2g_enable = self._get_value(data, ['band2_4', 'host', 'enable'])
-        status.guest_2g_enable = self._get_value(data, ['band2_4', 'guest', 'enable'])
-        status.wifi_5g_enable = self._get_value(data, ['band5_1', 'host', 'enable'])
-        status.guest_5g_enable = self._get_value(data, ['band5_1', 'guest', 'enable'])
-        status.wifi_6g_enable = self._get_value(data, ['band6', 'host', 'enable'])
-        status.guest_6g_enable = self._get_value(data, ['band6', 'guest', 'enable'])
+        status.wifi_2g_enable = get_value(data, ['band2_4', 'host', 'enable'])
+        status.guest_2g_enable = get_value(data, ['band2_4', 'guest', 'enable'])
+        status.wifi_5g_enable = get_value(data, ['band5_1', 'host', 'enable'])
+        status.guest_5g_enable = get_value(data, ['band5_1', 'guest', 'enable'])
+        status.wifi_6g_enable = get_value(data, ['band6', 'host', 'enable'])
+        status.guest_6g_enable = get_value(data, ['band6', 'guest', 'enable'])
 
         devices = []
         data = self.request('admin/client?form=client_list', dumps(
@@ -125,33 +125,29 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
-        ipv4_status._wan_macaddr = EUI48(self._get_value(data, ['wan', 'ip_info', 'mac']))
-        element = self._get_value(data, ['wan', 'ip_info', 'ip'])
+        element = get_value(data, ['wan', 'ip_info', 'mac'])
+        ipv4_status._wan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
+        element = get_value(data, ['wan', 'ip_info', 'ip'])
         ipv4_status._wan_ipv4_ipaddr = IPv4Address(element) if element else None
-        element = self._get_value(data, ['wan', 'ip_info', 'gateway'])
+        element = get_value(data, ['wan', 'ip_info', 'gateway'])
         ipv4_status._wan_ipv4_gateway = IPv4Address(element) if element else None
-        ipv4_status.wan_ipv4_conntype = self._get_value(data, ['wan', 'dial_type'])
-        element = self._get_value(data, ['wan', 'ip_info', 'mask'])
+        element = get_value(data, ['wan', 'dial_type'])
+        ipv4_status.wan_ipv4_conntype = element if element else ''
+        element = get_value(data, ['wan', 'ip_info', 'mask'])
         ipv4_status._wan_ipv4_netmask = IPv4Address(element) if element else None
-        ipv4_status._wan_ipv4_pridns = IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns1']))
-        ipv4_status._wan_ipv4_snddns = IPv4Address(self._get_value(data, ['wan', 'ip_info', 'dns2']))
-        ipv4_status._lan_macaddr = EUI48(self._get_value(data, ['lan', 'ip_info', 'mac']))
-        ipv4_status._lan_ipv4_ipaddr = IPv4Address(self._get_value(data, ['lan', 'ip_info', 'ip']))
+        element = get_value(data, ['wan', 'ip_info', 'dns1'])
+        ipv4_status._wan_ipv4_pridns = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['wan', 'ip_info', 'dns2'])
+        ipv4_status._wan_ipv4_snddns = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['lan', 'ip_info', 'mac'])
+        ipv4_status._lan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
+        element = get_value(data, ['lan', 'ip_info', 'ip'])
+        ipv4_status._lan_ipv4_ipaddr = get_ip(element if element else '0.0.0.0')
         ipv4_status.lan_ipv4_dhcp_enable = False
-        ipv4_status._lan_ipv4_netmask = IPv4Address(self._get_value(data, ['lan', 'ip_info', 'mask']))
+        element = get_value(data, ['lan', 'ip_info', 'mask'])
+        ipv4_status._lan_ipv4_netmask = get_ip(element if element else '0.0.0.0')
 
         return ipv4_status
-
-    @staticmethod
-    def _get_value(dictionary: dict, keys: list):
-        nested_dict = dictionary
-
-        for key in keys:
-            try:
-                nested_dict = nested_dict[key]
-            except Exception:
-                return None
-        return nested_dict
 
     def _map_wire_type(self, data: dict) -> Connection:
         if data.get('wire_type') == 'wired':
@@ -160,7 +156,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                    'band5': {'main': Connection.HOST_5G, 'guest': Connection.GUEST_5G, 'iot': Connection.IOT_5G},
                    'band6': {'main': Connection.HOST_6G, 'guest': Connection.GUEST_6G, 'iot': Connection.IOT_6G}
                    }
-        result = self._get_value(mapping, [data.get('connection_type'), data.get('interface')])
+        result = get_value(mapping, [data.get('connection_type'), data.get('interface')])
 
         return result if result else Connection.UNKNOWN
 
