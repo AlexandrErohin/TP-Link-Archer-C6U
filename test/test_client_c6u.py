@@ -6,6 +6,7 @@ from tplinkrouterc6u import (
     TplinkRouter,
     Connection,
     Status,
+    IPv4Status,
     Device,
     ClientException,
 )
@@ -693,6 +694,33 @@ class TestTPLinkClient(TestCase):
         client.set_wifi(Connection.IOT_6G, True)
         self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_6g')
         self.assertEqual(check_data, 'operation=write&iot_6g_enable=on')
+
+    def test_get_ipv4_status_empty(self) -> None:
+        response_network = '{"result": {}, "error_code": 0}'
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=status_ipv4&operation=read':
+                    return loads(response_network)['result']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertIsInstance(result, IPv4Status)
+        self.assertEqual(result.wan_macaddr, '00-00-00-00-00-00')
+        self.assertEqual(result.wan_ipv4_ipaddr, '0.0.0.0')
+        self.assertEqual(result.wan_ipv4_gateway, '0.0.0.0')
+        self.assertEqual(result.wan_ipv4_conntype, '')
+        self.assertEqual(result.wan_ipv4_netmask, '0.0.0.0')
+        self.assertEqual(result.wan_ipv4_pridns, '0.0.0.0')
+        self.assertEqual(result.wan_ipv4_snddns, '0.0.0.0')
+        self.assertEqual(result.lan_macaddr, '00-00-00-00-00-00')
+        self.assertEqual(result.lan_ipv4_ipaddr, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_dhcp_enable, False)
+        self.assertEqual(result.remote, None)
 
 
 if __name__ == '__main__':

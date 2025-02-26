@@ -579,6 +579,52 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertIsInstance(ipv4_status.lan_ipv4_netmask_address, IPv4Address)
         self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('255.255.255.0'))
 
+    def test_get_ipv4_status_empty(self):
+        mock_data = json.loads('{"error_code": 0}')
+        check_payload = {}
+
+        class TPLinkXDRClientTest(TPLinkXDRClient):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDRClientTest('', '')
+        ipv4_status = client.get_ipv4_status()
+
+        self.assertEqual(check_payload['method'], 'get')
+        self.assertIsInstance(check_payload['dhcpd'], dict)
+        self.assertEqual(check_payload['dhcpd']['name'], 'udhcpd')
+        self.assertIsInstance(check_payload['network'], dict)
+        self.assertEqual(check_payload['network']['name'], ['lan', 'wan_status'])
+
+        self.assertIsInstance(ipv4_status, IPv4Status)
+        self.assertEqual(ipv4_status.wan_ipv4_ipaddr, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.wan_ipv4_ipaddress, IPv4Address)
+        self.assertEqual(ipv4_status.wan_ipv4_ipaddress, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.wan_ipv4_gateway, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.wan_ipv4_gateway_address, IPv4Address)
+        self.assertEqual(ipv4_status.wan_ipv4_gateway_address, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.wan_ipv4_netmask, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.wan_ipv4_netmask_address, IPv4Address)
+        self.assertEqual(ipv4_status.wan_ipv4_netmask_address, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.wan_ipv4_pridns, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.wan_ipv4_pridns_address, IPv4Address)
+        self.assertEqual(ipv4_status.wan_ipv4_pridns_address, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.wan_ipv4_snddns, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.wan_ipv4_snddns_address, IPv4Address)
+        self.assertEqual(ipv4_status.wan_ipv4_snddns_address, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.lan_macaddr, '00-00-00-00-00-00')
+        self.assertIsInstance(ipv4_status.lan_macaddress, EUI48)
+        self.assertEqual(ipv4_status.lan_macaddress, get_mac('00-00-00-00-00-00'))
+        self.assertEqual(ipv4_status.lan_ipv4_ipaddr, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.lan_ipv4_ipaddress, IPv4Address)
+        self.assertEqual(ipv4_status.lan_ipv4_ipaddress, get_ip('0.0.0.0'))
+        self.assertEqual(ipv4_status.lan_ipv4_dhcp_enable, False)
+        self.assertEqual(ipv4_status.lan_ipv4_netmask, '0.0.0.0')
+        self.assertIsInstance(ipv4_status.lan_ipv4_netmask_address, IPv4Address)
+        self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('0.0.0.0'))
+
 
 if __name__ == '__main__':
     main()

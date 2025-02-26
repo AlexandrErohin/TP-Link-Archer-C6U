@@ -11,7 +11,7 @@ from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, IPv4Status,
                                               Status)
 from tplinkrouterc6u.common.exception import ClientException
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 
 
@@ -170,15 +170,23 @@ class TPLinkXDRClient(AbstractRouter):
         })
 
         ipv4_status = IPv4Status()
-        ipv4_status._wan_ipv4_ipaddr = get_ip(data['network']['wan_status']['ipaddr'])
-        ipv4_status._wan_ipv4_gateway = get_ip(data['network']['wan_status']['gateway'])
-        ipv4_status._wan_ipv4_netmask = get_ip(data['network']['wan_status']['netmask'])
-        ipv4_status._wan_ipv4_pridns = get_ip(data['network']['wan_status']['pri_dns'])
-        ipv4_status._wan_ipv4_snddns = get_ip(data['network']['wan_status']['snd_dns'])
-        ipv4_status._lan_macaddr = get_mac(data['network']['lan']['macaddr'])
-        ipv4_status._lan_ipv4_ipaddr = get_ip(data['network']['lan']['ipaddr'])
-        ipv4_status.lan_ipv4_dhcp_enable = data['dhcpd']['udhcpd']['enable'] == '1'
-        ipv4_status._lan_ipv4_netmask = get_ip(data['network']['lan']['netmask'])
+        element = get_value(data, ['network', 'wan_status', 'ipaddr'])
+        ipv4_status._wan_ipv4_ipaddr = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['network', 'wan_status', 'gateway'])
+        ipv4_status._wan_ipv4_gateway = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['network', 'wan_status', 'netmask'])
+        ipv4_status._wan_ipv4_netmask = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['network', 'wan_status', 'pri_dns'])
+        ipv4_status._wan_ipv4_pridns = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['network', 'wan_status', 'snd_dns'])
+        ipv4_status._wan_ipv4_snddns = get_ip(element if element else '0.0.0.0')
+        element = get_value(data, ['network', 'lan', 'macaddr'])
+        ipv4_status._lan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
+        element = get_value(data, ['network', 'lan', 'ipaddr'])
+        ipv4_status._lan_ipv4_ipaddr = get_ip(element if element else '0.0.0.0')
+        ipv4_status.lan_ipv4_dhcp_enable = get_value(data, ['dhcpd', 'udhcpd', 'enable']) == '1'
+        element = get_value(data, ['network', 'lan', 'netmask'])
+        ipv4_status._lan_ipv4_netmask = get_ip(element if element else '0.0.0.0')
         return ipv4_status
 
     def reboot(self) -> None:
