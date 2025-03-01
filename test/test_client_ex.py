@@ -277,6 +277,35 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
 
+    def test_get_ipv4_status_empty(self) -> None:
+
+        DEV2_ADT_LAN = ('{"data":[],"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[],"operation":"gl","oid":"DEV2_ADT_WAN","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertIsInstance(result, IPv4Status)
+        self.assertEqual(result.wan_ipv4_ipaddr, None)
+        self.assertEqual(result.wan_ipv4_gateway, None)
+        self.assertEqual(result.wan_ipv4_netmask, None)
+        self.assertEqual(result.wan_ipv4_conntype, '')
+        self.assertEqual(result.lan_macaddr, '00-00-00-00-00-00')
+        self.assertEqual(result.lan_ipv4_ipaddr, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_dhcp_enable, False)
+        self.assertEqual(result.remote, None)
+
     def test_get_ipv4_status_one_wlan(self) -> None:
 
         DEV2_ADT_LAN = ('{"data":[{"MACAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.5.1",'

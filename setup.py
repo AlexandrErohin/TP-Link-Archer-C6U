@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tplinkrouterc6u",
-    version="5.4.1",
+    version="5.4.2",
     author="Alex Erohin",
     author_email="alexanderErohin@yandex.ru",
     description="TP-Link Router API",

@@ -132,7 +132,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         element = get_value(data, ['wan', 'ip_info', 'gateway'])
         ipv4_status._wan_ipv4_gateway = IPv4Address(element) if element else None
         element = get_value(data, ['wan', 'dial_type'])
-        ipv4_status.wan_ipv4_conntype = element if element else ''
+        ipv4_status._wan_ipv4_conntype = element if element else ''
         element = get_value(data, ['wan', 'ip_info', 'mask'])
         ipv4_status._wan_ipv4_netmask = IPv4Address(element) if element else None
         element = get_value(data, ['wan', 'ip_info', 'dns1'])

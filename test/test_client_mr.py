@@ -618,6 +618,7 @@ DNSServers=7.7.7.7,2.2.2.2
 
         self.assertIsInstance(result, IPv4Status)
         self.assertEqual(result.lan_macaddr, '00-00-00-00-00-00')
+        self.assertEqual(result.wan_ipv4_conntype, '')
         self.assertEqual(result.lan_ipv4_ipaddr, '0.0.0.0')
         self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
         self.assertEqual(result.lan_ipv4_dhcp_enable, False)

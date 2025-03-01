@@ -288,6 +288,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer VR600 v3
 - Archer VR900v
 - Archer VR2100v v1
+- Archer VX1800v v1.0
 - Deco M4 2.0
 - Deco M4R 2.0
 - Deco M5 v3

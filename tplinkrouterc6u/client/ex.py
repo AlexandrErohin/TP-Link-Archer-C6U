@@ -5,6 +5,7 @@ from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection, VPN
+from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
@@ -203,26 +204,26 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
         _, values = self.req_act(acts)
 
-        if values[0].__class__ == list:
+        if values[0].__class__ == list and len(values[0]) > 0:
             values[0] = values[0][0]
 
         ipv4_status = IPv4Status()
-        ipv4_status._lan_macaddr = EUI48(values[0]['MACAddress'])
-        ipv4_status._lan_ipv4_ipaddr = IPv4Address(values[0]['IPAddress'])
-        ipv4_status._lan_ipv4_netmask = IPv4Address(values[0]['IPSubnetMask'])
-        ipv4_status.lan_ipv4_dhcp_enable = bool(int(values[0]['DHCPv4Enable']))
+        ipv4_status._lan_macaddr = get_mac(get_value(values, [0, 'MACAddress'], '00:00:00:00:00:00'))
+        ipv4_status._lan_ipv4_ipaddr = get_ip(get_value(values, [0, 'IPAddress'], '0.0.0.0'))
+        ipv4_status._lan_ipv4_netmask = get_ip(get_value(values, [0, 'IPSubnetMask'], '0.0.0.0'))
+        ipv4_status.lan_ipv4_dhcp_enable = bool(int(get_value(values, [0, 'DHCPv4Enable'], '0')))
 
         for item in values[1]:
             if int(item['enable']) == 0 and values[1].__class__ == list:
                 continue
-            ipv4_status._wan_macaddr = EUI48(item['MACAddr'])
-            ipv4_status._wan_ipv4_ipaddr = IPv4Address(item['connIPv4Address'])
-            ipv4_status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway'])
-            ipv4_status.wan_ipv4_conntype = item['name']
-            ipv4_status._wan_ipv4_netmask = IPv4Address(item['connIPv4SubnetMask'])
-            dns = item['connIPv4DnsServer'].split(',')
-            ipv4_status._wan_ipv4_pridns = IPv4Address(dns[0])
-            ipv4_status._wan_ipv4_snddns = IPv4Address(dns[1])
+            ipv4_status._wan_macaddr = get_mac(get_value(item, ['MACAddr'], '00:00:00:00:00:00'))
+            ipv4_status._wan_ipv4_ipaddr = get_ip(get_value(item, ['connIPv4Address'], '0.0.0.0'))
+            ipv4_status._wan_ipv4_gateway = get_ip(get_value(item, ['connIPv4Gateway'], '0.0.0.0'))
+            ipv4_status._wan_ipv4_conntype = get_value(item, ['name'], '')
+            ipv4_status._wan_ipv4_netmask = get_ip(get_value(item, ['connIPv4SubnetMask'], '0.0.0.0'))
+            dns = get_value(item, ['connIPv4DnsServer'], '').split(',')
+            ipv4_status._wan_ipv4_pridns = get_ip(dns[0] if len(dns) > 0 else '0.0.0.0')
+            ipv4_status._wan_ipv4_snddns = get_ip(dns[1] if len(dns) > 1 else '0.0.0.0')
 
         return ipv4_status
 
