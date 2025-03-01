@@ -7,7 +7,7 @@ from datetime import timedelta, datetime
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
@@ -543,10 +543,10 @@ class TPLinkMRClient(TPLinkMRClientBase):
         _, values = self.req_act(acts)
 
         ipv4_status = IPv4Status()
-        ipv4_status._lan_macaddr = get_mac(values.get('0', {}).get('X_TP_MACAddress', '00:00:00:00:00:00'))
-        ipv4_status._lan_ipv4_ipaddr = get_ip(values.get('0', {}).get('IPInterfaceIPAddress', '0.0.0.0'))
-        ipv4_status._lan_ipv4_netmask = get_ip(values.get('0', {}).get('IPInterfaceSubnetMask', '0.0.0.0'))
-        ipv4_status.lan_ipv4_dhcp_enable = bool(int(values.get('1', {}).get('DHCPServerEnable', '0')))
+        ipv4_status._lan_macaddr = get_mac(get_value(values, ['0', 'X_TP_MACAddress'], '00:00:00:00:00:00'))
+        ipv4_status._lan_ipv4_ipaddr = get_ip(get_value(values, ['0', 'IPInterfaceIPAddress'], '0.0.0.0'))
+        ipv4_status._lan_ipv4_netmask = get_ip(get_value(values, ['0', 'IPInterfaceSubnetMask'], '0.0.0.0'))
+        ipv4_status.lan_ipv4_dhcp_enable = bool(int(get_value(values, ['1', 'DHCPServerEnable'], '0')))
 
         for item in self._to_list(values.get('2')):
             if int(item.get('enable', '0')) == 0 and values.get('2').__class__ == list:
@@ -554,11 +554,11 @@ class TPLinkMRClient(TPLinkMRClientBase):
             ipv4_status._wan_macaddr = get_mac(item.get('MACAddress', '00:00:00:00:00:00'))
             ipv4_status._wan_ipv4_ipaddr = get_ip(item.get('externalIPAddress', '0.0.0.0'))
             ipv4_status._wan_ipv4_gateway = get_ip(item.get('defaultGateway', '0.0.0.0'))
-            ipv4_status.wan_ipv4_conntype = item.get('name', '')
+            ipv4_status._wan_ipv4_conntype = item.get('name', '')
             ipv4_status._wan_ipv4_netmask = get_ip(item.get('subnetMask', '0.0.0.0'))
             dns = item.get('DNSServers', '').split(',')
-            ipv4_status._wan_ipv4_pridns = get_ip(dns[0] if len(dns) == 2 else '0.0.0.0')
-            ipv4_status._wan_ipv4_snddns = get_ip(dns[1] if len(dns) == 2 else '0.0.0.0')
+            ipv4_status._wan_ipv4_pridns = get_ip(dns[0] if len(dns) > 0 else '0.0.0.0')
+            ipv4_status._wan_ipv4_snddns = get_ip(dns[1] if len(dns) > 1 else '0.0.0.0')
 
         return ipv4_status
 
