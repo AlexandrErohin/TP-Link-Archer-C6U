@@ -4,31 +4,29 @@ from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientBase
 from tplinkrouterc6u.common.exception import ClientException
 from time import time, sleep
 from logging import Logger
-from tplinkrouterc6u.common.exception import ClientException
 
 
 class TPLinkVRClientBase(TPLinkMRClientBase):
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30):
-        super().__init__(host, password, username, logger, verify_ssl, timeout) 
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._url_rsa_key = 'cgi/getGDPRParm'
         self.SUPPORT_WARNING_MESSAGE = "Since we are checking for support, it will be ignored."
 
     def supports(self):
-
         return self._verify_router() and super().supports()
-    
+
     def _verify_router(self) -> bool:
         """
         Verifies if the connected router is a supported TP-Link VR model.
 
         This function checks if the router is a TP-Link VR model by sending a GET request
-        to the host and analyzing the response. It verifies the presence of specific 
+        to the host and analyzing the response. It verifies the presence of specific
         keywords and endpoints in the response to determine the model type.
 
         Returns:
-            bool: True if the router is a supported TP-Link VR model and supports the RSA key endpoint, 
+            bool: True if the router is a supported TP-Link VR model and supports the RSA key endpoint,
                 otherwise False.
 
         Raises:
@@ -44,37 +42,37 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
         try:
             status_code, response = self._request(self.host, method='GET')
-        except:
+        except Exception as e:
             if self._logger is not None:
                 self._logger.error("Error while checking modem: {}".format(e))
 
             return False
 
-        if status_code ==  HTTPStatus.OK:
+        if status_code == HTTPStatus.OK:
             is_VR = "Archer VR" in response
             has_url_rsa_endpoint = self._url_rsa_key in response
 
         if has_url_rsa_endpoint and is_VR:
             return True
         elif is_VR:
-            #check if lib.js is present. If response code is 200, it is okay. Check if self._url_rsa_key is present
+            # check if lib.js is present. If response code is 200, it is okay. Check if self._url_rsa_key is present
             try:
                 status_code, response = self._request("{}/js/lib.js".format(self.host), method='GET')
             except Exception as e:
                 if self._logger is not None:
                     self._logger.error("Error while checking if lib.js is present in modem: {}".format(e))
 
-                #if lib.js is not present, return False. Are API not compatible to this class?
+                # if lib.js is not present, return False. Are API not compatible to this class?
                 return False
-            
+
             if status_code == HTTPStatus.OK:
                 has_url_rsa_endpoint = (self._url_rsa_key in response)
 
             return is_VR and has_url_rsa_endpoint
         else:
-            #modem is not VR
+            # modem is not VR
             return False
-        
+
     def logout(self) -> None:
         '''
         Logs out from the host
@@ -106,7 +104,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
             '?' if len(params_dict) > 0 else '',
             '&'.join(params_dict)
         )
-    
+
     def _req_login(self) -> None:
         '''
         Authenticates to the host
@@ -117,16 +115,15 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
         Example session token (set as a cookie):
             {'JSESSIONID': '4d786fede0164d7613411c7b6ec61e'}
         '''
-        #self.password to base64 string
+        # self.password to base64 string
         base64pwd = base64.b64encode(self.password.encode('utf-8')).decode('utf-8')
 #        sign, data = self._prepare_data(self.username + '\n' + str(base64pwd), True)
 
         data_list = []
         data_list.append("UserName={}".format(self.username))
         data_list.append("Passwd={}".format(base64pwd))
-        
 
-        actItem = self.ActItem(self.ActItem.CGI, '/cgi/login', attrs= data_list)
+        actItem = self.ActItem(self.ActItem.CGI, '/cgi/login', attrs=data_list)
         response, _ = self.req_act([actItem])
 
         ret_code = self._parse_ret_val(response)
@@ -145,7 +142,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
             if self._logger:
                 self._logger.debug(error)
             raise ClientException(error)
-        
+
         if ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
             error = 'TplinkRouter - MR - Login failed. Generic error code: {}'.format(ret_code)
             if self._logger:
@@ -180,9 +177,9 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
         # encrypt request data if needed (for the /cgi_gdpr endpoint)
         if encrypt:
-            #check if data_str contains /cgi/login
-            is_login =  '/cgi/login' in data_str
-            
+            # check if data_str contains /cgi/login
+            is_login = '/cgi/login' in data_str
+
             sign, data = self._prepare_data(data_str, is_login)
             data = 'sign={}\r\ndata={}\r\n'.format(sign, data)
         else:
@@ -212,9 +209,6 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
             return r.status_code, r.text
 
 
-
 class TPLinkVRClient(TPLinkVRClientBase, TPLinkMRClient):
     def __init__(self, host, username, password, logger=None, verify_ssl=True, timeout=30):
         super().__init__(host, username, password, logger, verify_ssl, timeout)
-    
-    
