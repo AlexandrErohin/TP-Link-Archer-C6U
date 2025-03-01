@@ -599,6 +599,29 @@ DNSServers=7.7.7.7,2.2.2.2
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
 
+    def test_get_ipv4_status_empty(self) -> None:
+        response = '''
+[1,1,0,0,0,0]0
+[1,1,0,0,0,0]1
+[1,1,1,0,0,0]2
+[2,1,1,0,0,0]2
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertIsInstance(result, IPv4Status)
+        self.assertEqual(result.lan_macaddr, '00-00-00-00-00-00')
+        self.assertEqual(result.lan_ipv4_ipaddr, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
+        self.assertEqual(result.lan_ipv4_dhcp_enable, False)
+
     def test_get_ipv4_status_one_wlan(self) -> None:
         response = '''
 [1,1,0,0,0,0]0
