@@ -1,23 +1,19 @@
+import re
+from dataclasses import dataclass
 from requests import Session
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from urllib import parse
-from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from base64 import b64encode, b64decode
 from macaddress import EUI48
 from ipaddress import IPv4Address
-import re
 from collections import defaultdict
-from tplinkrouterc6u.common.encryption import EncryptionWrapper
-from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
-from tplinkrouterc6u.common.exception import ClientException
-from tplinkrouterc6u.client_abstract import AbstractRouter
 
 
 # code 2 asyn 1 - 401 error and strings for encrypting password
@@ -25,29 +21,37 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 # code 7 asyn 0 with id gives 00000 as ack i think
 # code 16 asyn 0 with id sets AES keys for router to use
 
-class TplinkC80Router(AbstractRouter):
-    ENCODING = ("yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8"
+class RouterConfig:
+    """Configuration parameters for the router."""
+    ENCODING: str = ("yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8"
                    "ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70T"
                    "OoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW")
-    KEY = "RDpbLfCPsJZ7fiv"
-    PAD_CHAR = chr(187)
+    KEY: str = "RDpbLfCPsJZ7fiv"
+    PAD_CHAR: str = chr(187)
 
-    nnRSA = ''
-    eeRSA = ''
-    seq = ''
+class EncryptionState:
+    """Holds encryption-related state."""
+    def __init__(self):
+        self.nn_rsa = ''
+        self.ee_rsa = ''
+        self.seq = ''
+        self.key_aes = ''
+        self.iv_aes = ''
+        self.string_aes = ''
+        self.token = ''
 
-    keyAES = ''
-    ivAES = ''
-    stringAES = ''
+class TplinkC80Router(AbstractRouter):
 
-    token = ''
-    _encryption = EncryptionWrapper()
-   
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
-
+        self._encryption = EncryptionWrapper()
+        self._encryption_state = EncryptionState()
+        self._setup_wifi_requests()
+    
+    def _setup_wifi_requests(self) -> None:
+        """Initialize WiFi request mappings."""
         self.host_wifi_2g_request = '33|1,1,0'
         self.host_wifi_5g_request = '33|2,1,0'
         self.guest_wifi_2g_request = '33|1,2,0'
@@ -65,57 +69,52 @@ class TplinkC80Router(AbstractRouter):
         }
 
     def supports(self) -> bool:
-        response = self._session.post(self._build_url(2, 1), data='0|1,0,0')
+        response = self.request(2, 1, data='0|1,0,0')
         return 'modelName Archer%20C80' in response.text
 
     def authorize(self) -> None:
-        authInfoUrl = self._build_url(2, 1)
-        RSAKeyUrl = self._build_url(16, 0)
-
         encodedPassword = self._encrypt(self.password)
 
         # Get token encryption strings and encrypt the password
-        response = self._session.post(authInfoUrl)
-        TplinkC80Router.token = TplinkC80Router._encode_token(encodedPassword, response)
+        response = self.request(2, 1)
+        self._encryption_state.token = TplinkC80Router._encode_token(encodedPassword, response)
 
         # Get RSA exponent, modulus and sequence number
-        response = self._session.post(RSAKeyUrl, data='get')
+        response = self.request(16, 0, data='get')
 
         responseText = response.text.splitlines()
-        TplinkC80Router.eeRSA = responseText[1]
-        TplinkC80Router.nnRSA = responseText[2]
-        TplinkC80Router.seq = responseText[3]
+        if len(responseText) < 4:
+            raise ClientException("Invalid response for RSA keys from router")
+        self._encryption_state.ee_rsa = responseText[1]
+        self._encryption_state.nn_rsa = responseText[2]
+        self._encryption_state.seq = responseText[3]
 
         # Generate key and initialization vector
-        TplinkC80Router.keyAES = "0000000000000000"
-        TplinkC80Router.ivAES = "0000000000000000"
-        TplinkC80Router.stringAES = f'k={TplinkC80Router.keyAES}&i={TplinkC80Router.ivAES}'
+        self._encryption_state.key_aes = "0000000000000000"
+        self._encryption_state.iv_aes = "0000000000000000"
+        self._encryption_state.string_aes = f'k={self._encryption_state.key_aes}&i={self._encryption_state.iv_aes}'
 
         # Encrypt AES string 
-        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(TplinkC80Router.stringAES, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(self._encryption_state.string_aes, self._encryption_state.nn_rsa, self._encryption_state.ee_rsa)
         # Register AES string for decryption on server side
-        response = self._session.post(self._build_url(16, 0, TplinkC80Router.token), data='set ' + aes_string_encrypted)
+        self.request(16, 0, self._encryption_state.token, data='set ' + aes_string_encrypted)
         # Some auth request, might be redundant
-        response = self._session.post(self._build_url(7, 0, TplinkC80Router.token))
-
-        self.get_devices()
-
-        'TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'.format(self.__class__.__name__, "e", response)
+        response = self.request(7, 0, self._encryption_state.token)
 
     def logout(self) -> None:
-        self._session.post(self._build_url(11, 0, TplinkC80Router.token))
+        self.request(11, 0, self._encryption_state.token)
 
     def get_firmware(self) -> Firmware:
         text = '0|1,0,0'
         
-        body = self._encrypt_body(TplinkC80Router.keyAES, TplinkC80Router.ivAES, TplinkC80Router.stringAES, text, 
-                                        TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+        body = self._encrypt_body(self._encryption_state.key_aes, self._encryption_state.iv_aes, self._encryption_state.string_aes, text, 
+                                        self._encryption_state.seq, self._encryption_state.nn_rsa, self._encryption_state.ee_rsa)
 
-        response = self._session.post(self._build_url(2, 1, TplinkC80Router.token), data = body)
-        response_text = self._decrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, response.text)
+        response = self.request(2, 1, self._encryption_state.token, data = body)
+        response_text = self._decrypt_data(self._encryption_state.key_aes, self._encryption_state.iv_aes, response.text)
         device_datamap = dict(line.split(" ", 1) for line in response_text.split("\r\n")[1:-1])
 
-        return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']), parse.unquote(device_datamap['hardVer']))
+        return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']), parse.unquote(device_datamap['softVer']))
 
     def get_status(self) -> Status:
         mac_info_request = "1|1,0,0"
@@ -125,11 +124,11 @@ class TplinkC80Router(AbstractRouter):
         request_text = '#'.join([mac_info_request, lan_ip_request, wan_ip_request, device_data_request,
                                  self.host_wifi_2g_request, self.host_wifi_5g_request, self.guest_wifi_2g_request, 
                                  self.guest_wifi_5g_request, self.iot_wifi_2g_request, self.iot_wifi_5g_request])
-        body = self._encrypt_body(TplinkC80Router.keyAES, TplinkC80Router.ivAES, TplinkC80Router.stringAES, request_text, 
-                                        TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
+        body = self._encrypt_body(self._encryption_state.key_aes, self._encryption_state.iv_aes, self._encryption_state.string_aes, request_text, 
+                                        self._encryption_state.seq, self._encryption_state.nn_rsa, self._encryption_state.ee_rsa)
 
-        response = self._session.post(self._build_url(2, 1, TplinkC80Router.token), data = body)
-        response_text = self._decrypt_data(TplinkC80Router.keyAES, TplinkC80Router.ivAES, response.text)
+        response = self.request(2, 1, self._encryption_state.token, data = body)
+        response_text = self._decrypt_data(self._encryption_state.key_aes, self._encryption_state.iv_aes, response.text)
         
         matches = re.findall(r'id (\d+\|\d,\d,\d)\r\n(.*?)(?=\r\nid \d+\||$)', response_text, re.DOTALL)
 
@@ -163,12 +162,12 @@ class TplinkC80Router(AbstractRouter):
         iot_wifi_2g = next(s.split("bEnable ", 1)[1] for s in iot_wifi_2g_response if s.startswith("bEnable "))
         iot_wifi_5g = next(s.split("bEnable ", 1)[1] for s in iot_wifi_5g_response if s.startswith("bEnable "))
 
-        devices = defaultdict(dict)
+        device_dict = defaultdict(dict)
         for entry in device_data_response:
             entry_list = entry.split(' ', 2)
-            devices[int(entry_list[1])][entry_list[0]] = entry_list[2]  # Grouping by device ID
+            device_dict[int(entry_list[1])][entry_list[0]] = entry_list[2]  # Grouping by device ID
 
-        filtered_devices = [v for _, v in devices.items() if v.get("ip") != "0.0.0.0"]
+        filtered_devices = [v for _, v in device_dict.items() if v.get("ip") != "0.0.0.0"]
 
         mapped_devices: list[Device] = []
         for device in filtered_devices:
@@ -178,9 +177,12 @@ class TplinkC80Router(AbstractRouter):
                 device['tag'] = device_tags[int(device['type'])]
             else:
                 device['tag'] = Connection.UNKNOWN
-            mapped_devices.append(Device(device['tag'], device['mac'], device['ip'], device['name']))
+            
+            device_to_add = Device(device['tag'], EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
+            device_to_add.up_speed = int(device['up'])
+            device_to_add.down_speed = int(device['down'])
+            mapped_devices.append(device_to_add)
         
-
         status = Status()
         status._wan_macaddr = EUI48(wan_mac)
         status._lan_macaddr = EUI48(lan_mac)
@@ -205,22 +207,21 @@ class TplinkC80Router(AbstractRouter):
         return status
 
     def reboot(self) -> None:
-        self._session.post(self._build_url(6, 1, TplinkC80Router.token))
+        self.request(6, 1, self._encryption_state.token)
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         enable_string = f'bEnable {int(enable)}'
         text = f'id {self.connection_requests[wifi]}\r\n{enable_string}'
-        print(text)
-        body = self._encrypt_body(TplinkC80Router.keyAES, TplinkC80Router.ivAES, TplinkC80Router.stringAES, text, 
-                                        TplinkC80Router.seq, TplinkC80Router.nnRSA, TplinkC80Router.eeRSA)
-        self._session.post(self._build_url(1, 0, TplinkC80Router.token), data=body)
+        body = self._encrypt_body(self._encryption_state.key_aes, self._encryption_state.iv_aes, self._encryption_state.string_aes, text, 
+                                        self._encryption_state.seq, self._encryption_state.nn_rsa, self._encryption_state.ee_rsa)
+        self.request(1, 0, self._encryption_state.token, data=body)
 
     @staticmethod
-    def _encrypt(pwd: str, key: str = KEY, encoding: str = ENCODING) -> str:
+    def _encrypt(pwd: str, key: str = RouterConfig.KEY, encoding: str = RouterConfig.ENCODING) -> str:
         max_len = max(len(key), len(pwd))
 
-        pwd = pwd.ljust(max_len, TplinkC80Router.PAD_CHAR)
-        key = key.ljust(max_len, TplinkC80Router.PAD_CHAR)
+        pwd = pwd.ljust(max_len, RouterConfig.PAD_CHAR)
+        key = key.ljust(max_len, RouterConfig.PAD_CHAR)
 
         result = []
 
@@ -263,12 +264,10 @@ class TplinkC80Router(AbstractRouter):
 
         cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
         decrypted_padded = cipher.decrypt(b64decode(encrypted_text))
-        decrypted_text = unpad(decrypted_padded, AES.block_size).decode("utf-8")
-
-        return decrypted_text
+        return unpad(decrypted_padded, AES.block_size).decode("utf-8")
    
-    def _build_url(self, code: int, asyn: int, token: str = None) -> str:
+    def request(self, code: int, asyn: int, token: str = None, data: str = None):
         url = f"{self.host}/?code={code}&asyn={asyn}"
         if token:
             url += f"&id={token}"
-        return url
+        return self._session.post(url, data=data)
