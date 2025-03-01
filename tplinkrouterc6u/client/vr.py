@@ -17,32 +17,7 @@ class TPLinkVRClientBase(TPLinkMRClientBase):
 
     def supports(self):
 
-        is_supported = self._verify_router() and super().supports()
-        if is_supported:
-            try:        
-                # Test authorization API
-                self.authorize()
-                # Test status API
-                status = self.get_status()
-                # Assert status is not none
-                assert status
-            except AssertionError as e:
-                if self._logger is not None:
-                    self._logger.warning("Error while getting status: {}. {}".format(e, self.SUPPORT_WARNING_MESSAGE))
-                is_supported = False
-            except Exception as e:
-                if self._logger is not None:
-                    self._logger.warning("Error while authorizing: {}. {}".format(e, self.SUPPORT_WARNING_MESSAGE))
-                is_supported = False
-            finally:
-                try:
-                    # Test logout
-                    self.logout()
-                except Exception as e:
-                    if self._logger is not None:
-                        self._logger.warning("Error while logging out: {}. {}".format(e, self.SUPPORT_WARNING_MESSAGE))
-                    is_supported = False
-        return is_supported
+        return self._verify_router() and super().supports()
     
     def _verify_router(self) -> bool:
         """
