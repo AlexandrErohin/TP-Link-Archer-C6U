@@ -366,7 +366,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         ipv4_status._wan_macaddr = get_mac(data.get('wan_macaddr', '00:00:00:00:00:00'))
         ipv4_status._wan_ipv4_ipaddr = get_ip(data.get('wan_ipv4_ipaddr', '0.0.0.0'))
         ipv4_status._wan_ipv4_gateway = get_ip(data.get('wan_ipv4_gateway', '0.0.0.0'))
-        ipv4_status.wan_ipv4_conntype = data.get('wan_ipv4_conntype', '')
+        ipv4_status._wan_ipv4_conntype = data.get('wan_ipv4_conntype', '')
         ipv4_status._wan_ipv4_netmask = get_ip(data.get('wan_ipv4_netmask', '0.0.0.0'))
         ipv4_status._wan_ipv4_pridns = get_ip(data.get('wan_ipv4_pridns', '0.0.0.0'))
         ipv4_status._wan_ipv4_snddns = get_ip(data.get('wan_ipv4_snddns', '0.0.0.0'))

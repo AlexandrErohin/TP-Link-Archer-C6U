@@ -16,12 +16,12 @@ def get_mac(mac: str) -> EUI48:
         return EUI48('00:00:00:00:00:00')
 
 
-def get_value(dictionary: dict, keys: list):
+def get_value(dictionary, keys: list, default=None):
     nested_dict = dictionary
 
     for key in keys:
         try:
             nested_dict = nested_dict[key]
         except Exception:
-            return None
+            return default
     return nested_dict
