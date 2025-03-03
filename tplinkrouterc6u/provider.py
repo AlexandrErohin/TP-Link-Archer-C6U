@@ -11,13 +11,14 @@ from tplinkrouterc6u.client.c6v4 import TplinkC6V4Router
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
+from tplinkrouterc6u.client.vr import TPLinkVRClient
 
 
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [TplinkC5400XRouter, TPLinkEXClient, TPLinkMRClient, TPLinkDecoClient,
+        for client in [TPLinkVRClient, TplinkC5400XRouter, TPLinkEXClient, TPLinkMRClient, TPLinkDecoClient,
                        TPLinkXDRClient, TplinkRouter, TplinkC80Router, TplinkC6V4Router]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():

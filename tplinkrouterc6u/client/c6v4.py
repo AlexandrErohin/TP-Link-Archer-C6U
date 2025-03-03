@@ -1,6 +1,6 @@
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
@@ -29,6 +29,9 @@ class TplinkC6V4Router(AbstractRouter):
         raise ClientException('Not Implemented')
 
     def get_status(self) -> Status:
+        raise ClientException('Not Implemented')
+
+    def get_ipv4_status(self) -> IPv4Status:
         raise ClientException('Not Implemented')
 
     def reboot(self) -> None:
