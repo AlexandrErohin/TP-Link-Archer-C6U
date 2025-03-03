@@ -17,7 +17,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [TPLinkVRClient, TplinkC5400XRouter, TPLinkEXClient, TPLinkMRClient, TplinkC6V4Router,
+        for client in [TplinkC5400XRouter, TPLinkVRClient, TPLinkEXClient, TPLinkMRClient, TplinkC6V4Router,
                        TPLinkDecoClient, TPLinkXDRClient, TplinkRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
