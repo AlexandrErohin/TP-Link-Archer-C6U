@@ -126,4 +126,4 @@ class TPLinkVRClient(TPLinkMRClient):
 
     def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
         is_login = encrypt and '/cgi/login' in data_str
-        super()._request(url, method, data_str, encrypt, is_login)
+        return super()._request(url, method, data_str, encrypt, is_login)
