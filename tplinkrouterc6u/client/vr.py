@@ -1,11 +1,11 @@
 import base64
 from http import HTTPStatus
-from tplinkrouterc6u.client.mr import TPLinkMRClient
+from tplinkrouterc6u.client.mr import TPLinkMRClientBase
 from tplinkrouterc6u.common.exception import ClientException
 from logging import Logger
 
 
-class TPLinkVRClient(TPLinkMRClient):
+class TPLinkVRClient(TPLinkMRClientBase):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
