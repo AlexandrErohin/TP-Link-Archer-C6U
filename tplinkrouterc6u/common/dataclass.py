@@ -68,6 +68,7 @@ class Status:
         self.wan_ipv4_uptime: int | None = None
         self.mem_usage: float | None = None
         self.cpu_usage: float | None = None
+        self.conn_type: str | None = None
         self.devices: list[Device] = []
 
     @property
