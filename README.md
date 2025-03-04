@@ -22,6 +22,7 @@ from tplinkrouterc6u import (
     TplinkC1200Router,
     TplinkC5400XRouter,
     TPLinkMRClient,
+    TPLinkVRClient,
     TPLinkEXClient,
     TPLinkXDRClient,
     TPLinkDecoClient,
@@ -287,6 +288,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer MR600 (v1, v2, v3)
 - Archer VR600 v3
 - Archer VR900v
+- Archer VR1200v v1
 - Archer VR2100v v1
 - Archer VX1800v v1.0
 - Deco M4 2.0

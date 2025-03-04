@@ -303,7 +303,7 @@ class TPLinkMRClientBase(AbstractRouter):
                 self._logger.debug(error)
             raise ClientException(error)
 
-    def _request(self, url, method='POST', data_str=None, encrypt=False):
+    def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
         '''
         Prepares and sends an HTTP request to the host
             - sets up the headers, handles token auth
@@ -325,7 +325,7 @@ class TPLinkMRClientBase(AbstractRouter):
 
         # encrypt request data if needed (for the /cgi_gdpr endpoint)
         if encrypt:
-            sign, data = self._prepare_data(data_str, False)
+            sign, data = self._prepare_data(data_str, is_login)
             data = 'sign={}\r\ndata={}\r\n'.format(sign, data)
         else:
             data = data_str
