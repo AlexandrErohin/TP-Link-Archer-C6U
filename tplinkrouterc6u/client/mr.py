@@ -114,6 +114,212 @@ class TPLinkMRClientBase(AbstractRouter):
         ]
         self.req_act(acts)
 
+    def get_firmware(self) -> Firmware:
+        acts = [
+            self.ActItem(self.ActItem.GET, 'IGD_DEV_INFO', attrs=[
+                'hardwareVersion',
+                'modelName',
+                'softwareVersion'
+            ])
+        ]
+        _, values = self.req_act(acts)
+
+        firmware = Firmware(values.get('hardwareVersion', ''), values.get('modelName', ''),
+                            values.get('softwareVersion', ''))
+
+        return firmware
+
+    def get_status(self) -> Status:
+        status = Status()
+        acts = [
+            self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
+            self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
+                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway']),
+            self.ActItem(self.ActItem.GL, 'LAN_WLAN', attrs=['enable', 'X_TP_Band']),
+            self.ActItem(self.ActItem.GL, 'LAN_WLAN_GUESTNET', attrs=['enable', 'name']),
+            self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=[
+                'IPAddress',
+                'MACAddress',
+                'hostName',
+                'X_TP_ConnType',
+                'active',
+            ]),
+            self.ActItem(self.ActItem.GS, 'LAN_WLAN_ASSOC_DEV', attrs=[
+                'associatedDeviceMACAddress',
+                'X_TP_TotalPacketsSent',
+                'X_TP_TotalPacketsReceived',
+            ]),
+        ]
+        _, values = self.req_act(acts)
+
+        if values['0'].__class__ == list:
+            values['0'] = values['0'][0]
+
+        status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
+        status._lan_ipv4_addr = IPv4Address(values['0']['IPInterfaceIPAddress'])
+
+        for item in self._to_list(values.get('1')):
+            if int(item['enable']) == 0 and values.get('1').__class__ == list:
+                continue
+            status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
+            status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
+            status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
+
+        if values['2'].__class__ != list:
+            status.wifi_2g_enable = bool(int(values['2']['enable']))
+        else:
+            status.wifi_2g_enable = bool(int(values['2'][0]['enable']))
+            status.wifi_5g_enable = bool(int(values['2'][1]['enable']))
+
+        if values['3'].__class__ != list:
+            status.guest_2g_enable = bool(int(values['3']['enable']))
+        else:
+            status.guest_2g_enable = bool(int(values['3'][0]['enable']))
+            status.guest_5g_enable = bool(int(values['3'][1]['enable']))
+
+        devices = {}
+        for val in self._to_list(values.get('4')):
+            if int(val['active']) == 0:
+                continue
+            conn = self.CLIENT_TYPES.get(int(val['X_TP_ConnType']))
+            if conn is None:
+                continue
+            elif conn == Connection.WIRED:
+                status.wired_total += 1
+            elif conn.is_guest_wifi():
+                status.guest_clients_total += 1
+            elif conn.is_host_wifi():
+                status.wifi_clients_total += 1
+            devices[val['MACAddress']] = Device(conn,
+                                                EUI48(val['MACAddress']),
+                                                IPv4Address(val['IPAddress']),
+                                                val['hostName'])
+
+        for val in self._to_list(values.get('5')):
+            if val['associatedDeviceMACAddress'] not in devices:
+                status.wifi_clients_total += 1
+                devices[val['associatedDeviceMACAddress']] = Device(
+                    Connection.HOST_2G,
+                    EUI48(val['associatedDeviceMACAddress']),
+                    IPv4Address('0.0.0.0'),
+                    '')
+            devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
+            devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
+
+        status.devices = list(devices.values())
+        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+
+        return status
+
+    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr']),
+        ]
+        _, values = self.req_act(acts)
+
+        ipv4_reservations = []
+        for item in self._to_list(values):
+            ipv4_reservations.append(
+                IPv4Reservation(
+                    EUI48(item['chaddr']),
+                    IPv4Address(item['yiaddr']),
+                    '',
+                    bool(int(item['enable']))
+                ))
+
+        return ipv4_reservations
+
+    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName',
+                                                                   'leaseTimeRemaining']),
+        ]
+        _, values = self.req_act(acts)
+
+        dhcp_leases = []
+        for item in self._to_list(values):
+            lease_time = item['leaseTimeRemaining']
+            dhcp_leases.append(
+                IPv4DHCPLease(
+                    EUI48(item['MACAddress']),
+                    IPv4Address(item['IPAddress']),
+                    item['hostName'],
+                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
+                ))
+
+        return dhcp_leases
+
+    def get_ipv4_status(self) -> IPv4Status:
+        acts = [
+            self.ActItem(self.ActItem.GS, 'LAN_IP_INTF',
+                         attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress', 'IPInterfaceSubnetMask']),
+            self.ActItem(self.ActItem.GET, 'LAN_HOST_CFG', '1,0,0,0,0,0', attrs=['DHCPServerEnable']),
+            self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
+                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name', 'subnetMask',
+                                'DNSServers']),
+        ]
+        _, values = self.req_act(acts)
+
+        ipv4_status = IPv4Status()
+        ipv4_status._lan_macaddr = get_mac(get_value(values, ['0', 'X_TP_MACAddress'], '00:00:00:00:00:00'))
+        ipv4_status._lan_ipv4_ipaddr = get_ip(get_value(values, ['0', 'IPInterfaceIPAddress'], '0.0.0.0'))
+        ipv4_status._lan_ipv4_netmask = get_ip(get_value(values, ['0', 'IPInterfaceSubnetMask'], '0.0.0.0'))
+        ipv4_status.lan_ipv4_dhcp_enable = bool(int(get_value(values, ['1', 'DHCPServerEnable'], '0')))
+
+        for item in self._to_list(values.get('2')):
+            if int(item.get('enable', '0')) == 0 and values.get('2').__class__ == list:
+                continue
+            ipv4_status._wan_macaddr = get_mac(item.get('MACAddress', '00:00:00:00:00:00'))
+            ipv4_status._wan_ipv4_ipaddr = get_ip(item.get('externalIPAddress', '0.0.0.0'))
+            ipv4_status._wan_ipv4_gateway = get_ip(item.get('defaultGateway', '0.0.0.0'))
+            ipv4_status._wan_ipv4_conntype = item.get('name', '')
+            ipv4_status._wan_ipv4_netmask = get_ip(item.get('subnetMask', '0.0.0.0'))
+            dns = item.get('DNSServers', '').split(',')
+            ipv4_status._wan_ipv4_pridns = get_ip(dns[0] if len(dns) > 0 else '0.0.0.0')
+            ipv4_status._wan_ipv4_snddns = get_ip(dns[1] if len(dns) > 1 else '0.0.0.0')
+
+        return ipv4_status
+
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET,
+                'LAN_WLAN' if wifi in [Connection.HOST_2G, Connection.HOST_5G] else 'LAN_WLAN_MSSIDENTRY',
+                self.WIFI_SET[wifi],
+                attrs=['enable={}'.format(int(enable))]),
+        ]
+        self.req_act(acts)
+
+    def get_vpn_status(self) -> VPNStatus:
+        status = VPNStatus()
+        acts = [
+            self.ActItem(self.ActItem.GET, 'OPENVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GET, 'PPTPVPN', attrs=['enable']),
+            self.ActItem(self.ActItem.GL, 'OVPN_CLIENT', attrs=['connAct']),
+            self.ActItem(self.ActItem.GL, 'PVPN_CLIENT', attrs=['connAct']),
+        ]
+        _, values = self.req_act(acts)
+
+        status.openvpn_enable = values['0']['enable'] == '1'
+        status.pptpvpn_enable = values['1']['enable'] == '1'
+
+        for item in values['2']:
+            if item['connAct'] == '1':
+                status.openvpn_clients_total += 1
+
+        for item in values['3']:
+            if item['connAct'] == '1':
+                status.pptpvpn_clients_total += 1
+
+        return status
+
+    def set_vpn(self, vpn: VPN, enable: bool) -> None:
+        acts = [
+            self.ActItem(self.ActItem.SET, vpn.value, attrs=['enable={}'.format(int(enable))])
+        ]
+
+        self.req_act(acts)
+
     def req_act(self, acts: list):
         '''
         Requests ACTs via the cgi_gdpr proxy
@@ -396,182 +602,6 @@ class TPLinkMRClient(TPLinkMRClientBase):
         if ret_code == self.HTTP_RET_OK:
             self._token = None
 
-    def get_firmware(self) -> Firmware:
-        acts = [
-            self.ActItem(self.ActItem.GET, 'IGD_DEV_INFO', attrs=[
-                'hardwareVersion',
-                'modelName',
-                'softwareVersion'
-            ])
-        ]
-        _, values = self.req_act(acts)
-
-        firmware = Firmware(values.get('hardwareVersion', ''), values.get('modelName', ''),
-                            values.get('softwareVersion', ''))
-
-        return firmware
-
-    def get_status(self) -> Status:
-        status = Status()
-        acts = [
-            self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
-            self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway']),
-            self.ActItem(self.ActItem.GL, 'LAN_WLAN', attrs=['enable', 'X_TP_Band']),
-            self.ActItem(self.ActItem.GL, 'LAN_WLAN_GUESTNET', attrs=['enable', 'name']),
-            self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=[
-                'IPAddress',
-                'MACAddress',
-                'hostName',
-                'X_TP_ConnType',
-                'active',
-            ]),
-            self.ActItem(self.ActItem.GS, 'LAN_WLAN_ASSOC_DEV', attrs=[
-                'associatedDeviceMACAddress',
-                'X_TP_TotalPacketsSent',
-                'X_TP_TotalPacketsReceived',
-            ]),
-        ]
-        _, values = self.req_act(acts)
-
-        if values['0'].__class__ == list:
-            values['0'] = values['0'][0]
-
-        status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
-        status._lan_ipv4_addr = IPv4Address(values['0']['IPInterfaceIPAddress'])
-
-        for item in self._to_list(values.get('1')):
-            if int(item['enable']) == 0 and values.get('1').__class__ == list:
-                continue
-            status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
-            status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
-            status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
-
-        if values['2'].__class__ != list:
-            status.wifi_2g_enable = bool(int(values['2']['enable']))
-        else:
-            status.wifi_2g_enable = bool(int(values['2'][0]['enable']))
-            status.wifi_5g_enable = bool(int(values['2'][1]['enable']))
-
-        if values['3'].__class__ != list:
-            status.guest_2g_enable = bool(int(values['3']['enable']))
-        else:
-            status.guest_2g_enable = bool(int(values['3'][0]['enable']))
-            status.guest_5g_enable = bool(int(values['3'][1]['enable']))
-
-        devices = {}
-        for val in self._to_list(values.get('4')):
-            if int(val['active']) == 0:
-                continue
-            conn = self.CLIENT_TYPES.get(int(val['X_TP_ConnType']))
-            if conn is None:
-                continue
-            elif conn == Connection.WIRED:
-                status.wired_total += 1
-            elif conn.is_guest_wifi():
-                status.guest_clients_total += 1
-            elif conn.is_host_wifi():
-                status.wifi_clients_total += 1
-            devices[val['MACAddress']] = Device(conn,
-                                                EUI48(val['MACAddress']),
-                                                IPv4Address(val['IPAddress']),
-                                                val['hostName'])
-
-        for val in self._to_list(values.get('5')):
-            if val['associatedDeviceMACAddress'] not in devices:
-                status.wifi_clients_total += 1
-                devices[val['associatedDeviceMACAddress']] = Device(
-                    Connection.HOST_2G,
-                    EUI48(val['associatedDeviceMACAddress']),
-                    IPv4Address('0.0.0.0'),
-                    '')
-            devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
-            devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
-
-        status.devices = list(devices.values())
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
-
-        return status
-
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
-        acts = [
-            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr']),
-        ]
-        _, values = self.req_act(acts)
-
-        ipv4_reservations = []
-        for item in self._to_list(values):
-            ipv4_reservations.append(
-                IPv4Reservation(
-                    EUI48(item['chaddr']),
-                    IPv4Address(item['yiaddr']),
-                    '',
-                    bool(int(item['enable']))
-                ))
-
-        return ipv4_reservations
-
-    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
-        acts = [
-            self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName',
-                                                                   'leaseTimeRemaining']),
-        ]
-        _, values = self.req_act(acts)
-
-        dhcp_leases = []
-        for item in self._to_list(values):
-            lease_time = item['leaseTimeRemaining']
-            dhcp_leases.append(
-                IPv4DHCPLease(
-                    EUI48(item['MACAddress']),
-                    IPv4Address(item['IPAddress']),
-                    item['hostName'],
-                    str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
-                ))
-
-        return dhcp_leases
-
-    def get_ipv4_status(self) -> IPv4Status:
-        acts = [
-            self.ActItem(self.ActItem.GS, 'LAN_IP_INTF',
-                         attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress', 'IPInterfaceSubnetMask']),
-            self.ActItem(self.ActItem.GET, 'LAN_HOST_CFG', '1,0,0,0,0,0', attrs=['DHCPServerEnable']),
-            self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name', 'subnetMask',
-                                'DNSServers']),
-        ]
-        _, values = self.req_act(acts)
-
-        ipv4_status = IPv4Status()
-        ipv4_status._lan_macaddr = get_mac(get_value(values, ['0', 'X_TP_MACAddress'], '00:00:00:00:00:00'))
-        ipv4_status._lan_ipv4_ipaddr = get_ip(get_value(values, ['0', 'IPInterfaceIPAddress'], '0.0.0.0'))
-        ipv4_status._lan_ipv4_netmask = get_ip(get_value(values, ['0', 'IPInterfaceSubnetMask'], '0.0.0.0'))
-        ipv4_status.lan_ipv4_dhcp_enable = bool(int(get_value(values, ['1', 'DHCPServerEnable'], '0')))
-
-        for item in self._to_list(values.get('2')):
-            if int(item.get('enable', '0')) == 0 and values.get('2').__class__ == list:
-                continue
-            ipv4_status._wan_macaddr = get_mac(item.get('MACAddress', '00:00:00:00:00:00'))
-            ipv4_status._wan_ipv4_ipaddr = get_ip(item.get('externalIPAddress', '0.0.0.0'))
-            ipv4_status._wan_ipv4_gateway = get_ip(item.get('defaultGateway', '0.0.0.0'))
-            ipv4_status._wan_ipv4_conntype = item.get('name', '')
-            ipv4_status._wan_ipv4_netmask = get_ip(item.get('subnetMask', '0.0.0.0'))
-            dns = item.get('DNSServers', '').split(',')
-            ipv4_status._wan_ipv4_pridns = get_ip(dns[0] if len(dns) > 0 else '0.0.0.0')
-            ipv4_status._wan_ipv4_snddns = get_ip(dns[1] if len(dns) > 1 else '0.0.0.0')
-
-        return ipv4_status
-
-    def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        acts = [
-            self.ActItem(
-                self.ActItem.SET,
-                'LAN_WLAN' if wifi in [Connection.HOST_2G, Connection.HOST_5G] else 'LAN_WLAN_MSSIDENTRY',
-                self.WIFI_SET[wifi],
-                attrs=['enable={}'.format(int(enable))]),
-        ]
-        self.req_act(acts)
-
     def send_sms(self, phone_number: str, message: str) -> None:
         acts = [
             self.ActItem(
@@ -681,33 +711,3 @@ class TPLinkMRClient(TPLinkMRClientBase):
         status.isp_name = values['3']['ispName']
 
         return status
-
-    def get_vpn_status(self) -> VPNStatus:
-        status = VPNStatus()
-        acts = [
-            self.ActItem(self.ActItem.GET, 'OPENVPN', attrs=['enable']),
-            self.ActItem(self.ActItem.GET, 'PPTPVPN', attrs=['enable']),
-            self.ActItem(self.ActItem.GL, 'OVPN_CLIENT', attrs=['connAct']),
-            self.ActItem(self.ActItem.GL, 'PVPN_CLIENT', attrs=['connAct']),
-        ]
-        _, values = self.req_act(acts)
-
-        status.openvpn_enable = values['0']['enable'] == '1'
-        status.pptpvpn_enable = values['1']['enable'] == '1'
-
-        for item in values['2']:
-            if item['connAct'] == '1':
-                status.openvpn_clients_total += 1
-
-        for item in values['3']:
-            if item['connAct'] == '1':
-                status.pptpvpn_clients_total += 1
-
-        return status
-
-    def set_vpn(self, vpn: VPN, enable: bool) -> None:
-        acts = [
-            self.ActItem(self.ActItem.SET, vpn.value, attrs=['enable={}'.format(int(enable))])
-        ]
-
-        self.req_act(acts)
