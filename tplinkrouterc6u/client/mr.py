@@ -134,7 +134,7 @@ class TPLinkMRClientBase(AbstractRouter):
         acts = [
             self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
             self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway']),
+                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN', attrs=['enable', 'X_TP_Band']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN_GUESTNET', attrs=['enable', 'name']),
             self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=[
@@ -164,6 +164,7 @@ class TPLinkMRClientBase(AbstractRouter):
             status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
             status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
             status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
+            status.conn_type = item.get('name', '')
 
         if values['2'].__class__ != list:
             status.wifi_2g_enable = bool(int(values['2']['enable']))
