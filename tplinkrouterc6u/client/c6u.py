@@ -284,6 +284,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
+        status.conn_type = data.get('conn_type')
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))

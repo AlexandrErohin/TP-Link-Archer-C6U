@@ -137,6 +137,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
+| conn_type | Connection type | str, None |
 | devices | List of all connectedd devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
