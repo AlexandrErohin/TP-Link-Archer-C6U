@@ -1,10 +1,9 @@
 from unittest import main, TestCase
 from macaddress import EUI48
 from ipaddress import IPv4Address
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
+from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status
 from json import loads
 from tplinkrouterc6u import (
-    TplinkRouter,
     Connection,
     Status,
     Device,
@@ -178,6 +177,28 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'PC')
         self.assertEqual(device.up_speed, 600)
         self.assertEqual(device.down_speed, 50)
+
+    def test_get_ipv4(self) -> None:
+        status_response_text = '00000\r\nid 1|1,0,0\r\nauthKey token\r\nreserved\r\nsetWzd 8\r\nmode 1\r\nlogLevel 3\r\nfastpath 1\r\nmac 0 00-00-00-00-00-00\r\nmac 1 00-00-00-00-00-01\r\nwanMacType 0\r\nmodelMergeCursor 8\r\nid 4|1,0,0\r\nip 192.168.0.1\r\nmask 255.255.255.0\r\nmode 0\r\nsmartIp 1\r\ngateway 192.168.0.1\r\nid 8|1,0,0\r\nenable 1\r\npoolStart 192.168.0.100\r\npoolEnd 192.168.0.249\r\nleaseTime 120\r\ndns 0 0.0.0.0\r\ndns 1 0.0.0.0\r\ngateway 0.0.0.0\r\nhostName\r\nrelayEnableAll 0\r\nrelayEnable 0\r\nrelayServer 0.0.0.0\r\nid 22|1,0,0\r\nenable 1\r\nneedPnpDetect 0\r\nocnDetect 0\r\nreserved\r\nlinkMode 0\r\nlinkType 0\r\nid 23|1,0,0\r\nip 1.1.1.1\r\nmask 255.255.252.0\r\ngateway 1.1.1.2\r\ndns 0 5.8.8.8\r\ndns 1 5.8.8.8\r\nstatus 1\r\ncode 0\r\nupTime 15000\r\ninPkts 9537954\r\ninOctets 327534332\r\noutPkts 24449491\r\noutOctets 2189487468\r\ninRates 42346\r\noutRates 19222\r\ndualMode 0\r\ndualIp 0.0.0.0\r\ndualMask 0.0.0.0\r\ndualGateway 0.0.0.0\r\ndualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\ndualCode 1\r\ndualStatus 3\r\ninternetDnsDetect 1\r\nid 24|1,0,0\r\nip 1.0.0.1\r\nmask 255.255.255.0\r\ngateway 1.0.0.1\r\ndns 0 8.8.8.8\r\ndns 1 8.8.8.8\r\nmtu 1500'
+        client = TplinkC80RouterTest('', '')
+        client.authorize()
+
+        client.set_encrypted_response(status_response_text)
+        ipv4status: IPv4Status = client.get_ipv4_status()
+
+        self.assertIsInstance(ipv4status, IPv4Status)
+        self.assertEqual(ipv4status._wan_macaddr, EUI48('00-00-00-00-00-01'))
+        self.assertEqual(ipv4status._wan_ipv4_ipaddr, IPv4Address('1.1.1.1'))
+        self.assertEqual(ipv4status._wan_ipv4_gateway, IPv4Address('1.1.1.2'))
+        self.assertEqual(ipv4status._wan_ipv4_conntype, 'Dynamic IP')
+        self.assertEqual(ipv4status._wan_ipv4_netmask, IPv4Address('255.255.252.0'))
+        self.assertEqual(ipv4status._wan_ipv4_pridns, IPv4Address('5.8.8.8'))
+        self.assertEqual(ipv4status._wan_ipv4_snddns, IPv4Address('5.8.8.8'))
+        self.assertEqual(ipv4status._lan_macaddr, EUI48('00-00-00-00-00-00'))
+        self.assertEqual(ipv4status._lan_ipv4_ipaddr, IPv4Address('192.168.0.1'))
+        self.assertEqual(ipv4status.lan_ipv4_dhcp_enable, True)
+        self.assertEqual(ipv4status._lan_ipv4_netmask, IPv4Address('255.255.255.0'))
+
 
 if __name__ == '__main__':
     main()

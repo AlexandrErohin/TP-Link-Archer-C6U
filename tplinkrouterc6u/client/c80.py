@@ -7,6 +7,7 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from urllib import parse
 from Crypto.Cipher import AES
@@ -27,6 +28,24 @@ class RouterConstants:
     GUEST_WIFI_5G_REQUEST = '33|2,2,0'
     IOT_WIFI_2G_REQUEST = '33|1,9,0'
     IOT_WIFI_5G_REQUEST = '33|2,9,0'
+
+    CONNECTION_REQUESTS_MAP = {
+            Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
+            Connection.HOST_5G: HOST_WIFI_5G_REQUEST,
+            Connection.GUEST_2G: GUEST_WIFI_2G_REQUEST,
+            Connection.GUEST_5G: GUEST_WIFI_5G_REQUEST,
+            Connection.IOT_2G: IOT_WIFI_2G_REQUEST,
+            Connection.IOT_5G: IOT_WIFI_5G_REQUEST
+        }
+    
+    CONNECTION_TYPE_MAP = {
+        '0': "Dynamic IP",
+        '1': 'Static IP',
+        '2': 'PPPoE',
+        '3': 'L2TP',
+        '4': 'PPTP'
+    }
+
 
 class RouterConfig:
     """Configuration parameters for the router."""
@@ -56,17 +75,6 @@ class TplinkC80Router(AbstractRouter):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
         self._encryption = EncryptionState()
-        self._setup_wifi_requests()
-    
-    def _setup_wifi_requests(self) -> None:
-        self.connection_requests = {
-            Connection.HOST_2G: RouterConstants.HOST_WIFI_2G_REQUEST,
-            Connection.HOST_5G: RouterConstants.HOST_WIFI_5G_REQUEST,
-            Connection.GUEST_2G: RouterConstants.GUEST_WIFI_2G_REQUEST,
-            Connection.GUEST_5G: RouterConstants.GUEST_WIFI_5G_REQUEST,
-            Connection.IOT_2G: RouterConstants.IOT_WIFI_2G_REQUEST,
-            Connection.IOT_5G: RouterConstants.IOT_WIFI_5G_REQUEST
-        }
 
     def supports(self) -> bool:
         response = self.request(2, 1, data='0|1,0,0')
@@ -146,18 +154,9 @@ class TplinkC80Router(AbstractRouter):
             'gateway_ip': extract_value(data_blocks[wan_ip_request], "gateway "),
             'uptime': extract_value(data_blocks[wan_ip_request], "upTime ")
         }
-        
-        wifi_mappings = {
-            'host_2g': RouterConstants.HOST_WIFI_2G_REQUEST,
-            'host_5g': RouterConstants.HOST_WIFI_5G_REQUEST,
-            'guest_2g': RouterConstants.GUEST_WIFI_2G_REQUEST,
-            'guest_5g': RouterConstants.GUEST_WIFI_5G_REQUEST,
-            'iot_2g': RouterConstants.IOT_WIFI_2G_REQUEST,
-            'iot_5g': RouterConstants.IOT_WIFI_5G_REQUEST
-        }
 
         wifi_status = {key: extract_value(data_blocks[request], "bEnable ") == '1'
-                  for key, request in wifi_mappings.items()}
+                  for key, request in RouterConstants.CONNECTION_REQUESTS_MAP.items()}
 
         device_data_response = data_blocks[device_data_request]
 
@@ -170,13 +169,13 @@ class TplinkC80Router(AbstractRouter):
         status._wan_ipv4_addr = IPv4Address(network_info['wan_ip'])
         status._wan_ipv4_gateway = IPv4Address(network_info['gateway_ip'])
         status.wan_ipv4_uptime = int(network_info['uptime']) // 100
-        
-        status.wifi_2g_enable = wifi_status['host_2g']
-        status.wifi_5g_enable = wifi_status['host_5g']
-        status.guest_2g_enable = wifi_status['guest_2g']
-        status.guest_5g_enable = wifi_status['guest_5g']
-        status.iot_2g_enable = wifi_status['iot_2g']
-        status.iot_5g_enable = wifi_status['iot_5g']
+
+        status.wifi_2g_enable = wifi_status[Connection.HOST_2G]
+        status.wifi_5g_enable = wifi_status[Connection.HOST_5G]
+        status.guest_2g_enable = wifi_status[Connection.GUEST_2G]
+        status.guest_5g_enable = wifi_status[Connection.GUEST_5G]
+        status.iot_2g_enable = wifi_status[Connection.IOT_2G]
+        status.iot_5g_enable = wifi_status[Connection.IOT_5G]
         
         status.wired_total = sum(1 for device in mapped_devices if device.type == Connection.WIRED)
         status.wifi_clients_total = sum(1 for device in mapped_devices if device.type in (Connection.HOST_2G, Connection.HOST_5G))
@@ -195,6 +194,57 @@ class TplinkC80Router(AbstractRouter):
         text = f'id {self.connection_requests[wifi]}\r\n{enable_string}'
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
+
+    def get_ipv4_status(self) -> IPv4Status:
+        mac_info_request = "1|1,0,0"
+        lan_ip_request = "4|1,0,0"
+        dhcp_request = "8|1,0,0"
+        link_type_request = "22|1,0,0"
+        wan_ip_request = "23|1,0,0"
+        static_ip_request = "24|1,0,0"
+        all_requests = [
+            mac_info_request, lan_ip_request, dhcp_request, link_type_request, wan_ip_request, static_ip_request]
+        request_text = '#'.join(all_requests)
+        body = self._encrypt_body(request_text)
+
+        response = self.request(2, 1, True, data=body)
+        response_text = self._decrypt_data(response.text)
+        
+        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
+
+        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+
+        def extract_value(response_list, prefix):
+            return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
+        
+        network_info = {
+            'lan_mac': extract_value(data_blocks[mac_info_request], "mac 0 "),
+            'wan_mac': extract_value(data_blocks[mac_info_request], "mac 1 "),
+            'lan_ip': extract_value(data_blocks[lan_ip_request], "ip "),
+            'wan_ip': extract_value(data_blocks[wan_ip_request], "ip "),
+            'gateway_ip': extract_value(data_blocks[wan_ip_request], "gateway "),
+            'uptime': extract_value(data_blocks[wan_ip_request], "upTime "),
+            'wan_mask': extract_value(data_blocks[wan_ip_request], "mask "),
+            'lan_mask': extract_value(data_blocks[lan_ip_request], "mask "),
+            'dns_1': extract_value(data_blocks[wan_ip_request], "dns 0 "),
+            'dns_2': extract_value(data_blocks[wan_ip_request], "dns 1 "),
+            'dhcp_enabled': extract_value(data_blocks[dhcp_request], "enable "),
+            'link_type': extract_value(data_blocks[link_type_request], "linkType "),
+        }
+
+        ipv4status = IPv4Status()
+        ipv4status._wan_macaddr = EUI48(network_info['wan_mac'])
+        ipv4status._wan_ipv4_ipaddr = IPv4Address(network_info['wan_ip'])
+        ipv4status._wan_ipv4_gateway = IPv4Address(network_info['gateway_ip'])
+        ipv4status._wan_ipv4_conntype = RouterConstants.CONNECTION_TYPE_MAP[network_info['link_type']]
+        ipv4status._wan_ipv4_netmask = IPv4Address(network_info['wan_mask'])
+        ipv4status._wan_ipv4_pridns = IPv4Address(network_info['dns_1'])
+        ipv4status._wan_ipv4_snddns = IPv4Address(network_info['dns_2'])
+        ipv4status._lan_macaddr = EUI48(network_info['lan_mac'])
+        ipv4status._lan_ipv4_ipaddr = IPv4Address(network_info['lan_ip'])
+        ipv4status.lan_ipv4_dhcp_enable = network_info['dhcp_enabled'] == '1'
+        ipv4status._lan_ipv4_netmask = IPv4Address(network_info['lan_mask'])
+        return ipv4status
 
     def _parse_devices(self, device_data_response: list[str]) -> list[Device]:
         device_dict = defaultdict(dict)
