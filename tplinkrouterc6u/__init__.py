@@ -3,6 +3,7 @@ from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.mr import TPLinkMRClient
 from tplinkrouterc6u.client.ex import TPLinkEXClient
+from tplinkrouterc6u.client.vr import TPLinkVRClient
 from tplinkrouterc6u.client.c6v4 import TplinkC6V4Router
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router

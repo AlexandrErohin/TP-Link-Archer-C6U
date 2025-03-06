@@ -64,6 +64,7 @@ class TestTPLinkClient(TestCase):
         ],
         "guest_5g_psk_key": "",
         "cpu_usage": 0.28,
+        "conn_type": "1",
         "guest_2g_encryption": "none",
         "wireless_5g_encryption": "psk",
         "guest_5g_ssid": "TP-Link_Guest_21CC_5G",
@@ -244,6 +245,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.wifi_5g_enable, True)
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, 0.43)
+        self.assertEqual(status.conn_type, '1')
         self.assertEqual(status.cpu_usage, 0.28)
         self.assertEqual(len(status.devices), 5)
         self.assertIsInstance(status.devices[0], Device)

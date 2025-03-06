@@ -310,6 +310,7 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
         self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.30.1')
+        self.assertEqual(status.conn_type, 'ipoe_1_d')
         self.assertEqual(status.wired_total, 0)
         self.assertEqual(status.wifi_clients_total, 1)
         self.assertEqual(status.guest_clients_total, 0)

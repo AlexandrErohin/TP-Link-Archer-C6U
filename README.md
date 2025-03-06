@@ -22,6 +22,7 @@ from tplinkrouterc6u import (
     TplinkC1200Router,
     TplinkC5400XRouter,
     TPLinkMRClient,
+    TPLinkVRClient,
     TPLinkEXClient,
     TPLinkXDRClient,
     TPLinkDecoClient,
@@ -136,6 +137,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
+| conn_type | Connection type | str, None |
 | devices | List of all connectedd devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
@@ -287,6 +289,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer MR600 (v1, v2, v3)
 - Archer VR600 v3
 - Archer VR900v
+- Archer VR1200v v1
 - Archer VR2100v v1
 - Archer VX1800v v1.0
 - Deco M4 2.0
