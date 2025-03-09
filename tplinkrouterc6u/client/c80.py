@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from requests import Session
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation, IPv4DHCPLease, Device
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from urllib import parse
 from Crypto.Cipher import AES
@@ -16,6 +15,7 @@ from base64 import b64encode, b64decode
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from collections import defaultdict
+
 
 class RouterConstants:
     AUTH_TOKEN_INDEX1 = 3
@@ -37,7 +37,7 @@ class RouterConstants:
             Connection.IOT_2G: IOT_WIFI_2G_REQUEST,
             Connection.IOT_5G: IOT_WIFI_5G_REQUEST
         }
-    
+
     CONNECTION_TYPE_MAP = {
         '0': "Dynamic IP",
         '1': 'Static IP',
@@ -50,10 +50,11 @@ class RouterConstants:
 class RouterConfig:
     """Configuration parameters for the router."""
     ENCODING: str = ("yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8"
-                   "ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70T"
-                   "OoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW")
+                     "ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70T"
+                     "OoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW")
     KEY: str = "RDpbLfCPsJZ7fiv"
     PAD_CHAR: str = chr(187)
+
 
 @dataclass
 class EncryptionState:
@@ -66,6 +67,7 @@ class EncryptionState:
         self.iv_aes = ''
         self.aes_string = ''
         self.token = ''
+
 
 class TplinkC80Router(AbstractRouter):
     DATA_REGEX = re.compile(r'id (\d+\|\d,\d,\d)\r\n(.*?)(?=\r\nid \d+\||$)', re.DOTALL)
@@ -102,8 +104,9 @@ class TplinkC80Router(AbstractRouter):
         self._encryption.iv_aes = RouterConstants.DEFAULT_AES_VALUE
         self._encryption.aes_string = f'k={self._encryption.key_aes}&i={self._encryption.iv_aes}'
 
-        # Encrypt AES string 
-        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(self._encryption.aes_string, self._encryption.nn_rsa, self._encryption.ee_rsa)
+        # Encrypt AES string
+        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(self._encryption.aes_string, self._encryption.nn_rsa,
+                                                             self._encryption.ee_rsa)
         # Register AES string for decryption on server side
         self.request(16, 0, True, data=f'set {aes_string_encrypted}')
         # Some auth request, might be redundant
@@ -114,14 +117,15 @@ class TplinkC80Router(AbstractRouter):
 
     def get_firmware(self) -> Firmware:
         text = '0|1,0,0'
-        
+
         body = self._encrypt_body(text)
 
         response = self.request(2, 1, True, data=body)
         response_text = self._decrypt_data(response.text)
         device_datamap = dict(line.split(" ", 1) for line in response_text.split("\r\n")[1:-1])
 
-        return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']), parse.unquote(device_datamap['softVer']))
+        return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']),
+                        parse.unquote(device_datamap['softVer']))
 
     def get_status(self) -> Status:
         mac_info_request = "1|1,0,0"
@@ -130,22 +134,23 @@ class TplinkC80Router(AbstractRouter):
         device_data_request = '13|1,0,0'
         all_requests = [
             mac_info_request, lan_ip_request, wan_ip_request, device_data_request,
-            RouterConstants.HOST_WIFI_2G_REQUEST, RouterConstants.HOST_WIFI_5G_REQUEST, RouterConstants.GUEST_WIFI_2G_REQUEST, 
-            RouterConstants.GUEST_WIFI_5G_REQUEST, RouterConstants.IOT_WIFI_2G_REQUEST, RouterConstants.IOT_WIFI_5G_REQUEST
+            RouterConstants.HOST_WIFI_2G_REQUEST, RouterConstants.HOST_WIFI_5G_REQUEST,
+            RouterConstants.GUEST_WIFI_2G_REQUEST, RouterConstants.GUEST_WIFI_5G_REQUEST,
+            RouterConstants.IOT_WIFI_2G_REQUEST, RouterConstants.IOT_WIFI_5G_REQUEST
         ]
         request_text = '#'.join(all_requests)
         body = self._encrypt_body(request_text)
 
         response = self.request(2, 1, True, data=body)
         response_text = self._decrypt_data(response.text)
-        
+
         matches = TplinkC80Router.DATA_REGEX.findall(response_text)
 
         data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
 
         def extract_value(response_list, prefix):
             return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
-        
+
         network_info = {
             'lan_mac': extract_value(data_blocks[mac_info_request], "mac 0 "),
             'wan_mac': extract_value(data_blocks[mac_info_request], "mac 1 "),
@@ -156,12 +161,12 @@ class TplinkC80Router(AbstractRouter):
         }
 
         wifi_status = {key: extract_value(data_blocks[request], "bEnable ") == '1'
-                  for key, request in RouterConstants.CONNECTION_REQUESTS_MAP.items()}
+                       for key, request in RouterConstants.CONNECTION_REQUESTS_MAP.items()}
 
         device_data_response = data_blocks[device_data_request]
 
         mapped_devices = self._parse_devices(device_data_response)
-        
+
         status = Status()
         status._wan_macaddr = EUI48(network_info['wan_mac'])
         status._lan_macaddr = EUI48(network_info['lan_mac'])
@@ -176,13 +181,17 @@ class TplinkC80Router(AbstractRouter):
         status.guest_5g_enable = wifi_status[Connection.GUEST_5G]
         status.iot_2g_enable = wifi_status[Connection.IOT_2G]
         status.iot_5g_enable = wifi_status[Connection.IOT_5G]
-        
+
         status.wired_total = sum(1 for device in mapped_devices if device.type == Connection.WIRED)
-        status.wifi_clients_total = sum(1 for device in mapped_devices if device.type in (Connection.HOST_2G, Connection.HOST_5G))
-        status.guest_clients_total = sum(1 for device in mapped_devices if device.type in (Connection.GUEST_2G, Connection.GUEST_5G))
-        status.iot_clients_total = sum(1 for device in mapped_devices if device.type in (Connection.IOT_2G, Connection.IOT_5G))
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total + status.iot_clients_total
-        
+        status.wifi_clients_total = sum(1 for device in mapped_devices
+                                        if device.type in (Connection.HOST_2G, Connection.HOST_5G))
+        status.guest_clients_total = sum(1 for device in mapped_devices
+                                         if device.type in (Connection.GUEST_2G, Connection.GUEST_5G))
+        status.iot_clients_total = sum(1 for device in mapped_devices
+                                       if device.type in (Connection.IOT_2G, Connection.IOT_5G))
+        status.clients_total = (status.wired_total + status.wifi_clients_total +
+                                status.guest_clients_total + status.iot_clients_total)
+
         status.devices = mapped_devices
         return status
 
@@ -209,14 +218,14 @@ class TplinkC80Router(AbstractRouter):
 
         response = self.request(2, 1, True, data=body)
         response_text = self._decrypt_data(response.text)
-        
+
         matches = TplinkC80Router.DATA_REGEX.findall(response_text)
 
         data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
 
         def extract_value(response_list, prefix):
             return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
-        
+
         network_info = {
             'lan_mac': extract_value(data_blocks[mac_info_request], "mac 0 "),
             'wan_mac': extract_value(data_blocks[mac_info_request], "mac 1 "),
@@ -246,6 +255,27 @@ class TplinkC80Router(AbstractRouter):
         ipv4status._lan_ipv4_netmask = IPv4Address(network_info['lan_mask'])
         return ipv4status
 
+    def get_ipv4_reservations(self) -> list[IPv4Reservation]:
+        body = self._encrypt_body('12|1,0,0')
+
+        response = self.request(2, 1, True, data=body)
+        response_text = self._decrypt_data(response.text)
+        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
+
+        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        return self._parse_reservations(data_blocks['12|1,0,0'])
+
+    def get_dhcp_leases(self) -> list[IPv4DHCPLease]:
+        body = self._encrypt_body('9|1,0,0')
+
+        response = self.request(2, 1, True, data=body)
+        response_text = self._decrypt_data(response.text)
+        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
+
+        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+
+        return self._parse_leases(data_blocks['9|1,0,0'])
+
     def _parse_devices(self, device_data_response: list[str]) -> list[Device]:
         device_dict = defaultdict(dict)
         for entry in device_data_response:
@@ -255,9 +285,9 @@ class TplinkC80Router(AbstractRouter):
         filtered_devices = [v for _, v in device_dict.items() if v.get("ip") != "0.0.0.0"]
 
         device_type_to_connection = {
-            0: Connection.WIRED, 
-            1: Connection.HOST_2G, 2: Connection.GUEST_2G, 
-            3: Connection.HOST_5G, 4: Connection.GUEST_5G, 
+            0: Connection.WIRED,
+            1: Connection.HOST_2G, 2: Connection.GUEST_2G,
+            3: Connection.HOST_5G, 4: Connection.GUEST_5G,
             13: Connection.IOT_2G, 14: Connection.IOT_5G
         }
 
@@ -269,12 +299,45 @@ class TplinkC80Router(AbstractRouter):
                 device['tag'] = connection_type
             else:
                 device['tag'] = Connection.UNKNOWN
-            
+
             device_to_add = Device(device['tag'], EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
             device_to_add.up_speed = int(device['up'])
             device_to_add.down_speed = int(device['down'])
             mapped_devices.append(device_to_add)
         return mapped_devices
+
+    def _parse_reservations(self, reservations_response: list[str]) -> list[IPv4Reservation]:
+        reservation_dict = defaultdict(dict)
+        for entry in reservations_response:
+            entry_list = entry.split(' ', 2)
+            if entry_list.__len__() == 3:
+                reservation_dict[int(entry_list[1])][entry_list[0]] = entry_list[2]
+            else:
+                reservation_dict[int(entry_list[1])][entry_list[0]] = ''
+
+        filtered_reservations = [v for _, v in reservation_dict.items() if v.get("ip") != "0.0.0.0"]
+
+        mapped_reservations: list[IPv4Reservation] = []
+        for reservation in filtered_reservations:
+            reservation_to_add = IPv4Reservation(EUI48(reservation['mac']), IPv4Address(reservation['ip']),
+                                                 reservation['name'], reservation['dhcpsEnable'] == '1')
+            mapped_reservations.append(reservation_to_add)
+        return mapped_reservations
+
+    def _parse_leases(self, reservations_response: list[str]) -> list[IPv4DHCPLease]:
+        leases_dict = defaultdict(dict)
+        for entry in reservations_response:
+            entry_list = entry.split(' ', 2)
+            leases_dict[int(entry_list[1])][entry_list[0]] = entry_list[2]
+
+        filtered_leases = [v for _, v in leases_dict.items() if v.get("ip") != "0.0.0.0"]
+
+        mapped_leases: list[IPv4DHCPLease] = []
+        for lease in filtered_leases:
+            lease_to_add = IPv4DHCPLease(EUI48(lease['mac']), IPv4Address(lease['ip']),
+                                         lease['hostName'], f'expires {lease["expires"]}')
+            mapped_leases.append(lease_to_add)
+        return mapped_leases
 
     @staticmethod
     def _encrypt_password(pwd: str, key: str = RouterConfig.KEY, encoding: str = RouterConfig.ENCODING) -> str:
@@ -285,9 +348,9 @@ class TplinkC80Router(AbstractRouter):
         result = []
         for i in range(max_len):
             result.append(encoding[(ord(pwd[i]) ^ ord(key[i])) % len(encoding)])
-        
+
         return "".join(result)
-    
+
     @staticmethod
     def _encode_token(encodedPassword: str, response: str) -> str:
         responseText = response.text.splitlines()
@@ -296,7 +359,7 @@ class TplinkC80Router(AbstractRouter):
 
         encodedToken = TplinkC80Router._encrypt_password(encodedPassword, authInfo1, authInfo2)
         return parse.quote(encodedToken, safe='!()*')
-    
+
     def _get_signature(self, datalen: int) -> str:
         encryption = self._encryption
         r = f'{encryption.aes_string}&s={str(int(encryption.seq) + datalen)}'
@@ -306,7 +369,7 @@ class TplinkC80Router(AbstractRouter):
             e += EncryptionWrapper.rsa_encrypt(r[n:53], encryption.nn_rsa, encryption.ee_rsa)
             n += 53
         return e
-    
+
     def _encrypt_body(self, text: str) -> str:
         encryption = self._encryption
 
@@ -318,7 +381,7 @@ class TplinkC80Router(AbstractRouter):
 
         sign = self._get_signature(len(data))
         return f'sign={sign}\r\ndata={data}'
-    
+
     def _decrypt_data(self, encrypted_text: str) -> str:
         key_bytes = self._encryption.key_aes.encode("utf-8")
         iv_bytes = self._encryption.iv_aes.encode("utf-8")
@@ -326,7 +389,7 @@ class TplinkC80Router(AbstractRouter):
         cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
         decrypted_padded = cipher.decrypt(b64decode(encrypted_text))
         return unpad(decrypted_padded, AES.block_size).decode("utf-8")
-   
+
     def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
         url = f"{self.host}/?code={code}&asyn={asyn}"
         if use_token:
