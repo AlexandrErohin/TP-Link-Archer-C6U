@@ -81,7 +81,7 @@ class TplinkC80Router(AbstractRouter):
 
     def supports(self) -> bool:
         response = self.request(2, 1, data='0|1,0,0')
-        return 'modelName Archer%20C80' in response.text
+        return response.status_code == 200 and response.text.startswith('00000')
 
     def authorize(self) -> None:
         encodedPassword = TplinkC80Router._encrypt_password(self.password)

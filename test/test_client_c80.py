@@ -12,8 +12,9 @@ from tplinkrouterc6u import (
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 
 class ResponseMock():
-    def __init__(self, text):
+    def __init__(self, text, status_code = 0):
         self.text = text
+        self.status_code = status_code
 
 class TplinkC80RouterTest(TplinkC80Router):
     response = ''
@@ -24,7 +25,7 @@ class TplinkC80RouterTest(TplinkC80Router):
             if token is None:
                 if data == '0|1,0,0':
                     # Supports
-                    return ResponseMock(self.response)
+                    return ResponseMock(self.response, 200)
                 else:
                     # Authorization
                     return ResponseMock('blabla\r\nblabla\r\nblabla\r\nauthinfo1\r\nauthinfo2')
