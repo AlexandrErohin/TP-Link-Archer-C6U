@@ -1,21 +1,21 @@
-import re
-import requests
 from dataclasses import dataclass
-from requests import Session
 from logging import Logger
+from urllib import parse
+from base64 import b64encode, b64decode
+from collections import defaultdict
+from ipaddress import IPv4Address
+import re
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from macaddress import EUI48
+import requests
+from requests import Session
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus
 from tplinkrouterc6u.client_abstract import AbstractRouter
-from urllib import parse
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-from base64 import b64encode, b64decode
-from macaddress import EUI48
-from ipaddress import IPv4Address
-from collections import defaultdict
 
 
 class RouterConstants:
@@ -84,11 +84,11 @@ class TplinkC80Router(AbstractRouter):
         return response.status_code == 200 and response.text.startswith('00000')
 
     def authorize(self) -> None:
-        encodedPassword = TplinkC80Router._encrypt_password(self.password)
+        encoded_password = TplinkC80Router._encrypt_password(self.password)
 
         # Get token encryption strings and encrypt the password
         response = self.request(2, 1)
-        self._encryption.token = TplinkC80Router._encode_token(encodedPassword, response)
+        self._encryption.token = TplinkC80Router._encode_token(encoded_password, response)
 
         # Get RSA exponent, modulus and sequence number
         response = self.request(16, 0, data='get')
@@ -201,7 +201,7 @@ class TplinkC80Router(AbstractRouter):
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         enable_string = f'bEnable {int(enable)}'
-        text = f'id {self.connection_requests[wifi]}\r\n{enable_string}'
+        text = f'id {RouterConstants.CONNECTION_REQUESTS_MAP[wifi]}\r\n{enable_string}'
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
 
@@ -350,13 +350,13 @@ class TplinkC80Router(AbstractRouter):
         return "".join(result)
 
     @staticmethod
-    def _encode_token(encodedPassword: str, response: str) -> str:
-        responseText = response.text.splitlines()
-        authInfo1 = responseText[RouterConstants.AUTH_TOKEN_INDEX1]
-        authInfo2 = responseText[RouterConstants.AUTH_TOKEN_INDEX2]
+    def _encode_token(encoded_password: str, response: str) -> str:
+        response_text = response.text.splitlines()
+        auth_info1 = response_text[RouterConstants.AUTH_TOKEN_INDEX1]
+        auth_info2 = response_text[RouterConstants.AUTH_TOKEN_INDEX2]
 
-        encodedToken = TplinkC80Router._encrypt_password(encodedPassword, authInfo1, authInfo2)
-        return parse.quote(encodedToken, safe='!()*')
+        encoded_token = TplinkC80Router._encrypt_password(encoded_password, auth_info1, auth_info2)
+        return parse.quote(encoded_token, safe='!()*')
 
     def _get_signature(self, datalen: int) -> str:
         encryption = self._encryption
@@ -403,4 +403,4 @@ class TplinkC80Router(AbstractRouter):
             return response
         except requests.exceptions.RequestException as e:
             self._logger.error(f"Network error: {e}")
-            raise ClientException(f"Network error: {str(e)}")
+            raise ClientException(f"Network error: {str(e)}") from e
