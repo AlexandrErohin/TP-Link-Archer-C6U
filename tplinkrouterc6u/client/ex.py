@@ -290,7 +290,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ret_code = self._parse_ret_val(response)
         error = ''
         if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
-            error = 'TplinkRouter - EX - Login failed, wrong user or password.'
+            error = ('TplinkRouter - EX - Login failed, wrong user or password. '
+                     'Try to pass user instead of admin in username')
         elif ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
             error = 'TplinkRouter - EX - Login failed. Generic error code: {}'.format(ret_code)
         elif ret_code != self.HTTP_RET_OK:
