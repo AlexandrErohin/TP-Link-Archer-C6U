@@ -26,6 +26,7 @@ from tplinkrouterc6u import (
     TPLinkEXClient,
     TPLinkXDRClient,
     TPLinkDecoClient,
+    TplinkC80Router,
     Connection
 )
 from logging import Logger
@@ -282,6 +283,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer C6 (v2.0, v3.0)
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
+- Archer C80 2.20
 - Archer C5400X V1
 - Archer GX90 v1.0
 - Archer MR200 (v5, v5.3, v6.0)
@@ -303,6 +305,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco X60 V3
 - Deco X90
 - Deco XE75 (v1.0, v2.0)
+- Deco XE75PRO (v3.0)
 - EX511 v2.0
 - HX510 v1.0
 - NX510v v1.0
@@ -313,6 +316,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR6500v
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
+- XC220-G3v v2.30
 
 ### Not fully tested Hardware Versions
 - AD7200 V2
