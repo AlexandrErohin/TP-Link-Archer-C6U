@@ -8,7 +8,7 @@ setuptools.setup(
     version="5.6.0",
     author="Alex Erohin",
     author_email="alexanderErohin@yandex.ru",
-    description="TP-Link Router API",
+    description="TP-Link and Mercusys Router API",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/AlexandrErohin/TP-Link-Archer-C6U",
