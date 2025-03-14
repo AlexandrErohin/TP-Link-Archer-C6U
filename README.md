@@ -1,5 +1,5 @@
-# TP-Link Router API
-Python package for API access and management for TP-Link Routers. See [Supported routers](#supports)
+# TP-Link and Mercusys Router API
+Python package for API access and management for TP-Link and Mercusys Routers. See [Supported routers](#supports)
 
 [![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
@@ -253,8 +253,11 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - VPN.PPTP_VPN
 
 ## <a id="supports">Supported routers</a>
-### Fully tested Hardware Versions
+- [TP-LINK routers](#tplink)
+- [MERCUSYS routers](#mercusys)
+### <a id="tplink">TP-LINK routers</a>
 - Archer A7 V5
+- Archer A8 1.0
 - Archer A9 V6
 - Archer AX10 v1.0
 - Archer AX12 v1.0
@@ -317,24 +320,11 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
 - XC220-G3v v2.30
+### <a id="mercusys">MERCUSYS routers</a>
+- MR47BE v1.0
+- H60XR 1.0
 
-### Not fully tested Hardware Versions
-- AD7200 V2
-- Archer A6 (V2 and V3)
-- Archer A10 (V1 and V2)
-- Archer A20 (V1, V3)
-- Archer C8 (V3 and V4)
-- Archer C9 (V4 and V5)
-- Archer C59 V2
-- Archer C90 V6
-- Archer C900 V1
-- Archer C1200 V3
-- Archer C1900 V2
-- Archer C4000 (V2 and V3)
-- Archer C5400 V2
-- TL-WR1043N V5
-
-Please let me know if you have tested integration with one of this or other model. Open an issue with info about router's model, hardware and firmware versions.
+Please let me know if you have tested integration with any other model. Open an issue with info about router's model, hardware and firmware versions.
 
 ## <a id="add_support">Adding Support For More Models</a>
 Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/master/CONTRIBUTING.md)
