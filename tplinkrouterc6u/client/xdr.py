@@ -22,6 +22,8 @@ class TPLinkXDRClient(AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
+        if self._verify_ssl is False:
+            self._session.verify = False
 
     def supports(self) -> bool:
         response = self._session.get(self.host, timeout=self.timeout, verify=self._verify_ssl)

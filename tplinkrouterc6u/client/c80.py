@@ -77,6 +77,8 @@ class TplinkC80Router(AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
+        if self._verify_ssl is False:
+            self._session.verify = False
         self._encryption = EncryptionState()
 
     def supports(self) -> bool:
@@ -161,8 +163,10 @@ class TplinkC80Router(AbstractRouter):
             'uptime': extract_value(data_blocks[wan_ip_request], "upTime ")
         }
 
-        wifi_status = {key: extract_value(data_blocks[request], "bEnable ") == '1'
-                       for key, request in RouterConstants.CONNECTION_REQUESTS_MAP.items()}
+        wifi_status = {}
+        for key, request in RouterConstants.CONNECTION_REQUESTS_MAP.items():
+            value = data_blocks.get(request)
+            wifi_status[key] = extract_value(data_blocks.get(request), "bEnable ") == '1' if value else None
 
         device_data_response = data_blocks[device_data_request]
 
@@ -396,7 +400,7 @@ class TplinkC80Router(AbstractRouter):
         if use_token:
             url += f"&id={self._encryption.token}"
         try:
-            response = self._session.post(url, data=data, timeout=self.timeout)
+            response = self._session.post(url, data=data, timeout=self.timeout, verify=self._verify_ssl)
             # Raises exception for 4XX/5XX status codes for all requests except 1st in authorize
             if not (code == 2 and asyn == 1 and use_token is False and data is None):
                 response.raise_for_status()
