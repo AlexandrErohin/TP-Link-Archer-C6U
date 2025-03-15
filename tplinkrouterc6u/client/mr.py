@@ -77,6 +77,8 @@ class TPLinkMRClientBase(AbstractRouter):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self.req = Session()
+        if self._verify_ssl is False:
+            self.req.verify = False
         self._token = None
         self._hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
         self._nn = None

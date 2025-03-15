@@ -1,4 +1,4 @@
-# TP-Link and Mercusys Router API
+# TP-Link Router API (supports also Mercusys Router)
 Python package for API access and management for TP-Link and Mercusys Routers. See [Supported routers](#supports)
 
 [![Pypi](https://img.shields.io/pypi/v/tplinkrouterc6u)](https://pypi.org/project/tplinkrouterc6u/)
@@ -283,9 +283,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer BE3600 1.6
 - Archer C1200 (v1.0, v2.0)
 - Archer C2300 (v1.0, v2.0)
-- Archer C6 (v2.0, v3.0)
+- Archer C6 (v2.0, v3.0, 4.0)
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
+- Archer C60 v2.0
 - Archer C80 (1.0, 2.20)
 - Archer C5400X V1
 - Archer GX90 v1.0

@@ -162,6 +162,106 @@ STATUS_RESPONSE_TEXT = ('00000\r\nid 1|1,0,0\r\nauthKey aaa3eKKee\r\nreserved\r\
                         '\r\nuMaxDownloadSpeed -1\r\nbwCtrlEnable 0\r\nenableBackup 0\r\nbTr069APEnable 0'
                         '\r\nbTr069SSIDEnable 0')
 
+STATUS_RESPONSE_IOT = ('00000\r\nid 1|1,0,0\r\nauthKey aaa3eKKee\r\nreserved\r\nsetWzd 8\r\nmode 1\r\n'
+                       'logLevel 3\r\nfastpath 1\r\nmac 0 00-00-00-00-00-00\r\nmac 1 00-00-00-00-00-01'
+                       '\r\nwanMacType 0\r\nmodelMergeCursor 8\r\nid 4|1,0,0\r\nip 192.168.0.1\r\n'
+                       'mask 255.255.255.0\r\nmode 0\r\nsmartIp 1\r\ngateway 192.168.0.1\r\nid 23|1,0,0'
+                       '\r\nip 100.100.100.100\r\nmask 255.255.252.0\r\ngateway 100.100.105.1\r\n'
+                       'dns 0 100.100.0.1\r\ndns 1 100.100.0.1\r\nstatus 1\r\ncode 0\r\nupTime 30814980'
+                       '\r\ninPkts 3014881\r\ninOctets 1502000045\r\noutPkts 8216676\r\noutOctets 2500478193'
+                       '\r\ninRates 337\r\noutRates 714\r\ndualMode 0\r\ndualIp 0.0.0.0\r\ndualMask 0.0.0.0'
+                       '\r\ndualGateway 0.0.0.0\r\ndualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\ndualCode 0'
+                       '\r\ndualStatus 0\r\ninternetDnsDetect 1\r\nid 13|1,0,0\r\nip 0 192.168.0.1\r\n'
+                       'ip 1 192.168.0.2\r\nip 2 192.168.0.3\r\nip 3 192.168.0.4\r\nip 4 192.168.0.5'
+                       '\r\nip 5 192.168.0.6\r\nmac 0 00-00-00-00-00-02\r\nmac 1 00-00-00-00-00-03'
+                       '\r\nmac 2 00-00-00-00-00-04\r\nmac 3 00-00-00-00-00-05\r\nmac 4 00-00-00-00-00-06'
+                       '\r\nmac 5 00-00-00-00-00-07\r\nbindEntry 0 0\r\nbindEntry 1 0\r\nbindEntry 2 0'
+                       '\r\nbindEntry 3 0\r\nbindEntry 4 0\r\nbindEntry 5 0\r\nstaMgtEntry 0 0\r\n'
+                       'staMgtEntry 1 0\r\nstaMgtEntry 2 0\r\nstaMgtEntry 3 0\r\nstaMgtEntry 4 1'
+                       '\r\nstaMgtEntry 5 0\r\ntype 0 3\r\ntype 1 1\r\ntype 2 2\r\ntype 3 1\r\ntype 4 13'
+                       '\r\ntype 5 0\r\nonline 0 0\r\nonline 1 0\r\nonline 2 1\r\nonline 3 1\r\nonline 4 1'
+                       '\r\nonline 5 1\r\nblocked 0 0\r\nblocked 1 0\r\nblocked 2 0\r\nblocked 3 0\r\n'
+                       'blocked 4 0\r\nblocked 5 0\r\nqosPrior 0 0\r\nqosPrior 1 0\r\nqosPrior 2 0\r\n'
+                       'qosPrior 3 0\r\nqosPrior 4 0\r\nqosPrior 5 0\r\nup 0 0\r\nup 1 0\r\nup 2 30\r\n'
+                       'up 3 800\r\nup 4 1824\r\nup 5 600\r\ndown 0 0\r\ndown 1 0\r\ndown 2 200\r\n'
+                       'down 3 400\r\ndown 4 800\r\ndown 5 50\r\nupLimit 0 204800\r\nupLimit 1 204800\r\n'
+                       'upLimit 2 204800\r\nupLimit 3 204800\r\nupLimit 4 204800\r\nupLimit 5 204800\r\n'
+                       'downLimit 0 1048576\r\ndownLimit 1 1048576\r\ndownLimit 2 1048576\r\n'
+                       'downLimit 3 1048576\r\ndownLimit 4 1048576\r\ndownLimit 5 1048576\r\nname 0 Laptop'
+                       '\r\nname 1 iPhone\r\nname 2 Laptop2\r\nname 3 iPhone2\r\nname 4 IoT_thing\r\n'
+                       'name 5 PC\r\nuBandwidth 0 0\r\nuBandwidth 1 0\r\nuBandwidth 2 0\r\nuBandwidth 3 0'
+                       '\r\nuBandwidth 4 0\r\nuBandwidth 5 0\r\nuStandard 0 0\r\nuStandard 1 0\r\n'
+                       'uStandard 2 0\r\nuStandard 3 2\r\nuStandard 4 2\r\nuStandard 5 0\r\ndevType 0 0'
+                       '\r\ndevType 1 0\r\ndevType 2 0\r\ndevType 3 0\r\ndevType 4 0\r\ndevType 5 0\r\n'
+                       'priTime 0 0\r\npriTime 1 0\r\npriTime 2 0\r\npriTime 3 0\r\npriTime 4 0\r\n'
+                       'priTime 5 0\r\nleaseTime 0 0\r\nleaseTime 1 0\r\nleaseTime 2 0\r\nleaseTime 3 0'
+                       '\r\nleaseTime 4 0\r\nleaseTime 5 0\r\ntotalVal 0 450\r\ntotalVal 1 5\r\n'
+                       'totalVal 2 13\r\ntotalVal 3 956\r\ntotalVal 4 13\r\ntotalVal 5 53\r\ntotalUnit 0 2'
+                       '\r\ntotalUnit 1 2\r\ntotalUnit 2 2\r\ntotalUnit 3 2\r\ntotalUnit 4 2\r\n'
+                       'totalUnit 5 2\r\ndhcpsEntry 0 0\r\ndhcpsEntry 1 0\r\ndhcpsEntry 2 0\r\n'
+                       'dhcpsEntry 3 0\r\ndhcpsEntry 4 0\r\ndhcpsEntry 5 0\r\nduration 0 0\r\n'
+                       'duration 1 0\r\nduration 2 0\r\nduration 3 73\r\nduration 4 5388\r\n'
+                       'duration 5 8559\r\ntxRate 0 0\r\ntxRate 1 0\r\ntxRate 2 0\r\ntxRate 3 156\r\n'
+                       'txRate 4 130\r\ntxRate 5 0\r\nrxRate 0 0\r\nrxRate 1 0\r\nrxRate 2 0\r\n'
+                       'rxRate 3 130\r\nrxRate 4 173\r\nrxRate 5 0\r\naveRssi 0 0\r\naveRssi 1 0\r\n'
+                       'aveRssi 2 0\r\naveRssi 3 33\r\naveRssi 4 46\r\naveRssi 5 0\r\nslEnable 0 0\r\n'
+                       'slEnable 1 0\r\nslEnable 2 0\r\nslEnable 3 0\r\nslEnable 4 0\r\nslEnable 5 0'
+                       '\r\npriScheStatus 0 0\r\npriScheStatus 1 0\r\npriScheStatus 2 0\r\n'
+                       'priScheStatus 3 0\r\npriScheStatus 4 0\r\npriScheStatus 5 0\r\nstart 0 0\r\n'
+                       'start 1 0\r\nstart 2 0\r\nstart 3 0\r\nstart 4 0\r\nstart 5 0\r\nend 0 0\r\n'
+                       'end 1 0\r\nend 2 0\r\nend 3 0\r\nend 4 0\r\nend 5 0\r\nday 0 0\r\nday 1 0\r\n'
+                       'day 2 0\r\nday 3 0\r\nday 4 0\r\nday 5 0\r\nstartMin 0 0\r\nstartMin 1 0\r\n'
+                       'startMin 2 0\r\nstartMin 3 0\r\nstartMin 4 0\r\nstartMin 5 0\r\nendMin 0 0\r\n'
+                       'endMin 1 0\r\nendMin 2 0\r\nendMin 3 0\r\nendMin 4 0\r\nendMin 5 0\r\nrate 0 0'
+                       '\r\nrate 1 0\r\nrate 2 0\r\nrate 3 156\r\nrate 4 173\r\nrate 5 0\r\ntxPkt 0 0'
+                       '\r\ntxPkt 1 0\r\ntxPkt 2 0\r\ntxPkt 3 42602\r\ntxPkt 4 119683\r\ntxPkt 5 0'
+                       '\r\nrxPkt 0 0\r\nrxPkt 1 0\r\nrxPkt 2 0\r\nrxPkt 3 6343\r\nrxPkt 4 275076\r\n'
+                       'rxPkt 5 0\r\nid 33|1,1,0\r\nuUnit 0\r\ncSsidPrefix\r\nuRadiusIp 0.0.0.0\r\n'
+                       'uRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\nuKeyLength 1 0'
+                       '\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0\r\ncKeyVal 1\r\ncKeyVal 2\r\n'
+                       'cKeyVal 3\r\nuRadiusPort 1812\r\nuKeyType 0\r\nuDefaultKey 1\r\nbEnable 1\r\n'
+                       'bBcastSsid 1\r\ncSsid TP-Link\r\nbSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3'
+                       '\r\nuRadiusSecOpt 3\r\nuPSKSecOpt 2\r\nuRadiusEncryptType 1\r\nuPSKEncryptType 3'
+                       '\r\ncRadiusSecret\r\ncPskSecret admin\r\nbSecCheck 0\r\nbEnabled 1\r\n'
+                       'cUsrPIN 11100111\r\nbConfigured 1\r\nbIsLocked 0\r\nbEnRtPIN 1\r\n'
+                       'bWifiBtnRecEnable 1\r\nuVid 0\r\nbMumimo 0\r\nbMwdsEnable 0\r\nbLanAccess 1'
+                       '\r\nSecurityType 2\r\nbApIsolated 0\r\neffectiveTime 0\r\nuMaxUploadSpeed -1'
+                       '\r\nuMaxDownloadSpeed -1\r\nbwCtrlEnable 0\r\nenableBackup 1\r\nbTr069APEnable 0'
+                       '\r\nbTr069SSIDEnable 0\r\nid 33|2,1,0\r\nuUnit 0\r\ncSsidPrefix\r\nuRadiusIp 0.0.0.0'
+                       '\r\nuRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\nuKeyLength 1 0'
+                       '\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0\r\ncKeyVal 1\r\ncKeyVal 2\r\n'
+                       'cKeyVal 3\r\nuRadiusPort 1812\r\nuKeyType 0\r\nuDefaultKey 1\r\nbEnable 1\r\n'
+                       'bBcastSsid 1\r\ncSsid TP-Link\r\nbSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3'
+                       '\r\nuRadiusSecOpt 3\r\nuPSKSecOpt 2\r\nuRadiusEncryptType 1\r\nuPSKEncryptType 3'
+                       '\r\ncRadiusSecret\r\ncPskSecret admin\r\nbSecCheck 0\r\nbEnabled 1\r\n'
+                       'cUsrPIN 11100111\r\nbConfigured 1\r\nbIsLocked 0\r\nbEnRtPIN 1\r\nbWifiBtnRecEnable 1'
+                       '\r\nuVid 0\r\nbMumimo 0\r\nbMwdsEnable 0\r\nbLanAccess 1\r\nSecurityType 2\r\n'
+                       'bApIsolated 0\r\neffectiveTime 0\r\nuMaxUploadSpeed -1\r\nuMaxDownloadSpeed -1\r\n'
+                       'bwCtrlEnable 0\r\nenableBackup 1\r\nbTr069APEnable 0\r\nbTr069SSIDEnable 0\r\n'
+                       'id 33|1,2,0\r\nuUnit 1\r\ncSsidPrefix Guest\r\nuRadiusIp 0.0.0.0\r\n'
+                       'uRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\nuKeyLength 1 0'
+                       '\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0\r\ncKeyVal 1\r\ncKeyVal 2\r\n'
+                       'cKeyVal 3\r\nuRadiusPort 1812\r\nuKeyType 0\r\nuDefaultKey 1\r\nbEnable 0\r\n'
+                       'bBcastSsid 1\r\ncSsid TP-Link_Guest\r\nbSecurityEnable 0\r\nuAuthType 3\r\n'
+                       'uWEPSecOpt 3\r\nuRadiusSecOpt 3\r\nuPSKSecOpt 3\r\nuRadiusEncryptType 1\r\n'
+                       'uPSKEncryptType 3\r\ncRadiusSecret\r\ncPskSecret\r\nbSecCheck 0\r\nbEnabled 1'
+                       '\r\ncUsrPIN 11100111\r\nbConfigured 0\r\nbIsLocked 0\r\nbEnRtPIN 0\r\n'
+                       'bWifiBtnRecEnable 1\r\nuVid 0\r\nbMumimo 0\r\nbMwdsEnable 0\r\nbLanAccess 0'
+                       '\r\nSecurityType 1\r\nbApIsolated 1\r\neffectiveTime 0\r\nuMaxUploadSpeed -1'
+                       '\r\nuMaxDownloadSpeed -1\r\nbwCtrlEnable 0\r\nenableBackup 0\r\nbTr069APEnable 0'
+                       '\r\nbTr069SSIDEnable 0\r\nid 33|2,2,0\r\nuUnit 1\r\ncSsidPrefix Guest\r\n'
+                       'uRadiusIp 0.0.0.0\r\nuRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\n'
+                       'uKeyLength 0 0\r\nuKeyLength 1 0\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\n'
+                       'cKeyVal 0\r\ncKeyVal 1\r\ncKeyVal 2\r\ncKeyVal 3\r\nuRadiusPort 1812\r\n'
+                       'uKeyType 0\r\nuDefaultKey 1\r\nbEnable 0\r\nbBcastSsid 1\r\ncSsid TP-Link_Guest_5G'
+                       '\r\nbSecurityEnable 0\r\nuAuthType 3\r\nuWEPSecOpt 3\r\nuRadiusSecOpt 3\r\n'
+                       'uPSKSecOpt 3\r\nuRadiusEncryptType 1\r\nuPSKEncryptType 3\r\ncRadiusSecret\r\n'
+                       'cPskSecret\r\nbSecCheck 0\r\nbEnabled 1\r\ncUsrPIN 11100111\r\nbConfigured 0\r\n'
+                       'bIsLocked 0\r\nbEnRtPIN 0\r\nbWifiBtnRecEnable 1\r\nuVid 0\r\nbMumimo 0\r\n'
+                       'bMwdsEnable 0\r\nbLanAccess 0\r\nSecurityType 1\r\nbApIsolated 1\r\neffectiveTime 0'
+                       '\r\nuMaxUploadSpeed -1\r\nuMaxDownloadSpeed -1\r\nbwCtrlEnable 0\r\nenableBackup 0'
+                       '\r\nbTr069APEnable 0\r\nbTr069SSIDEnable 0')
+
 
 class ResponseMock():
     def __init__(self, text, status_code=0):
@@ -429,6 +529,39 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'PC')
         self.assertEqual(device.up_speed, 600)
         self.assertEqual(device.down_speed, 50)
+
+    def test_get_status_without_iot(self) -> None:
+        client = TplinkC80RouterTest('', '')
+        client.authorize()
+
+        client.set_encrypted_response(STATUS_RESPONSE_IOT)
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, '00-00-00-00-00-01')
+        self.assertIsInstance(status.wan_macaddress, EUI48)
+        self.assertEqual(status.lan_macaddr, '00-00-00-00-00-00')
+        self.assertIsInstance(status.lan_macaddress, EUI48)
+        self.assertEqual(status.wan_ipv4_addr, '100.100.100.100')
+        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
+        self.assertEqual(status.lan_ipv4_addr, '192.168.0.1')
+        self.assertEqual(status.wan_ipv4_gateway, '100.100.105.1')
+        self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
+        self.assertEqual(status.wired_total, 1)
+        self.assertEqual(status.wifi_clients_total, 1)
+        self.assertEqual(status.guest_clients_total, 1)
+        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.iot_clients_total, 1)
+        self.assertFalse(status.guest_2g_enable)
+        self.assertFalse(status.guest_5g_enable)
+        self.assertIsNone(status.iot_2g_enable)
+        self.assertIsNone(status.iot_5g_enable)
+        self.assertTrue(status.wifi_2g_enable)
+        self.assertTrue(status.wifi_5g_enable)
+        self.assertEqual(status.wan_ipv4_uptime, 308149)
+        self.assertEqual(status.mem_usage, None)
+        self.assertEqual(status.cpu_usage, None)
+        self.assertEqual(len(status.devices), 6)
 
     def test_get_ipv4(self) -> None:
         client = TplinkC80RouterTest('', '')
