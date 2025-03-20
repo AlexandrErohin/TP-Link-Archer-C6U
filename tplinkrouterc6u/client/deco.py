@@ -1,5 +1,7 @@
 from base64 import b64decode
 from json import dumps
+from requests.exceptions import ConnectTimeout
+from collections.abc import Callable
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
@@ -148,6 +150,22 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         ipv4_status._lan_ipv4_netmask = get_ip(element if element else '0.0.0.0')
 
         return ipv4_status
+
+    def authorize(self) -> None:
+        self._retry_request(super().authorize)
+
+    def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+        return self._retry_request(super().request, path, data, ignore_response, ignore_errors)
+
+    def _retry_request(self, callback: Callable, *args):
+        retries = 0
+        while True:
+            try:
+                return callback(*args)
+            except ConnectTimeout as err:
+                if retries > 2:
+                    raise err
+                retries += 1
 
     def _map_wire_type(self, data: dict) -> Connection:
         if data.get('wire_type') == 'wired':

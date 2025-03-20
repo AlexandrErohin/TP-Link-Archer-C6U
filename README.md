@@ -261,8 +261,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer A9 V6
 - Archer AX10 v1.0
 - Archer AX12 v1.0
-- Archer AX20 v1.0
-- Archer AX20 v3.0
+- Archer AX20 (v1.0, v3.0)
 - Archer AX21 (v1.20, v3.0)
 - Archer AX23 (v1.0, v1.2)
 - Archer AX50 v1.0
@@ -286,6 +285,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer C6 (v2.0, v3.0, 4.0)
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
+- Archer C24 (1.0, 2.0)
 - Archer C60 v2.0
 - Archer C80 (1.0, 2.20)
 - Archer C5400X V1
@@ -318,11 +318,13 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR105
 - TL-MR6400 (v5, v5.3)
 - TL-MR6500v
+- TL-WA1201 3.0
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
 - XC220-G3v v2.30
 ### <a id="mercusys">MERCUSYS routers</a>
 - MR47BE v1.0
+- MR50G 1.0
 - H60XR 1.0
 
 Please let me know if you have tested integration with any other model. Open an issue with info about router's model, hardware and firmware versions.
