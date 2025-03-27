@@ -8,7 +8,6 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
-from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from bs4 import BeautifulSoup
 
@@ -74,7 +73,9 @@ class WDRRequest:
     _headers_login = {}
     _data_block = 'data'
 
-
+    def buildUrl(self,section:str):
+        return '{}/userRpm{}'.format(self.host, dataUrls[section])
+    
     def request(self, section: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> str | None:
 
         def __buildUrl(section:str):
@@ -97,27 +98,29 @@ class WDRRequest:
         response = get(     # post(
             url,
             data=self._prepare_data(data),
-            headers=self._headers_request,
-            timeout=self.timeout,
-            verify=self._verify_ssl,
+            headers = self._headers_request,
+            timeout = self.timeout,
+            verify = self._verify_ssl,
         )
 
         data = response.content   #better than .text  for later parsing
         if response.ok:
+
             if ignore_response:
                  return None
             return data
         else:
             if ignore_errors:
                 return data
-            
+            if section == 'check':
+                return response
             error = ''
 
             error = ('WDRRouter - {} - Response with error; Request {} - Response {}'
             .format(self.__class__.__name__, path, data)) if not error else error
             if self._logger:
                 self._logger.debug(error)
-            print(error)
+
             raise ClientError
 
     def _is_valid_response(self, data: str) -> bool:
