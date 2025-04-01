@@ -12,7 +12,7 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 
 from dataclasses import dataclass
 from html.parser import HTMLParser
-# from bs4 import BeautifulSoup
+
 
 dataUrls = {
   'check':"/StatusRpm.htm" ,  
@@ -47,14 +47,11 @@ dataUrls = {
   'defReferer':"/MenuRpm.htm",
   ## routing
   'sysroute':"/SysRouteTableRpm.htm",
-  'forwarding':"/VirtualServerRpm.htm",
+  'portFwd':"/VirtualServerRpm.htm",
   'upnpFwd':"/UpnpCfgRpm.htm",
   ## Reboot
   'reboot': "/SysRebootHelpRpm.htm"
 }
-
-
-
 
 def defaultHeaders():
     return  { # default headers for all requests
@@ -76,12 +73,12 @@ class NetInfo:
         self.wlan24Gcfg = {}
         self.wlan24Gsec = {}
         self.wlan24Gadv = {}
-        self.wlan24Gcli:list[Device] = []
+        self.wlan24Gcli: list[Device] = []
         
         self.wlan50Gcfg = {}
         self.wlan50Gsec = {}
         self.wlan50Gadv = {}
-        self.wlan50Gcli:list[Device] = []
+        self.wlan50Gcli: list[Device] = []
 
         self.guest24Gcfg = {}
         self.guest50Gcfg = {}
@@ -90,7 +87,7 @@ class NetInfo:
         self.routing = {}
         self.fwd_static = {}
         self.fwd_pnp = {}
-
+        self.dhcp_cfg = {}
         self.security = {}
 
 class muParser(HTMLParser):
@@ -119,7 +116,6 @@ class muParser(HTMLParser):
         if (self.cTag == self.tag):
             self.cBlock += data
 
-
 class WDRRequest:
     host = ''
     credentials = ''
@@ -140,7 +136,7 @@ class WDRRequest:
 
         if not self._headers_request:
             self._headers_request = defaultHeaders()
-        
+
         ## add xtra headers: User-Agent, Authorization and Referer
 
         self._headers_request['Referer'] = self.buildUrl("defReferer")
@@ -152,12 +148,13 @@ class WDRRequest:
         if section == "reboot":
             url = url+'?Reboot=Reboot'
 
-        # if section == "dhcpreserve":
-        #     print(f'_request GET {url}')
-        #     print(f'_request headers {self._headers_request}')
+        # Always GET, so data always is a query
+        if data:
+            url = url+f'?{data}'
+
         response = get(     # post(
             url,
-            data=self._prepare_data(data),
+            # data=self._prepare_data(data),
             headers = self._headers_request,
             timeout = self.timeout,
             verify = self._verify_ssl,
@@ -206,18 +203,21 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
 
         # device data
         self.status: Status = {}
+        self.brand = "TP-Link"
         self.firmware: Firmware = {}
-        self.ipv4status: IPv4Status = {}
-        self.network : NetInfo = {}
+        self.hostname = ""
+        self.ipv4status: IPv4Status = IPv4Status()
+        self.network : NetInfo = NetInfo()
         self.ipv4Reserves: list [IPv4Reservation] = []
         self.dhcpLeases: list [IPv4DHCPLease] = []
         self.connDevices: list [Device] = []
         self.pending = {
             "status":  True, 
             "network" : True, 
+            "reserves" : True,
+            "leases" : True,
             "devices": True
             }
-
    
     # N/A. WDR family has no session support , so no "logged" state
     def authorize(self) -> None:
@@ -227,6 +227,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         pass
 
     def supports(self) -> bool:
+        
         ## check a simple request where the router identifies itself
         response :Response = self.request("check", '')
         return response.status_code == 200 and "WDR" in response.headers["www-authenticate"]
@@ -244,20 +245,20 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     def get_ipv4_status(self) -> IPv4Status:
         if self.pending['network'] == True:
             self._updateNet()
-        return self.network.ipv4
+        return self.ipv4status
     
     def get_ipv4_reservations(self):
-        if self.pending['network'] == True:
+        if self.pending['reserves'] == True:
             self._updateNet()
         return self.ipv4Reserves        
 
     def get_ipv4_dhcp_leases(self):
-        if self.pending['network'] == True:
+        if self.pending['leases'] == True:
             self._updateNet()
         return self.dhcpLeases        
 
     def get_clients(self):
-        if self.pending['network'] == True:
+        if self.pending['devices'] == True:
             self._updateNet()
         return self.status.devices
         
@@ -266,9 +267,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         self.request('reboot', 'Reboot=Reboot', True)
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        # main wifi cannot be activated /deactivvated via software. ONly by the phisical button
-        # Saved changes won't activate until next reboot
-        return None
+        # main wifi cannot be activated / deactivated via software. Only by the phisical button
+        # Guest wifi can, but saved changes won't activate until next reboot
         if wifi == Connection.GUEST_2G:
             section = "wgsettings"
             query ='setNetworkMode=1'
@@ -292,7 +292,9 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     def _updateStatus(self) -> None:
         raw = self.request("summary", "")
         self._parseSummary(raw)   
-        self.pending['status'] == False
+        if self.pending['network'] == True:
+            self._updateNet()
+        self.pending['status'] = False
 
     def _updateNet(self) -> None:
         sections = "netWan,netLan,dualBand,"
@@ -300,52 +302,47 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         sections += "w50settings,w50wps,w50sec,w50adv,"
         sections += "wgsettings,wgshare,dhcpconfig,dhcplease,"
         sections += "sysroute,upnpFwd"
-        section_list = sections.split(',')
-        raw:str =''
-        for section in section_list: self._updateSection(section)
-            # raw = self.request(section, "")
-            # self._parseSection(section,raw)
-        
-        multiPage_list = "w24stations,w50stations,dhcpreserve,forwarding".split(",")
 
-        for section in multiPage_list: self._updateMultiSection(section)
+        section_list = sections.split(',')
+        for section in section_list: 
+            self._updateSection(section)
+        
+        multiPage_list = "w24stations,w50stations,dhcpreserve,portFwd".split(",")
+        for section in multiPage_list: 
+            self._updateMultiSection(section)
         
         self._updateDevices()
-        self.pending['network'] == False 
+        self.pending['network'] = False 
 
     def _updateDevices(self):
         # get the wLan clients
         # get DHCP leases
         # Build wired client list by diff DHCP Leases with Wlan clients list
-   
+        if self.pending["devices"] == False:
+            return
+        
         isWireless: list = []
         
-        print ("_UD:0", self.network)
         w24s:list = self.network.wlan24Gcli
         
         for wl24 in w24s:
             _dev : HostId = self._findHostInLeases(wl24[0])
-            aDev = [
-                Connection.HOST_2G, 
-                wl24[0],_dev.ipaddr ,_dev.host,
-                wl24[3], wl24[2],
-                None,None,None
-                ]
-            thisone= Device(aDev[0], aDev[1], aDev[2], aDev[3], aDev[4], aDev[5], None, None, None) 
+            thisone = Device(Connection.HOST_2G, wl24[0],_dev.ipaddr ,_dev.host,)
+            thisone.packets_received = wl24[3]
+            thisone.packets_sent = wl24[2]
+
             self.connDevices.append(thisone)
-            isWireless.append(aDev[1])
+            isWireless.append(wl24[0])
 
         w50s = self.network.wlan50Gcli
         for wl50 in w50s:
             _dev : HostId = self._findHostInLeases(wl50[0])
-            aDev = [
-                Connection.HOST_5G, 
-                wl50[0],_dev.ipaddr ,_dev.host,
-                wl50[3], wl50[2],
-                None,None,None
-                ]
-            thisone= Device(aDev[0], aDev[1], aDev[2], aDev[3], aDev[4], aDev[5], None, None, None) 
+            thisone = Device(Connection.HOST_5G, wl50[0],_dev.ipaddr ,_dev.host,)
+            thisone.packets_received = wl50[3]
+            thisone.packets_sent = wl50[2]
+
             self.connDevices.append(thisone)
+            isWireless.append(wl50[0])
             
         self.status.wifi_clients_total = len(isWireless)
 
@@ -356,45 +353,163 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
 
         for client in connected:
             if not client.macaddr in isWireless:
-                thisone= Device(Connection.WIRED, client.macaddr, client.ipaddr, client.hostname, None, None, wired_speed, wired_speed, None)
+                thisone= Device(Connection.WIRED, client.macaddr, client.ipaddr, client.hostname) 
+                thisone.up_speed = wired_speed
+                thisone.down_speed = wired_speed
                 self.connDevices.append(thisone) 
 
-        self.pending['devices'] = False
+        self.status.devices = self.connDevices
 
+        wifiCli = len(isWireless)
+        totalCli = len(self.dhcpLeases)
+        wiredCli = totalCli - wifiCli
+
+        self.status.wifi_clients_total = wifiCli
+        self.status.guest_clients_total = 0
+        self.status.clients_total = totalCli
+        self.status.wired_total = wiredCli
+
+        self.pending['devices'] = False
 
     def _updateSection(self,section:str) -> None:
         raw = self.request(section, "")
         data = self._parseRawHTML(raw)
         self._parseSection(section,data) 
 
-    def _updateMultiSection(self,section:str) -> None:
-        # print(f'_uMP.0 {section}')
-        if section == "w24stations":
-            pass
-        elif section == "w50stations":        
-            pass
-        elif section == "dhcpreserve":
-            # var dhcpList = new Array("30-5A-3A-7F-5E-CC", "192.168.1.16", 1, "40-E2-30-42-08-4F", "192.168.1.71", 1, ...0,0 );
-            # var DHCPStaticPara = new Array(1,1,8,3,8,0,0 );
-            # var DHCPStaticPara = new Array(2,1,8,3,8,0,0 );
-            # var DHCPStaticPara = new Array(3,0,3,3,8,0,0 );
+    def _updateMultiSection(self, section:str) -> None:
+        ## For asection with potentially more than one page
+        if section == "w24stations" or section == "w50stations":  
             raw = self.request(section, "")
             data = self._parseRawHTML(raw)
+            mainData= data['script0']
+            listData: list = data['script1']
+            numTotal = mainData[0] - (mainData[1]-1)  * mainData[2]
+
+            nextPage = False
+            if numTotal > mainData[2]:
+                numTotal = mainData[2]
+                nextPage = True
+                        
+            while (nextPage):
+                query = 'Page=+int(mainData[1]+1'
+                raw = self.request(section, query)
+                nextPage = False
+                data = self._parseRawHTML(raw)
+                mainData= data['script0']
+                listData.extend(data['script1'])
+                numTotal = mainData[0] - (mainData[1]-1)  * mainData[2]
+                if numTotal > mainData[2]:
+                    numTotal = mainData[2]
+                    nextPage = True
+
+            self._parseSection(section, {'script0' : mainData, 'script1' : listData })
+
+        elif section == "dhcpreserve" and self.pending['reserves'] == True:
+            raw = self.request(section, "")
+            data = self._parseRawHTML(raw)
+
             currpage = int(data['script1'][0])
-            lastpage = int(data['script1'][0])
+            lastpage = int(data['script1'][3])
             tmpData = {}
             while currpage < lastpage:
-                query=f'Page={str(currPage + 1)}'
+                query=f'Page={str(currpage + 1)}'
                 raw = self.request( section, query) 
-
                 tmpData = self._parseRawHTML(raw)  
+
                 tArr=tmpData['script0']
                 for item in tArr:
                     data['script0'].append(item)
-                #tmpData["script00"].map(e => data["script00"].push(e))
 
-                currPage=int(tmpData['script1'][0])  
+                currpage = int(tmpData['script1'][0])  
+                lastpage = int(tmpData['script1'][3])
+                data['script1'] = tmpData['script1']
 
+            self._parseSection(section, data)
+
+        elif section == "portFwd":
+            # TODO
+            pass 
+
+    def _parseSection(self, section:str, data:dict) -> None:
+       
+        if section == "netLan":
+            ## var lanPara = new Array("C4-6E-1F-41-67-C0","192.168.1.254",2,"255.255.255.0",1,0,0 );          
+            lanData = data['script0']  
+            self.ipv4status._lan_ipv4_netmask = lanData[3]
+            self.network.ipv4['igmpProxy'] = lanData[4]
+            self.ipv4status.lan_ipv4_dhcp_enable = False
+            
+        elif section == "netWan":
+            wanData =data['script1']
+            conn_type = self._get_conn_type(wanData[0]-1)
+            self.status.conn_type = conn_type or "unknown"
+            self.ipv4status._wan_ipv4_conntype = conn_type or "unknown"
+
+            # self.ipv4status._wan_ipv4_ipaddr= wanData[13] or '0.0.0.0'
+            self.ipv4status._wan_ipv4_netmask = wanData[14] or '0.0.0.0'
+            # self.ipv4status._wan_ipv4_gateway = wanData[15] or '0.0.0.0'
+
+            self.ipv4status._wan_ipv4_pridns = '0.0.0.0'
+            self.ipv4status._wan_ipv4_snddns = '0.0.0.0'
+
+            if wanData[19] == '1':
+                self.ipv4status._wan_ipv4_pridns = wanData[20] 
+                self.ipv4status._wan_ipv4_snddns = wanData[22]
+            
+            self.hostname = wanData[26]
+            
+        elif section == "dualBand":
+            pass
+        elif section == "w24settings" or section == "w50settings":
+            # TODO
+            pass
+        elif section == "w24sec" or section == "w50sec":
+            # TODO
+            pass
+        elif section == "w24adv" or section == "w50adv":
+            # TODO            
+            pass
+        elif section == "w24stations" or section == "w50stations":
+            listData = data['script1']
+            if len(listData) > 3:
+                for i in range(0, len(listData), 4):
+                    tmpcli = [ listData[i], int(listData[i+1]), int(listData[i+2]), int(listData[i+3])]
+                    if section == "w24stations":
+                        self.network.wlan24Gcli.append(tmpcli)
+                    elif section == "w50stations":
+                        self.network.wlan50Gcli.append(tmpcli)
+        elif section == "wgsettings":
+            guestData = data['script3']
+            self.status.guest_2g_enable = bool(int(guestData[2]))
+            self.status.guest_5g_enable = bool(int(guestData[3]))
+
+        elif section == "wgshare":
+            # TODO            
+            pass   
+        elif section == "sysroute":
+            # TODO            
+            pass   
+        elif section == "portFwd":
+            # TODO            
+            pass          
+        elif section == "upnpFwd":
+            # TODO            
+            pass  
+        elif section == "dhcpconfig":
+            cfg = data['script0']
+            if cfg[0] == 1:
+                self.ipv4status.lan_ipv4_dhcp_enable = True
+            oCfg= {}
+            oCfg['enabled'] = bool(int(cfg[0]))
+            oCfg['range_start'] = cfg[1]
+            oCfg['range_end'] = cfg[2]
+            oCfg['lease_time'] =  int(cfg[3])
+            oCfg['gateway'] = cfg[4]
+            oCfg['domain'] = cfg[5] or None
+            oCfg['dns_pri'] = cfg[6] or None
+            oCfg['dns_sec'] = cfg[7] or None
+            self.network.dhcp_cfg = oCfg
+        elif section == "dhcpreserve" and self.pending['reserves'] == True:
             item : IPv4Reservation = {}   
             for i in range(0,len(data['script0']), 3):
                 _dev: HostId = self._findHostInLeases(data['script0'][i])
@@ -404,64 +519,61 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                     _dev.host,
                     bool(int(data['script0'][i+2]))
                     )
-                # print( "RES", data['script0'][i], data['script0'][i+1], data['script0'][i+2])
                 self.ipv4Reserves.append(item)
-        elif section == "forwarding":
-            pass 
-        
+                self.pending['reserves'] = False
+        elif section == "dhcplease" and self.pending['leases'] == True:
+ 
+            for i in range(0,len(data['script0']), 4):
+                item = IPv4DHCPLease(
+                    data['script0'][i+1],
+                    data['script0'][i+2],
+                    data['script0'][i],
+                    data['script0'][i+3]
+                    )
+                self.dhcpLeases.append(item)
+            self.pending["leases"] = False
+        elif (section == 'portFwd'):
+            # TODO            
+            pass
+       
     def _parseSummary(self, raw:str) -> None:
+        if self.pending['status'] == False:
+            return
         data = self._parseRawHTML(raw)
-        # print (f'_pS.0 {data}')
         tFirm= data['script0'][6]
         tHard = data['script0'][7]
         ## WDR3600 v1 00000000
         tModel = tHard.split(" ")
-        self.firmware= Firmware(tHard, tModel, tFirm)
+        self.firmware= Firmware(tHard, tModel[0], tFirm)
         self.status = Status()
         self.status.wan_ipv4_uptime = int(data['script0'][8]) 
-        self.status._lan_ipv4addr = get_ip(data['script1'][1])
+        self.status._lan_ipv4_addr = get_ip(data['script1'][1])
         self.status._lan_macaddr = EUI48(data['script1'][0])
 
-        # 0 var statusPara = new Array(1,1,1,22,20000,2493718,"3.13.34 Build 130909 Rel.53148n ","WDR3600 v1 00000000",6732336,0,0 );
-        # 1 var lanPara = new Array("C4-6E-1F-41-67-C0", "192.168.1.254", "255.255.255.0", 0,0 );
-        # 2 var wlanPara = new Array(1,"hermes24",15,5,"C4-6E-1F-41-67-BF","192.168.1.254",2,8,71,11,6,0,0 );
-        # 3 var wlan5GPara = new Array(1,"hermes",15,8,"C4-6E-1F-41-67-C0","192.168.1.254",2,8,83,36,6,0,0 );
-        # 4 var statistList = new Array( 1903689570, 1044405559, 141728548, 127489568, 0,0 );
-        # 5 var wanPara = new Array(4, "C4-6E-1F-41-67-C1", "192.168.0.129", 1, "255.255.255.0", 0, 0, "192.168.0.1", 1, 1, 0, "212.230.135.2 , 212.142.173.65", "", 0, 0, "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0 , 0.0.0.0", 0, 0, 0, 0, 0,  0,0 );
-        
+        self.ipv4status._lan_ipv4_ipaddr = get_ip(data['script1'][1])
+        self.ipv4status._lan_macaddr = EUI48(data['script1'][0])
+
         self.status._wan_macaddr = EUI48(data['script5'][1])
         self.status._wan_ipv4_addr = get_ip(data['script5'][2])
         self.status._wan_ipv4_gateway = get_ip(data['script5'][7])
+
+        self.ipv4status._wan_macaddr = EUI48(data['script5'][1])
+        self.ipv4status._wan_ipv4_ipaddr = get_ip(data['script5'][2])
+        self.ipv4status._wan_ipv4_netmask = ""
+        self.ipv4status._wan_ipv4_gateway = get_ip(data['script5'][7])
+
         self.status.guest_2g_enable = None
         self.status.guest_5g_enable =  None
         self.status.wifi_2g_enable = bool(int(data['script2'][0]))
         self.status.wifi_5g_enable =  bool(int(data['script3'][0]))
-        self.status.conn_type = self._get_conn_type(int(data['script5'][0]))
-        self.status.devices = []
-        # status = {
-        #     '_wan_macaddr': None, # EUI48 | None = None
-        #     '_lan_macaddr': None ,  # EUI48
-        #     '_wan_ipv4_addr': None, # IPv4Address | None = None
-        #     '_lan_ipv4_addr': None, # IPv4Address | None = None
-        #     '_wan_ipv4_gateway': None, # IPv4Address | None = None
-        #     'wired_total': 0,
-        #     'wifi_clients_total': 0,
-        #     'guest_clients_total': 0,
-        #     'clients_total':  0,
-        #     'guest_2g_enable': None,
-        #     'guest_5g_enable': None,
-        #     'wifi_2g_enable': None,
-        #     'wifi_5g_enable': None,
-        #     'wan_ipv4_uptime': 0, # int | None = None,
-        #     'mem_usage': None,
-        #     'cpu_usage': None,
-        #     'conn_type': "",
-        #     'devices': list[Device] = []
-        # }
 
-    def _get_conn_type(self,n:int) ->str:
-        transform = [0,1,2,5,6,7]
-        idx = transform[n]
+        self.status.conn_type = None #self._get_conn_type(int(data['script5'][0]))
+        self.status.devices = []
+
+    def _get_conn_type(self,n:int) -> str:
+        wantypeinfo = [6,0,"WanDynamicIpCfgRpm.htm",1,"WanStaticIpCfgRpm.htm",2,"PPPoECfgRpm.htm",5,"BPACfgRpm.htm",6,"L2TPCfgRpm.htm",7,"PPTPCfgRpm.htm",0,0 ];
+        wantype_filtered = wantypeinfo[2*n+1]
+
         wan_type: list = [
             'Dynamic IP',
             'Static IP',
@@ -472,54 +584,33 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             'L2TP/Russia L2TP',
             'PPTP/Russia PPTP',
         ]
-        return wan_type[idx]
-
-    def _parseSection(self, section:str, data:dict) -> None:
-        if section == "netLan":
-            pass
-        elif section == "netWan":
-            pass
-        elif section == "dhcplease":
-            for i in range(0,len(data['script0']), 4):
-                item = IPv4DHCPLease(
-                    data['script0'][i+1],
-                    data['script0'][i+2],
-                    data['script0'][i],
-                    data['script0'][i+3]
-                    )
-                # print( "LEASE", data['script0'][i+1], data['script0'][i+2], data['script0'][i],data['script0'][i+3])
-                self.dhcpLeases.append(item)
-
+        return wan_type[wantype_filtered]
+    
+    def _findHostInLeases(self,macaddr:str) -> HostId:
+        arr = self.dhcpLeases
+        for lease in arr:
+            if lease.macaddr == macaddr:
+                return HostId(lease.ipaddr, lease.hostname)
+                
+        return HostId('0.0.0.0','-')
+    
     def _parseRawHTML(self, rawHTML:str) -> dict:
         parser = muParser('script')
         parser.feed(rawHTML.decode('utf8', 'ignore'))
 
         all_scripts = parser.data
-        # print ("_pRH.0", len(all_scripts), parser.cIdx)
         data = {}
         count=0
-        #all_scripts = result('script')
-        ## scripts seem to be there onely to write each one an array of params ikn form of 
-        ##
-        ## var someName  = [
-        ## "a", "lot", "of", "values", 0, 1, 2, 3, 4, 5, 6
-        ## 0,0]
         for script in all_scripts:
             
             if script == "" :
                 continue
-            
-            # script=str(script).strip('\r\n')
-            # print (f'_pRH.1 {script[0:3]}')
 
             if not str(script).startswith(('var')) :
                 continue
 
-            # print (f'_pRH.2 {script}')
-
             oneLiner = self._parseDataBlock(script)
             
-            # print ("_pRH.2",oneLiner)
             newArr = []
             for item in oneLiner.split(","):
                 newVal = None
@@ -536,57 +627,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             count += 1
 
         return data
-
-
-    # def _parseSoupHTML(self, data:str) -> dict:
-    #     result = BeautifulSoup(data, "html.parser")
-    #     data = {}
-    #     count=0
-    #     all_scripts = result('script')
-    #     ## scripts seem to be there onely to write each one an array of params ikn form of 
-    #     ##
-    #     ## var someName  = [
-    #     ## "a", "lot", "of", "values", 0, 1, 2, 3, 4, 5, 6
-    #     ## 0,0]
-    #     for script in all_scripts:
-    #         temptxt = script.text
-    #         lines = temptxt.splitlines()
-    #         lines.pop(0)   # delete first line
-    #         lines.pop()   # delete last line
-    #         if (len(lines) == 1):
-    #             oneliner = lines[0].replace(", ", ",").replace('"', '')
-    #         else:
-    #             linesNew= []
-    #             for line in lines:
-    #                 line = line.replace(", ", ",").replace('"', '')
-    #                 linesNew.append(line)    
-    #             lines=linesNew
-    #             oneliner = "".join(lines) 
-                
-    #         if oneliner.endswith(","):
-    #             oneliner = oneliner[:-1]
-    #         # data["script"+str(count)] = oneliner.split(",")
-    #         newArr = []
-    #         for item in oneliner.split(","):
-    #             newVal = None
-    #             try:
-    #                 newVal = int(item)
-    #             except Exception as e:
-    #                 try:
-    #                     newVal = float(item)
-    #                 except Exception as e:
-    #                     newVal = item
-                
-    #             newArr.append(newVal)
-
-    #         data["script"+str(count)] = newArr        
-            
-    #         count += 1
-
-    #     return data
-
+    
     def _parseDataBlock(self, text) -> str:
-        # print (f'_pDB.0 {text or "empty"}')
         lines = text.splitlines()
         if len(lines) < 1: 
             return []
@@ -598,7 +640,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         result: str = ""
         if (len(lines) == 1):
             result = lines[0].replace(", ", ",").replace('"', '')
-            # print (f'_pDB.1 {result}')
         else:
             linesNew= []
             for oneLine in lines:
@@ -606,18 +647,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                 linesNew.append(oneLine)    
             lines=linesNew
             result = "".join(lines) 
-            # print (f'_pDB.2 {result}')
             
         if result.endswith(","):
             result = result[:-1]    
         return result    
 
-    def _findHostInLeases(self,macaddr:str) -> HostId:
-        arr = self.dhcpLeases
-        #ret : HostId = HostId('0.0.0.0','-')
-        for lease in arr:
-            if lease.macaddr == macaddr:
-                return HostId(lease.ipaddr, lease.hostname)
-                # return {"ip":lease.ipaddr, "hostname":lease.hostname}
-                
-        return HostId('0.0.0.0','-')
