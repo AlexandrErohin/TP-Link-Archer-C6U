@@ -328,6 +328,7 @@ class TplinkC80Router(AbstractRouter):
             device_to_add = Device(connection_type, EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
             device_to_add.up_speed = int(device['up'])
             device_to_add.down_speed = int(device['down'])
+            device_to_add.active = device['online'] == '1'
             mapped_devices.append(device_to_add)
         return mapped_devices
 
