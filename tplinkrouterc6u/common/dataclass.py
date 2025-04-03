@@ -25,6 +25,7 @@ class Device:
         self.down_speed: int | None = None
         self.up_speed: int | None = None
         self.signal: int | None = None
+        self.active: bool = True
 
     @property
     def macaddr(self):
