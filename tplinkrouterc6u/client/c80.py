@@ -82,8 +82,11 @@ class TplinkC80Router(AbstractRouter):
         self._encryption = EncryptionState()
 
     def supports(self) -> bool:
-        response = self.request(2, 1, data='0|1,0,0')
-        return response.status_code == 200 and response.text.startswith('00000')
+        try:
+            response = self.request(2, 1, data='0|1,0,0')
+            return response.status_code == 200 and response.text.startswith('00000')
+        except Exception:
+            return False
 
     def authorize(self) -> None:
         encoded_password = TplinkC80Router._encrypt_password(self.password)
