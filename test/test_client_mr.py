@@ -734,7 +734,6 @@ ussdStatus=1
 
         class TPLinkMRClientTest(TPLinkMRClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False):
-                nonlocal check_url, check_data
                 check_url.append(url)
                 check_data.append(data_str)
                 return 200, responses.pop(0)
@@ -776,7 +775,6 @@ ussdStatus=2
 
         class TPLinkMRClientTest(TPLinkMRClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False):
-                nonlocal check_url, check_data
                 check_url.append(url)
                 check_data.append(data_str)
                 return 200, responses.pop(0)

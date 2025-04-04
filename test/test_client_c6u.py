@@ -257,6 +257,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[0].hostname, 'SERVER')
         self.assertEqual(status.devices[0].packets_sent, None)
         self.assertEqual(status.devices[0].packets_received, None)
+        self.assertEqual(status.devices[0].active, True)
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[1].type, Connection.WIRED)
         self.assertEqual(status.devices[1].macaddr, 'AC-04-D6-25-2A-96')
@@ -266,6 +267,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[1].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[1].packets_sent, None)
         self.assertEqual(status.devices[1].packets_received, None)
+        self.assertEqual(status.devices[1].active, True)
         self.assertIsInstance(status.devices[2], Device)
         self.assertEqual(status.devices[2].type, Connection.HOST_2G)
         self.assertEqual(status.devices[2].macaddr, '06-82-9D-2B-8F-C6')
@@ -273,6 +275,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[2].hostname, 'UNKNOWN')
         self.assertEqual(status.devices[2].packets_sent, 450333)
         self.assertEqual(status.devices[2].packets_received, 4867482)
+        self.assertEqual(status.devices[2].active, True)
         self.assertIsInstance(status.devices[3], Device)
         self.assertEqual(status.devices[3].type, Connection.HOST_2G)
         self.assertEqual(status.devices[3].macaddr, '06-55-9D-2B-8F-A7')
@@ -280,6 +283,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[3].hostname, 'Unknown')
         self.assertEqual(status.devices[3].packets_sent, None)
         self.assertEqual(status.devices[3].packets_received, None)
+        self.assertEqual(status.devices[3].active, True)
         self.assertIsInstance(status.devices[4], Device)
         self.assertEqual(status.devices[4].type, Connection.HOST_5G)
         self.assertEqual(status.devices[4].macaddr, '1F-7A-BD-F7-20-0D')
@@ -287,6 +291,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[4].hostname, '')
         self.assertEqual(status.devices[4].packets_sent, 134815)
         self.assertEqual(status.devices[4].packets_received, 2953078)
+        self.assertEqual(status.devices[4].active, True)
 
     def test_get_status_ax_55(self) -> None:
         response_status = '''
