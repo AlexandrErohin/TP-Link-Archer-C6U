@@ -4,8 +4,8 @@ from requests import post, get, Response
 from logging import Logger
 from macaddress import EUI48
 from tplinkrouterc6u.common.helper import get_ip, get_mac
-from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
+from tplinkrouterc6u.common.package_enum import VPN, Connection
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, VPNStatus
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -54,7 +54,8 @@ dataUrls = {
 }
 
 def defaultHeaders():
-    return  { # default headers for all requests
+    # default headers for all requests
+    return  { 
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'User-Agent': 'TP-Link Scrapper',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -132,13 +133,13 @@ class WDRRequest:
     def buildUrl(self,section:str):
         return '{}/userRpm{}'.format(self.host, dataUrls[section])
     
-    def request(self, section: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> str | None:
+    def request(self, section: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> str | dict | None:
 
         if not self._headers_request:
             self._headers_request = defaultHeaders()
 
-        ## add xtra headers: User-Agent, Authorization and Referer
 
+        ## add xtra headers: User-Agent, Authorization and Referer
         self._headers_request['Referer'] = self.buildUrl("defReferer")
         self._headers_request['User-Agent'] = 'TP-Link Scrapper'
         self._headers_request['Authorization'] = 'Basic {}'.format(self.credentials)
@@ -154,7 +155,6 @@ class WDRRequest:
 
         response = get(     # post(
             url,
-            # data=self._prepare_data(data),
             headers = self._headers_request,
             timeout = self.timeout,
             verify = self._verify_ssl,
@@ -181,16 +181,6 @@ class WDRRequest:
 
             raise ClientError
 
-    # def _is_valid_response(self, data: str) -> bool:
-    #     #return 'success' in data and data['success'] and self._data_block in data
-    #     return True
-
-    def _prepare_data(self, data: str):
-        return data
-
-    def _decode_response(self, data: str) -> dict:
-        return data
-
 class TplinkWDRRouter(AbstractRouter, WDRRequest):
     #_smart_network = True
     _perf_status = False
@@ -211,13 +201,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         self.ipv4Reserves: list [IPv4Reservation] = []
         self.dhcpLeases: list [IPv4DHCPLease] = []
         self.connDevices: list [Device] = []
-        self.pending = {
-            "status":  True, 
-            "network" : True, 
-            "reserves" : True,
-            "leases" : True,
-            "devices": True
-            }
    
     # N/A. WDR family has no session support , so no "logged" state
     def authorize(self) -> None:
@@ -227,42 +210,37 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         pass
 
     def supports(self) -> bool:
-        
-        ## check a simple request where the router identifies itself
-        response :Response = self.request("check", '')
-        return response.status_code == 200 and "WDR" in response.headers["www-authenticate"]
+        try:
+            response :Response = self.request("check", '')
+            return response.status_code == 200  
+        except Exception:
+            return False
 
     def get_firmware(self) -> Firmware:
-        if self.pending['status'] == True:
-            self._updateStatus()
+        self._updateStatus()
         return self.firmware
 
     def get_status(self) -> Status:
-        if self.pending['status'] == True:
-            self._updateStatus()
+        self._updateStatus()
         return self.status
  
     def get_ipv4_status(self) -> IPv4Status:
-        if self.pending['network'] == True:
-            self._updateNet()
+        self._updateNet()
         return self.ipv4status
     
     def get_ipv4_reservations(self):
-        if self.pending['reserves'] == True:
-            self._updateNet()
+
+        self._updateNet()
         return self.ipv4Reserves        
 
     def get_ipv4_dhcp_leases(self):
-        if self.pending['leases'] == True:
-            self._updateNet()
+        self._updateNet()
         return self.dhcpLeases        
 
     def get_clients(self):
-        if self.pending['devices'] == True:
-            self._updateNet()
+        self._updateNet()
         return self.status.devices
-        
-
+    
     def reboot(self) -> None:
         self.request('reboot', 'Reboot=Reboot', True)
 
@@ -292,9 +270,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     def _updateStatus(self) -> None:
         raw = self.request("summary", "")
         self._parseSummary(raw)   
-        if self.pending['network'] == True:
-            self._updateNet()
-        self.pending['status'] = False
+        self._updateNet()
 
     def _updateNet(self) -> None:
         sections = "netWan,netLan,dualBand,"
@@ -312,15 +288,9 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             self._updateMultiSection(section)
         
         self._updateDevices()
-        self.pending['network'] = False 
+
 
     def _updateDevices(self):
-        # get the wLan clients
-        # get DHCP leases
-        # Build wired client list by diff DHCP Leases with Wlan clients list
-        if self.pending["devices"] == False:
-            return
-        
         isWireless: list = []
         
         w24s:list = self.network.wlan24Gcli
@@ -369,8 +339,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         self.status.clients_total = totalCli
         self.status.wired_total = wiredCli
 
-        self.pending['devices'] = False
-
     def _updateSection(self,section:str) -> None:
         raw = self.request(section, "")
         data = self._parseRawHTML(raw)
@@ -404,7 +372,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
 
             self._parseSection(section, {'script0' : mainData, 'script1' : listData })
 
-        elif section == "dhcpreserve" and self.pending['reserves'] == True:
+        elif section == "dhcpreserve" :
             raw = self.request(section, "")
             data = self._parseRawHTML(raw)
 
@@ -433,7 +401,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     def _parseSection(self, section:str, data:dict) -> None:
        
         if section == "netLan":
-            ## var lanPara = new Array("C4-6E-1F-41-67-C0","192.168.1.254",2,"255.255.255.0",1,0,0 );          
             lanData = data['script0']  
             self.ipv4status._lan_ipv4_netmask = lanData[3]
             self.network.ipv4['igmpProxy'] = lanData[4]
@@ -445,9 +412,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             self.status.conn_type = conn_type or "unknown"
             self.ipv4status._wan_ipv4_conntype = conn_type or "unknown"
 
-            # self.ipv4status._wan_ipv4_ipaddr= wanData[13] or '0.0.0.0'
             self.ipv4status._wan_ipv4_netmask = wanData[14] or '0.0.0.0'
-            # self.ipv4status._wan_ipv4_gateway = wanData[15] or '0.0.0.0'
+            
 
             self.ipv4status._wan_ipv4_pridns = '0.0.0.0'
             self.ipv4status._wan_ipv4_snddns = '0.0.0.0'
@@ -509,7 +475,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             oCfg['dns_pri'] = cfg[6] or None
             oCfg['dns_sec'] = cfg[7] or None
             self.network.dhcp_cfg = oCfg
-        elif section == "dhcpreserve" and self.pending['reserves'] == True:
+        elif section == "dhcpreserve":
             item : IPv4Reservation = {}   
             for i in range(0,len(data['script0']), 3):
                 _dev: HostId = self._findHostInLeases(data['script0'][i])
@@ -520,8 +486,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                     bool(int(data['script0'][i+2]))
                     )
                 self.ipv4Reserves.append(item)
-                self.pending['reserves'] = False
-        elif section == "dhcplease" and self.pending['leases'] == True:
+        elif section == "dhcplease":
  
             for i in range(0,len(data['script0']), 4):
                 item = IPv4DHCPLease(
@@ -531,14 +496,11 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                     data['script0'][i+3]
                     )
                 self.dhcpLeases.append(item)
-            self.pending["leases"] = False
         elif (section == 'portFwd'):
             # TODO            
             pass
        
     def _parseSummary(self, raw:str) -> None:
-        if self.pending['status'] == False:
-            return
         data = self._parseRawHTML(raw)
         tFirm= data['script0'][6]
         tHard = data['script0'][7]
