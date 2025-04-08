@@ -82,8 +82,11 @@ class TplinkC80Router(AbstractRouter):
         self._encryption = EncryptionState()
 
     def supports(self) -> bool:
-        response = self.request(2, 1, data='0|1,0,0')
-        return response.status_code == 200 and response.text.startswith('00000')
+        try:
+            response = self.request(2, 1, data='0|1,0,0')
+            return response.status_code == 200 and response.text.startswith('00000')
+        except Exception:
+            return False
 
     def authorize(self) -> None:
         encoded_password = TplinkC80Router._encrypt_password(self.password)
@@ -328,6 +331,7 @@ class TplinkC80Router(AbstractRouter):
             device_to_add = Device(connection_type, EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
             device_to_add.up_speed = int(device['up'])
             device_to_add.down_speed = int(device['down'])
+            device_to_add.active = device['online'] == '1'
             mapped_devices.append(device_to_add)
         return mapped_devices
 

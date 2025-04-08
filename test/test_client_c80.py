@@ -474,6 +474,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'Laptop')
         self.assertEqual(device.up_speed, 0)
         self.assertEqual(device.down_speed, 0)
+        self.assertEqual(device.active, False)
 
         device = status.devices[1]
         self.assertIsInstance(device, Device)
@@ -485,6 +486,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'iPhone')
         self.assertEqual(device.up_speed, 0)
         self.assertEqual(device.down_speed, 0)
+        self.assertEqual(device.active, False)
 
         device = status.devices[2]
         self.assertIsInstance(device, Device)
@@ -496,6 +498,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'Laptop2')
         self.assertEqual(device.up_speed, 30)
         self.assertEqual(device.down_speed, 200)
+        self.assertEqual(device.active, True)
 
         device = status.devices[3]
         self.assertIsInstance(device, Device)
@@ -507,6 +510,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'iPhone2')
         self.assertEqual(device.up_speed, 800)
         self.assertEqual(device.down_speed, 400)
+        self.assertEqual(device.active, True)
 
         device = status.devices[4]
         self.assertIsInstance(device, Device)
@@ -518,6 +522,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'IoT_thing')
         self.assertEqual(device.up_speed, 1824)
         self.assertEqual(device.down_speed, 800)
+        self.assertEqual(device.active, True)
 
         device = status.devices[5]
         self.assertIsInstance(device, Device)
@@ -529,6 +534,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.hostname, 'PC')
         self.assertEqual(device.up_speed, 600)
         self.assertEqual(device.down_speed, 50)
+        self.assertEqual(device.active, True)
 
     def test_get_status_without_iot(self) -> None:
         client = TplinkC80RouterTest('', '')

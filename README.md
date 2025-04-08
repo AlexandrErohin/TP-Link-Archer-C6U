@@ -155,6 +155,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | down_speed | download speed | int, None |
 | up_speed | upload speed | int, None |
 | signal | Signal strength | int, None |
+| active | Is active device | bool |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -257,8 +258,9 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - [MERCUSYS routers](#mercusys)
 ### <a id="tplink">TP-LINK routers</a>
 - Archer A7 V5
-- Archer A8 1.0
+- Archer A8 (1.0, 2.20)
 - Archer A9 V6
+- Archer A20 v1.0
 - Archer AX10 v1.0
 - Archer AX12 v1.0
 - Archer AX20 (v1.0, v3.0)
@@ -306,6 +308,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco P7
 - Deco X20
 - Deco X50 v1.3
+- Deco X55 1.0
 - Deco X60 V3
 - Deco X90
 - Deco XE75 (v1.0, v2.0)
