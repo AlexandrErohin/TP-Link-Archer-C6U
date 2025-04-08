@@ -1,6 +1,3 @@
-import sys
-sys.path.append('../tplinkrouterc6u')
-
 from unittest import main, TestCase
 from ipaddress import IPv4Address
 from macaddress import EUI48
@@ -8,7 +5,6 @@ from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease
 from tplinkrouterc6u import Connection, ClientException, ClientError
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
-
 
 _NETWAN = '<SCRIPT language="javascript" type="text/javascript">\nvar wanTypeDetectInfoArray = new Array(\n1, 0, 4500, \n0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar dhcpInf = new Array(\n1,\n0,\n1,\n0,\n0,\n0,\n0,\n0,\n"",\n"",\n0,\n0,\n"",\n"192.168.0.129",\n"255.255.255.0",\n"192.168.0.1",\n1,\n0,\n1500,\n0,\n"8.8.8.8",\n1,\n"8.8.4.4",\n0,\n0,\n0,\n"TL-WDR3600",\n0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar wantypeinfo = new Array(\n6,\n0,\n"WanDynamicIpCfgRpm.htm",\n1,\n"WanStaticIpCfgRpm.htm",\n2,\n"PPPoECfgRpm.htm",\n5,\n"BPACfgRpm.htm",\n6,\n"L2TPCfgRpm.htm",\n7,\n"PPTPCfgRpm.htm",\n0,0 );\n</SCRIPT>'
 _NETLAN = '<SCRIPT language="javascript" type="text/javascript">\nvar lanPara = new Array(\n"C4-6E-1F-41-67-C0",\n"192.168.1.254",\n2,\n"255.255.255.0",\n1,\n0,0 );\n</SCRIPT>'
@@ -32,7 +28,6 @@ ABSTRACT_NETWORK = {
     'dhcpreserve': _DHCPRESERVES,
 }
 
-
 class ResponseMock():
     def __init__(self, text:str, status_code=0):
         self.content = text.encode('utf8')
@@ -42,7 +37,6 @@ class ResponseMock():
 class TplinkWDRRouterTest(TplinkWDRRouter):
     response = ''
 
-    #def request(self, code: int, asyn: int, use_token: bool = False, data: str = None) -> dict | None:
     def request(self, section: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> str | dict | None:
         # only a test, so no extra headers
         # Responses
