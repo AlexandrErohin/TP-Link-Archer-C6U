@@ -13,6 +13,7 @@ from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 
+
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
