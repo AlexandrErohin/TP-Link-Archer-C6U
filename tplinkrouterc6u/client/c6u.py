@@ -275,7 +275,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
 
         status = Status()
-        status._wan_macaddr = EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None
+        status._wan_macaddr = EUI48(data['wan_macaddr']) if 'wan_macaddr' in data and data['wan_macaddr'] else None
         status._lan_macaddr = EUI48(data['lan_macaddr'])
         status._wan_ipv4_addr = IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
         status._lan_ipv4_addr = IPv4Address(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
