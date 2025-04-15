@@ -16,60 +16,83 @@ _NETWAN = (
     + '"WanDynamicIpCfgRpm.htm",\n1,\n"WanStaticIpCfgRpm.htm",\n'
     + '2,\n"PPPoECfgRpm.htm",\n5,\n"BPACfgRpm.htm",\n6,\n"L2TPCfgRpm.htm",\n7,\n"PPTPCfgRpm.htm",\n0,0 );\n</SCRIPT>'
 )
-_NETLAN = '<SCRIPT language="javascript" type="text/javascript">\nvar lanPara = new Array(\n"C4-6E-1F-41-67-C0",\n'
-+'"192.168.1.254",\n2,\n"255.255.255.0",\n1,\n0,0 );\n</SCRIPT>'
+_NETLAN = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar lanPara = new Array(\n"C4-6E-1F-41-67-C0",\n'
+    + '"192.168.1.254",\n2,\n"255.255.255.0",\n1,\n0,0 );\n</SCRIPT>'
+)
 
-_W24STA = '<SCRIPT language="javascript" type="text/javascript">\nvar wlanHostPara = new Array(\n1, 1, 8, 5000, 4,\n'
-+'0,0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar hostList = new Array(\n'
-+'"D0-BD-53-57-3E-4A", 1, 170893827, 0,\n"08-16-AC-03-E2-FA", 1, 873409583, 0,\n"F8-F1-E8-CD-0A-CF", 1, '
-+'240958643, 0,\n"ED-49-92-1A-1D-D7", 1, 358743698, 0,\n"0E-50-99-5D-9A-D5", 1, 572346959, 0,\n0,0 );\n</SCRIPT>'
+_W24STA = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar wlanHostPara = new Array(\n1, 1, 8, 5000, 4,\n'
+    + '0,0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar hostList = new Array(\n'
+    + '"D0-BD-53-57-3E-4A", 1, 170893827, 0,\n"08-16-AC-03-E2-FA", 1, 873409583, 0,\n"F8-F1-E8-CD-0A-CF", 1, '
+    + '240958643, 0,\n"ED-49-92-1A-1D-D7", 1, 358743698, 0,\n"0E-50-99-5D-9A-D5", 1, 572346959, 0,\n0,0 );\n</SCRIPT>'
+)
+_W50STA = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar wlanHostPara = new Array(\n1, 1, 8, 5000, 4,\n'
+    + '0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar hostList = new Array(\n'
+    + '"50-A6-FC-6D-EB-D3", 1, 708938274, 0,\n"6A-D0-5F-2A-FA-2D", 1, 287340958, 0,\n"DA-69-2D-59-B3-FA", 1'
+    + ", 540958641, 0,\n0,0 );\n</SCRIPT>"
+)
 
-_W50STA = '<SCRIPT language="javascript" type="text/javascript">\nvar wlanHostPara = new Array(\n1, 1, 8, 5000, 4,\n'
-+'0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar hostList = new Array(\n'
-+'"50-A6-FC-6D-EB-D3", 1, 708938274, 0,\n"6A-D0-5F-2A-FA-2D", 1, 287340958, 0,\n"DA-69-2D-59-B3-FA", 1'
-+", 540958641, 0,\n0,0 );\n</SCRIPT>"
+_WLANGUEST = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar guestNetworkBandwidthInf = '
+    + "new Array(\n"
+    + '0,\n1000000,\n1000000,\n1024,\n1024,\n1,\n0,0);\n</SCRIPT>\n<SCRIPT language="javascript" '
+    + 'type="text/javascript">'
+    + '\nvar guestNetAccTime2gInf = new Array(\n1,\n1,\n0,\n0,\n0,\n1,\n0,\n0,\n0,\n0,\n0,\n0,\n0,\n1,\n"",\n"",\n'
+    + "0,0 );"
+    + '\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar guestNetAccTime5gInf = new Array(\n'
+    + '1,\n0,\n0,\n0,\n0,\n1,\n0,\n0,\n0,\n0,\n0,\n0,\n0,\n1,\n"",\n"",\n0,0 );\n</SCRIPT>\n'
+    + '<SCRIPT language="javascript" type="text/javascript">\nvar guestNetworkInf = '
+    + 'new Array(\n1, 1, 1, 0, "Pegasus", '
+    + '"Pegasus", 1, 1, 3, 3, "333", "333", 0, 0, "p4ssw0rd", "p4ssw0rd", '
+    + "0, 0, 0, 0, 3, 3, 1, 1, 5, 8, 0, \n0,0 );\n"
+    + "</SCRIPT>"
+)
 
-_WLANGUEST = '<SCRIPT language="javascript" type="text/javascript">\nvar guestNetworkBandwidthInf = new Array(\n'
-+'0,\n1000000,\n1000000,\n1024,\n1024,\n1,\n0,0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\n'
-+'var guestNetAccTime2gInf = new Array(\n1,\n1,\n0,\n0,\n0,\n1,\n0,\n0,\n0,\n0,\n0,\n0,\n0,\n1,\n"",\n"",\n0,0 );\n'
-+'</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar guestNetAccTime5gInf = new Array(\n'
-+'1,\n0,\n0,\n0,\n0,\n1,\n0,\n0,\n0,\n0,\n0,\n0,\n0,\n1,\n"",\n"",\n0,0 );\n</SCRIPT>\n'
-+'<SCRIPT language="javascript" type="text/javascript">\nvar guestNetworkInf = new Array(\n1, 1, 1, 0, "Pegasus", '
-+'"Pegasus", 1, 1, 3, 3, "333", "333", 0, 0, "p4ssw0rd", "p4ssw0rd", 0, 0, 0, 0, 3, 3, 1, 1, 5, 8, 0, \n0,0 );\n'
-+"</SCRIPT>"
+_DHCPCFG = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar DHCPPara = new Array(\n1,\n"192.168.1.129",\n'
+    + '"192.168.1.192",\n120,\n"192.168.1.254",\n"internal.lan",\n"8.8.8.8",\n"8.8.4.4",\n0,\n0,0 );\n</SCRIPT>'
+)
 
-_DHCPCFG = '<SCRIPT language="javascript" type="text/javascript">\nvar DHCPPara = new Array(\n1,\n"192.168.1.129",\n'
-+'"192.168.1.192",\n120,\n"192.168.1.254",\n"internal.lan",\n"8.8.8.8",\n"8.8.4.4",\n0,\n0,0 );\n</SCRIPT>'
+_DHCPLEASES = (
+    '<SCRIPT language="javascript" type="text/javascript">var DHCPDynList = new Array(\n"aliquam",'
+    + '"A9-A8-2B-F7-9F-5D","192.168.1.123","Permanent",\n"pharetra","B3-A5-1E-C3-92-A9","192.168.1.163","Permanent",\n'
+    + '"ligula","71-34-47-FD-DE-84","192.168.1.165","Permanent",\n"vulputate","46-5F-5F-27-23-9F","192.168.1.103",'
+    + '"Permanent",\n"amet","86-9F-53-91-04-2B","192.168.1.72","Permanent",\n"volutpat","FA-5C-6F-87-A3-5A",'
+    + '"192.168.1.43",'
+    + '"Permanent",\n"eget","C4-ED-6C-B6-F6-B9","192.168.1.112","Permanent",\n"ante","FF-C1-A3-93-C8-E6",'
+    + '"192.168.1.38",'
+    + '"Permanent",\n"pellentesque","E3-5E-59-2E-CF-AD","192.168.1.148","Permanent",\n"metus","AE-15-51-37-0E-9E",'
+    + '"192.168.1.178","Permanent",\n0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\n'
+    + "var DHCPDynPara = new Array(\n10,\n4,\n0,0 );\n</SCRIPT>"
+)
 
-_DHCPLEASES = '<SCRIPT language="javascript" type="text/javascript">var DHCPDynList = new Array(\n"aliquam",'
-+'"A9-A8-2B-F7-9F-5D","192.168.1.123","Permanent",\n"pharetra","B3-A5-1E-C3-92-A9","192.168.1.163","Permanent",\n'
-+'"ligula","71-34-47-FD-DE-84","192.168.1.165","Permanent",\n"vulputate","46-5F-5F-27-23-9F","192.168.1.103",'
-+'"Permanent",\n"amet","86-9F-53-91-04-2B","192.168.1.72","Permanent",\n"volutpat","FA-5C-6F-87-A3-5A","192.168.1.43",'
-+'"Permanent",\n"eget","C4-ED-6C-B6-F6-B9","192.168.1.112","Permanent",\n"ante","FF-C1-A3-93-C8-E6","192.168.1.38",'
-+'"Permanent",\n"pellentesque","E3-5E-59-2E-CF-AD","192.168.1.148","Permanent",\n"metus","AE-15-51-37-0E-9E",'
-+'"192.168.1.178","Permanent",\n0,0 );\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\n'
-+"var DHCPDynPara = new Array(\n10,\n4,\n0,0 );\n</SCRIPT>"
+_DHCPRESERVES = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar dhcpList = new Array(\n"9B-FA-04-D8-AB-8D",'
+    + '"192.168.1.56",1,\n"EE-7C-6B-B6-05-2F","192.168.1.51",1,\n"09-51-B3-0B-92-01","192.168.1.21",1,\n'
+    + '"49-6F-72-CD-68-5D","192.168.1.25",1,\n"DF-24-38-C1-FE-BB","192.168.1.51",1,\n"1A-08-6C-52-31-3D",'
+    + '"192.168.1.22",1,\n"DE-E4-DF-9A-AD-0D","192.168.1.17",1,\n"DF-F2-CB-FE-46-15","192.168.1.26",1,\n'
+    + '0,0 )\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">var DHCPStaticPara = '
+    + "new Array(\n1,\n1,\n8,\n1,\n8,\n0,0 );\n</SCRIPT>"
+)
 
-_DHCPRESERVES = '<SCRIPT language="javascript" type="text/javascript">\nvar dhcpList = new Array(\n"9B-FA-04-D8-AB-8D",'
-+'"192.168.1.56",1,\n"EE-7C-6B-B6-05-2F","192.168.1.51",1,\n"09-51-B3-0B-92-01","192.168.1.21",1,\n'
-+'"49-6F-72-CD-68-5D","192.168.1.25",1,\n"DF-24-38-C1-FE-BB","192.168.1.51",1,\n"1A-08-6C-52-31-3D",'
-+'"192.168.1.22",1,\n"DE-E4-DF-9A-AD-0D","192.168.1.17",1,\n"DF-F2-CB-FE-46-15","192.168.1.26",1,\n'
-+'0,0 )\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">var DHCPStaticPara = '
-+"new Array(\n1,\n1,\n8,\n1,\n8,\n0,0 );\n</SCRIPT>"
-
-ABSTRACT_STATUS = '<SCRIPT language="javascript" type="text/javascript">\nvar statusPara = new Array(\n1,\n1,\n1,\n'
-+'22,\n20000,\n1468171,\n"3.13.34 Build 130909 Rel.53148n ",\n"WDR3600 v1 00000000",\n6732336,\n0, 0);\n</SCRIPT>\n'
-+'<SCRIPT language="javascript" type="text/javascript">\nvar lanPara = new Array(\n"C4-6E-1F-41-67-C0", '
-+'"192.168.1.254", "255.255.255.0",\n0, 0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\n'
-+'var wlanPara = new Array(\n1,\n"testSSID24",\n15,\n5,\n"C4-6E-1F-41-67-BF",\n"192.168.1.254",\n2,\n8,\n71,\n6,\n'
-+'6,\n0, 0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar wlan5GPara = new Array(\n1,\n'
-+'"testSSID",\n15,\n8,\n"C4-6E-1F-41-67-C0",\n"192.168.1.254",\n2,\n8,\n83,\n36,\n6,\n0, 0);\n</SCRIPT>\n'
-+'<SCRIPT language="javascript" type="text/javascript">\nvar statistList = '
-+"new Array(\n1129349328, 3900411475, 200068023, 165562287,\n0, 0);\n</SCRIPT>\n"
-+'<SCRIPT language="javascript" type="text/javascript">\nvar wanPara = new Array(\n4, '
-+'"C4-6E-1F-41-67-C1", "192.168.0.129", 1, "255.255.255.0", 0, 0, "192.168.0.1", 1, 1, 0, '
-+'"8.8.8.8 , 8.8.4.4", "", 0, 0, "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0 , 0.0.0.0", '
-+"0, 0, 0, 0, 0,\n0, 0);\n</SCRIPT>"
+ABSTRACT_STATUS = (
+    '<SCRIPT language="javascript" type="text/javascript">\nvar statusPara = new Array(\n1,\n1,\n1,\n'
+    + '22,\n20000,\n1468171,\n"3.13.34 Build 130909 Rel.53148n ",\n"WDR3600 v1 00000000",\n6732336,\n0, 0);\n'
+    + '</SCRIPT>\n'
+    + '<SCRIPT language="javascript" type="text/javascript">\nvar lanPara = new Array(\n"C4-6E-1F-41-67-C0", '
+    + '"192.168.1.254", "255.255.255.0",\n0, 0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\n'
+    + 'var wlanPara = new Array(\n1,\n"testSSID24",\n15,\n5,\n"C4-6E-1F-41-67-BF",\n"192.168.1.254",\n2,\n8,\n71,\n6,\n'
+    + '6,\n0, 0);\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">\nvar wlan5GPara = new Array(\n1,\n'
+    + '"testSSID",\n15,\n8,\n"C4-6E-1F-41-67-C0",\n"192.168.1.254",\n2,\n8,\n83,\n36,\n6,\n0, 0);\n</SCRIPT>\n'
+    + '<SCRIPT language="javascript" type="text/javascript">\nvar statistList = '
+    + "new Array(\n1129349328, 3900411475, 200068023, 165562287,\n0, 0);\n</SCRIPT>\n"
+    + '<SCRIPT language="javascript" type="text/javascript">\nvar wanPara = new Array(\n4, '
+    + '"C4-6E-1F-41-67-C1", "192.168.0.129", 1, "255.255.255.0", 0, 0, "192.168.0.1", 1, 1, 0, '
+    + '"8.8.8.8 , 8.8.4.4", "", 0, 0, "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0 , 0.0.0.0", '
+    + "0, 0, 0, 0, 0,\n0, 0);\n</SCRIPT>"
+)
 
 ABSTRACT_NETWORK = {
     "netWan": _NETWAN,
