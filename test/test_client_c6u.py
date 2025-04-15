@@ -741,14 +741,6 @@ class TestTPLinkClient(TestCase):
         }
     }
     '''
-        perf_stats = '''
-      {
-          "data": {"mem_usage":0.47, "cpu_usage":0.25},
-          "timeout": false,
-          "success": true,
-          "operator": "load"
-      }
-    '''
         response_stats = '''
       {
           "data": [],
@@ -763,8 +755,6 @@ class TestTPLinkClient(TestCase):
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return loads(response_status)['data']
-                elif path == 'admin/status?form=perf&operation=read':
-                    return loads(perf_stats)['data']
                 elif path == 'admin/wireless?form=statistics':
                     return loads(response_stats)['data']
                 raise ClientException()
