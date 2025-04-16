@@ -729,6 +729,45 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(result.lan_ipv4_dhcp_enable, False)
         self.assertEqual(result.remote, None)
 
+    def test_get_status_wan_macaddr_empty(self) -> None:
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "wan_macaddr": "",
+            "wan_ipv4_ipaddr": "0.0.0.0",
+            "wan_ipv4_gateway": "0.0.0.0"
+        }
+    }
+    '''
+        response_stats = '''
+      {
+          "data": [],
+          "timeout": false,
+          "success": true,
+          "operator": "load"
+      }
+    '''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_status()
+
+        self.assertIsInstance(result, Status)
+        self.assertEqual(result.wan_macaddr, None)
+        self.assertEqual(result.wan_ipv4_addr, '0.0.0.0')
+        self.assertEqual(result.wan_ipv4_gateway, '0.0.0.0')
+        self.assertEqual(result.lan_macaddr, '06-E6-97-9E-23-F5')
+
 
 if __name__ == '__main__':
     main()
