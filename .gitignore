@@ -2,11 +2,16 @@ __pycache__
 .idea
 .venv
 .vscode
+.env
+.env_sample
+.gitignore
 *.egg-info
 build
 logs
 temp
 dist
+sandbox*
+sandbox.py
 examples
 docker-compose.yaml
 allqueries.txt
