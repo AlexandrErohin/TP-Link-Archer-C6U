@@ -27,6 +27,7 @@ from tplinkrouterc6u import (
     TPLinkXDRClient,
     TPLinkDecoClient,
     TplinkC80Router,
+    TplinkWDRRouter,
     Connection
 )
 from logging import Logger
@@ -280,6 +281,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
+- Archer BE400 v1.0
 - Archer BE550 v1.0
 - Archer BE800 v1.0
 - Archer BE805 v1.0
@@ -302,6 +304,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer VR1200v v1
 - Archer VR2100v v1
 - Archer VX1800v v1.0
+- BE11000 2.0
 - Deco M4 2.0
 - Deco M4R 2.0
 - Deco M5 v3
