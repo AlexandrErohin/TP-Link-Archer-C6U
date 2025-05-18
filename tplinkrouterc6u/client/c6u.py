@@ -1,14 +1,23 @@
 from hashlib import md5
 from re import search
 from json import loads
+from urllib.parse import urlencode
 from requests import post, Response
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
-from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reservation, IPv4DHCPLease, IPv4Status
+from tplinkrouterc6u.common.package_enum import Connection, VPN
+from tplinkrouterc6u.common.dataclass import (
+    Firmware,
+    Status,
+    Device,
+    IPv4Reservation,
+    IPv4DHCPLease,
+    IPv4Status,
+    VPNStatus,
+)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from abc import abstractmethod
@@ -231,6 +240,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
+        self._url_openvpn = 'admin/openvpn?form=config&operation=read'
+        self._url_pptpd = 'admin/pptpd?form=config&operation=read'
+        self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
+        self._url_vpnconn_pptpd = 'admin/vpnconn?form=config&operation=list&vpntype=pptp'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -401,6 +414,36 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return dhcp_leases
 
+    def get_vpn_status(self) -> VPNStatus:
+        status = VPNStatus()
+
+        values = [
+            self.request(self._url_openvpn, "operation=read"),
+            self.request(self._url_pptpd, "operation=read"),
+            self.request(self._url_vpnconn_openvpn, "operation=list&vpntype=openvpn"),
+            self.request(self._url_vpnconn_pptpd, "operation=list&vpntype=pptp"),
+        ]
+
+        status.openvpn_enable = values[0]['enabled'] == 'on'
+        status.pptpvpn_enable = values[1]['enabled'] == 'on'
+
+        if isinstance(values[2], list):
+            status.openvpn_clients_total = len(values[2])
+            status.pptpvpn_clients_total = len(values[3])
+        else:
+            status.openvpn_clients_total = 0
+            status.pptpvpn_clients_total = 0
+
+        return status
+
+    def set_vpn(self, vpn: VPN, enable: bool) -> None:
+        path = self._url_openvpn if VPN.OPEN_VPN == vpn else self._url_pptpd
+        current_config = self.request(path, "operation=read")
+        current_config['enabled'] = "on" if enable else "off"
+        data = urlencode(current_config)
+        data = "operation=write&{}".format(data)
+        self.request(path, data)
+
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
@@ -435,3 +478,7 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         self._url_firmware = 'admin/firmware?form=upgrade'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
+        self._url_openvpn = 'admin/openvpn?form=config'
+        self._url_pptpd = 'admin/pptpd?form=config'
+        self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
+        self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
