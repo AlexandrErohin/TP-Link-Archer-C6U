@@ -9,6 +9,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     Device,
     ClientException,
+    VPN,
 )
 
 
@@ -767,6 +768,107 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(result.wan_ipv4_addr, '0.0.0.0')
         self.assertEqual(result.wan_ipv4_gateway, '0.0.0.0')
         self.assertEqual(result.lan_macaddr, '06-E6-97-9E-23-F5')
+
+    def test_vpn_status(self) -> None:
+        response_openvpn_read = """
+        {
+            "enabled": "on",
+            "proto": "udp",
+            "access": "home",
+            "cert_exist": true,
+            "mask": "255.255.255.0",
+            "port": "1194",
+            "serverip": "10.8.0.0"
+        }
+        """
+
+        response_pptp_read = """
+        {
+            "enabled": "off",
+            "unencrypted_access": "on",
+            "samba_access": "on",
+            "netbios_pass": "on",
+            "remoteip": "10.0.0.11-20"
+        }
+        """
+
+        respone_vpnconn_openvpn = """[
+            {"username": "admin", "remote_ip": "192.168.0.200", "ipaddr": "10.0.0.11",
+             "extra": "7450", "vpntype": "openvpn", "key": "7450"},
+            {"username": "admin", "remote_ip": "192.168.0.200", "ipaddr": "10.0.0.11",
+             "extra": "7450", "vpntype": "openvpn", "key": "7450"}
+        ]"""
+
+        respone_vpnconn_pptpvpn = """[
+            {"username": "admin", "remote_ip": "192.168.0.200", "ipaddr": "10.0.0.11",
+             "extra": "7450", "vpntype": "pptp", "key": "7450"},
+            {"username": "admin", "remote_ip": "192.168.0.200", "ipaddr": "10.0.0.11",
+             "extra": "7450", "vpntype": "pptp", "key": "7450"},
+            {"username": "admin", "remote_ip": "192.168.0.200", "ipaddr": "10.0.0.11",
+             "extra": "7450", "vpntype": "pptp", "key": "7450"}
+        ]"""
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/openvpn?form=config":
+                    return loads(response_openvpn_read)
+                if path == "admin/pptpd?form=config":
+                    return loads(response_pptp_read)
+                if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=openvpn":
+                    return loads(respone_vpnconn_openvpn)
+                if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=pptp":
+                    return loads(respone_vpnconn_pptpvpn)
+                raise ClientException()
+
+        client = TPLinkRouterTest("", "")
+
+        vpn_status = client.get_vpn_status()
+        self.assertTrue(vpn_status.openvpn_enable)
+        self.assertFalse(vpn_status.pptpvpn_enable)
+        self.assertEqual(vpn_status.openvpn_clients_total, 2)
+        self.assertEqual(vpn_status.pptpvpn_clients_total, 3)
+
+    def test_set_vpn(self) -> None:
+        response_openvpn_read = """
+        {
+            "enabled": "on",
+            "proto": "udp",
+            "access": "home",
+            "cert_exist": true,
+            "mask": "255.255.255.0",
+            "port": "1194",
+            "serverip": "10.8.0.0"
+        }
+        """
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/openvpn?form=config" and data == "operation=read":
+                    return loads(response_openvpn_read)
+                self.captured_path = path
+                self.captured_data = data
+
+        client = TPLinkRouterTest("", "")
+        client.set_vpn(VPN.OPEN_VPN, True)
+
+        expected_data = (
+            "operation=write&enabled=on"
+            "&proto=udp&access=home&cert_exist=True&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
+        )
+        self.assertEqual(client.captured_path, 'admin/openvpn?form=config')
+        self.assertEqual(client.captured_data, expected_data)
 
 
 if __name__ == '__main__':

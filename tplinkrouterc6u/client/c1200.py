@@ -1,11 +1,8 @@
 from re import search
 from requests import post, Response
-from urllib.parse import urlencode
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.exception import ClientException, AuthorizeError
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
-from tplinkrouterc6u.common.dataclass import VPNStatus
-from tplinkrouterc6u.common.package_enum import VPN
 
 
 class TplinkC1200Router(TplinkC5400XRouter):
@@ -103,36 +100,3 @@ class TplinkC1200Router(TplinkC5400XRouter):
     @staticmethod
     def _get_login_data(crypted_pwd: str) -> str:
         return 'operation=login&password={}'.format(crypted_pwd)
-
-    def get_vpn_status(self) -> VPNStatus:
-        status = VPNStatus()
-
-        values = [
-            self.request("/admin/openvpn?form=config&operation=read", "operation=read"),
-            self.request("/admin/pptpd?form=config&operation=read", "operation=read"),
-            self.request("/admin/vpnconn?form=config&operation=list&vpntype=openvpn",
-                         "operation=list&operation=list&vpntype=openvpn"),
-            self.request("/admin/vpnconn?form=config&operation=list&vpntype=pptp",
-                         "operation=list&operation=list&vpntype=pptp"),
-        ]
-
-        status.openvpn_enable = values[0]['enabled'] == 'on'
-        status.pptpvpn_enable = values[1]['enabled'] == 'on'
-
-        if isinstance(values[2], list):
-            status.openvpn_clients_total = len(values[2])
-            status.pptpvpn_clients_total = len(values[3])
-        else:
-            status.openvpn_clients_total = 0
-            status.pptpvpn_clients_total = 0
-
-        return status
-
-    def set_vpn(self, vpn: VPN, enable: bool) -> None:
-        path = "/admin/{}?form=config&operation=read".format(vpn.lowercase)
-        current_config = self.request(path, "operation=read")
-        current_config['enabled'] = "on" if enable else "off"
-        data = urlencode(current_config)
-        data = "&operation=write&{}".format(data)
-        path = "/admin/{}?form=config{}".format(vpn.lowercase, data)
-        self.request(path, data)

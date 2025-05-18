@@ -5,7 +5,6 @@ from tplinkrouterc6u import (
     Connection,
     ClientException,
 )
-from tplinkrouterc6u.common.package_enum import VPN
 
 
 class TestTPLinkC1200Client(TestCase):
@@ -201,13 +200,13 @@ class TestTPLinkC1200Client(TestCase):
                 ignore_response: bool = False,
                 ignore_errors: bool = False,
             ) -> dict | None:
-                if path == "/admin/openvpn?form=config&operation=read":
+                if path == "admin/openvpn?form=config&operation=read":
                     return loads(response_openvpn_read)
-                if path == "/admin/pptpd?form=config&operation=read":
+                if path == "admin/pptpd?form=config&operation=read":
                     return loads(response_pptp_read)
-                if path == "/admin/vpnconn?form=config&operation=list&vpntype=openvpn":
+                if path == "admin/vpnconn?form=config&operation=list&vpntype=openvpn":
                     return loads(respone_vpnconn_openvpn)
-                if path == "/admin/vpnconn?form=config&operation=list&vpntype=pptp":
+                if path == "admin/vpnconn?form=config&operation=list&vpntype=pptp":
                     return loads(respone_vpnconn_pptpvpn)
                 raise ClientException()
 
@@ -218,41 +217,6 @@ class TestTPLinkC1200Client(TestCase):
         self.assertFalse(vpn_status.pptpvpn_enable)
         self.assertEqual(vpn_status.openvpn_clients_total, 2)
         self.assertEqual(vpn_status.pptpvpn_clients_total, 3)
-
-    def test_set_vpn(self) -> None:
-        response_openvpn_read = """
-        {
-            "enabled": "on",
-            "proto": "udp",
-            "access": "home",
-            "cert_exist": true,
-            "mask": "255.255.255.0",
-            "port": "1194",
-            "serverip": "10.8.0.0"
-        }
-        """
-
-        class TPLinkRouterTest(TplinkC1200Router):
-            def request(
-                self,
-                path: str,
-                data: str,
-                ignore_response: bool = False,
-                ignore_errors: bool = False,
-            ) -> dict | None:
-                if path == "/admin/openvpn?form=config&operation=read":
-                    return loads(response_openvpn_read)
-                self.captured_path = path
-
-        client = TPLinkRouterTest("", "")
-        client.set_vpn(VPN.OPEN_VPN, True)
-
-        expected_path = (
-            "/admin/openvpn?form=config&operation=write&enabled=on"
-            "&proto=udp&access=home&cert_exist=True"
-            "&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
-        )
-        self.assertEqual(client.captured_path, expected_path)
 
 
 if __name__ == "__main__":
