@@ -74,7 +74,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
         _, values = self.req_act(acts)
 
-        if not values:
+        if not values or values[0] is None:
             raise ValueError('No firmware information received.')
 
         firmware = Firmware(
@@ -99,6 +99,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
 
         _, values = self.req_act(acts)
+
+        if not values or any(x is None for x in values[:-2]):
+            raise ValueError("Incomplete or malformed status data from device.")
 
         if values[0].__class__ == list:
             values[0] = values[0][0]
@@ -143,11 +146,17 @@ class TPLinkEXClient(TPLinkMRClientBase):
                                                  IPv4Address(val['IPAddress']),
                                                  val['hostName'])
 
-        total = int(values[4]['total'])
-        free = int(values[4]["free"])
-        status.mem_usage = ((total - free) / total)
+        try:
+            total = int(values[4]['total'])
+            free = int(values[4]["free"])
+            status.mem_usage = ((total - free) / total)
+        except ValueError:
+            status.mem_usage = 0
 
-        status.cpu_usage = int(values[5]['CPUUsage']) / 100
+        try:
+            status.cpu_usage =int(values[5]['CPUUsage']) / 100
+        except ValueError:
+            status.cpu_usage = 0
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
@@ -159,6 +168,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_DHCPV4_POOL_STATICADDR', attrs=['enable', 'chaddr', 'yiaddr']),
         ]
         _, values = self.req_act(acts)
+        if not values or values[0] is None:
+            return []
 
         ipv4_reservations = []
         for item in values[0]:
@@ -178,6 +189,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
                          attrs=['IPAddress', 'physAddress', 'hostName', 'leaseTimeRemaining']),
         ]
         _, values = self.req_act(acts)
+        if not values or values[0] is None:
+            return []
 
         dhcp_leases = []
         for item in values[0]:
@@ -202,6 +215,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
                                 'connIPv4DnsServer']),
         ]
         _, values = self.req_act(acts)
+        if not values or any(v is None for v in values):
+            raise ValueError("Incomplete IPv4 status data.")
 
         if values[0].__class__ == list and len(values[0]) > 0:
             values[0] = values[0][0]
@@ -244,6 +259,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         all_responses = []
         url = self._get_url('cgi_gdpr?9')
+        last_response = None
 
         for act in acts:
             attrs_str = ', '.join([attr if ':' in attr else f'"{attr}":""' for attr in act.attrs])
@@ -251,24 +267,28 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 (f'{{"data":{{"stack":"{act.stack}","pstack":"{act.pstack}"{"," + attrs_str if attrs_str else ""}}},'
                  f'"operation":"{act.type}","oid":"{act.oid}"}}')
 
-            code, response = self._request(url, data_str=tp_data, encrypt=True)
-            response = response.replace("\r", "").replace("\n", "").replace("\t", "")
-
-            if code != 200:
-                error = 'TplinkRouter - EX -  Response with error; Request {} - Response {}'.format(tp_data, response)
-                if self._logger:
-                    self._logger.debug(error)
-                raise ClientError(error)
-
             try:
-                if len(response):
-                    json_data = loads(response)
-                    if 'data' in json_data:
-                        all_responses.append(json_data['data'])
-            except ValueError:
-                raise ClientError(f"Error trying to convert response to JSON: {response}")
+                code, response = self._request(url, data_str=tp_data, encrypt=True)
+                response = response.replace("\r", "").replace("\n", "").replace("\t", "")
+                last_response = response
 
-        return response, all_responses
+                if code != 200:
+                    if self._logger:
+                        self._logger.debug(
+                            f'TplinkRouter - EX -  Response with error; Request {tp_data} - Response {response}'
+                        )
+                    all_responses.append(None)
+                    continue
+
+                json_data = loads(response)
+                all_responses.append(json_data.get('data', None))
+
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug(f"Request failed for: {tp_data}; Error: {e}")
+                all_responses.append(None)
+
+        return last_response, all_responses
 
     def _req_login(self) -> None:
         login_data = ('{"data":{"UserName":"%s","Passwd":"%s","Action": "1","stack":"0,0,0,0,0,0",'
@@ -311,6 +331,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_PVPN_CLIENT', attrs=['connAct']),
         ]
         _, values = self.req_act(acts)
+        if not values or any(v is None for v in values):
+            raise ValueError("Incomplete VPN status data.")
 
         status.openvpn_enable = values[0]['enable'] == '1'
         status.pptpvpn_enable = values[1]['enable'] == '1'
