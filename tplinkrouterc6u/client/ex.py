@@ -150,12 +150,12 @@ class TPLinkEXClient(TPLinkMRClientBase):
             total = int(values[4]['total'])
             free = int(values[4]["free"])
             status.mem_usage = ((total - free) / total)
-        except ValueError:
+        except Exception:
             status.mem_usage = 0
 
         try:
             status.cpu_usage =int(values[5]['CPUUsage']) / 100
-        except ValueError:
+        except Exception:
             status.cpu_usage = 0
 
         status.devices = list(devices.values())
