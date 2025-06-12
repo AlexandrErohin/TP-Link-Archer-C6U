@@ -276,6 +276,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer AX75 V1
 - Archer AX90 V1.20
 - Archer AXE75 V1
+- Archer AXE5400 v1.0
 - Archer AXE16000
 - Archer AX1800
 - Archer AX3000 V1
@@ -288,7 +289,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer BE3600 1.6
 - Archer C1200 (v1.0, v2.0)
 - Archer C2300 (v1.0, v2.0)
-- Archer C6 (v2.0, v3.0, 4.0)
+- Archer C6 (v2.0, v3.0, v3.20, 4.0)
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
 - Archer C24 (1.0, 2.0)
@@ -299,6 +300,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer MR200 (v5, v5.3, v6.0)
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3)
+- Archer VR400 v3
 - Archer VR600 v3
 - Archer VR900v
 - Archer VR1200v v1
