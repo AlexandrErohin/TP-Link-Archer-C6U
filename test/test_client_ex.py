@@ -122,6 +122,88 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.devices[1].packets_sent, None)  # TODO
         self.assertEqual(status.devices[1].packets_received, None)  # TODO
 
+    def test_get_status(self) -> None:
+
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"},'
+                                '{"primaryEnable":"0","guestEnable":"1","stack":"2,0,0,0,0,0"}],"operation":"gl",'
+                                '"oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"0","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.30.10","hostName":"host1","stack":"1,0,0,0,0,0"},'
+                           '{"active":"1","X_TP_LanConnType":"1","physAddress":"F4-A3-86-2D-41-B5",'
+                           '"IPAddress":"192.168.30.11","hostName":"host2","stack":"2,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+        DEV2_MEM_STATUS = ('{"data":{"total":"192780","free":"78400","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"47","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                elif 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                elif 'DEV2_MEM_STATUS' in data_str:
+                    return 200, DEV2_MEM_STATUS
+                elif 'DEV2_PROC_STATUS' in data_str:
+                    return 200, DEV2_PROC_STATUS
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, None)
+        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
+        self.assertIsInstance(status.lan_macaddress, EUI48)
+        self.assertEqual(status.wan_ipv4_addr, None)
+        self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
+        self.assertEqual(status.wan_ipv4_gateway, None)
+        self.assertEqual(status.wired_total, 1)
+        self.assertEqual(status.wifi_clients_total, 1)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.clients_total, 2)
+        self.assertEqual(status.guest_2g_enable, False)
+        self.assertEqual(status.guest_5g_enable, True)
+        self.assertEqual(status.iot_2g_enable, None)
+        self.assertEqual(status.iot_5g_enable, None)
+        self.assertEqual(status.wifi_2g_enable, True)
+        self.assertEqual(status.wifi_5g_enable, False)
+        self.assertEqual(status.wan_ipv4_uptime, None)
+        self.assertGreaterEqual(status.mem_usage, 0)
+        self.assertLessEqual(status.mem_usage, 1)
+        self.assertGreaterEqual(status.cpu_usage, 0)
+        self.assertLessEqual(status.cpu_usage, 1)
+        self.assertEqual(len(status.devices), 2)
+        self.assertIsInstance(status.devices[0], Device)
+        self.assertEqual(status.devices[0].type, Connection.WIRED)
+        self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
+        self.assertIsInstance(status.devices[0].macaddress, EUI48)
+        self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
+        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
+        self.assertEqual(status.devices[0].hostname, 'host1')
+        self.assertEqual(status.devices[0].packets_sent, None)
+        self.assertEqual(status.devices[0].packets_received, None)
+        self.assertIsInstance(status.devices[1], Device)
+        self.assertEqual(status.devices[1].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[1].macaddr, 'F4-A3-86-2D-41-B5')
+        self.assertIsInstance(status.devices[1].macaddress, EUI48)
+        self.assertEqual(status.devices[1].ipaddr, '192.168.30.11')
+        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
+        self.assertEqual(status.devices[1].hostname, 'host2')
+        self.assertEqual(status.devices[1].packets_sent, None)  # TODO
+        self.assertEqual(status.devices[1].packets_received, None)  # TODO
+
     def test_get_ipv4_reservations(self) -> None:
 
         response = ('{"data":[{"enable":"1","chaddr":"bf:75:44:4c:dc:9e","yiaddr":"192.168.8.21",'
