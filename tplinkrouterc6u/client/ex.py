@@ -109,9 +109,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
         for item in values[1]:
             if int(item['enable']) == 0 and values[1].__class__ == list:
                 continue
-            status._wan_macaddr = EUI48(item['MACAddr']) if item['MACAddr'] else None
-            status._wan_ipv4_addr = IPv4Address(item['connIPv4Address'])
-            status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway'])
+            status._wan_macaddr = EUI48(item['MACAddr']) if item.get('MACAddr') else None
+            status._wan_ipv4_addr = IPv4Address(item['connIPv4Address']) if item.get('connIPv4Address') else None
+            status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
 
         if values[2].__class__ != list:
             status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
