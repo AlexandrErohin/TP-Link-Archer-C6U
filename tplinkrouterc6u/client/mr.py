@@ -550,13 +550,14 @@ class TPLinkMRClientBase(AbstractRouter):
                 raise Exception('Unsupported method ' + str(method))
 
             # sometimes we get 500 here, not sure why... just retry the request
-            if r.status_code != 500 and '<title>500 Internal Server Error</title>' not in r.text:
+            if (r.status_code not in [500, 406]
+                    and '<title>500 Internal Server Error</title>' not in r.text
+                    and '<title>406 Not Acceptable</title>' not in r.text):
                 break
 
+            sleep(0.1)
             retry += 1
-            sleep(0.1*retry)
 
-        sleep(0.05)
         # decrypt the response, if needed
         if encrypt and (r.status_code == 200) and (r.text != ''):
             return r.status_code, self._encryption.aes_decrypt(r.text)
