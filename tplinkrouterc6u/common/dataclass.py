@@ -48,7 +48,7 @@ class Device:
 class Status:
     def __init__(self) -> None:
         self._wan_macaddr: EUI48 | None = None
-        self._lan_macaddr: EUI48
+        self._lan_macaddr: EUI48 | None = None
         self._wan_ipv4_addr: IPv4Address | None = None
         self._lan_ipv4_addr: IPv4Address | None = None
         self._wan_ipv4_gateway: IPv4Address | None = None
@@ -82,7 +82,7 @@ class Status:
 
     @property
     def lan_macaddr(self):
-        return str(self._lan_macaddr)
+        return str(self._lan_macaddr) if self._lan_macaddr else None
 
     @property
     def lan_macaddress(self):
