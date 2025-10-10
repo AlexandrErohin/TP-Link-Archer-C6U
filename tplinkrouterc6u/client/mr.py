@@ -645,14 +645,14 @@ class TPLinkMRClient(TPLinkMRClientBase):
     def set_sms_read(self, sms: SMS) -> None:
         acts = [
             self.ActItem(
-                self.ActItem.SET, 'LTE_SMS_RECVMSGENTRY', f'{sms.index},0,0,0,0,0', attrs=['unread=0']),
+                self.ActItem.SET, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0', attrs=['unread=0']),
         ]
         self.req_act(acts)
 
     def delete_sms(self, sms: SMS) -> None:
         acts = [
             self.ActItem(
-                self.ActItem.DEL, 'LTE_SMS_RECVMSGENTRY', f'{sms.index},0,0,0,0,0'),
+                self.ActItem.DEL, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0'),
         ]
         self.req_act(acts)
 
