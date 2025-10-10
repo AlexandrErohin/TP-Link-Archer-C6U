@@ -216,7 +216,7 @@ class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
         )
         guest_status = (
             self.request(
-                "admin/status?form=guest", "operation=read", ignore_response=True
+                "admin/status?form=guest", "operation=read", ignore_errors=True
             )
             or []
         )
