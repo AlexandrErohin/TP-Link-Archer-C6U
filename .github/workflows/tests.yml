@@ -1,23 +1,24 @@
 name: Tests
 on:
-  pull_requests:
-    - branches:
+  pull_request:
+    branches:
       - "**"
-    - paths:
-        - ".github/workflows/tests.yml"
-        - "src/**"
-        - "test/**"
-        - "requirements.txt"
-        - "setup.py"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "src/**"
+      - "test/**"
+      - "requirements.txt"
+      - "setup.py"
   push:
     branches:
       - "**"
     paths:
-        - ".github/workflows/tests.yml"
-        - "src/**"
-        - "test/**"
-        - "requirements.txt"
-        - "setup.py"
+      - ".github/workflows/tests.yml"
+      - "src/**"
+      - "test/**"
+      - "requirements.txt"
+      - "setup.py"
+
 jobs:
   ci:
     runs-on: ubuntu-latest
