@@ -90,7 +90,6 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
             verify=self._verify_ssl,
             headers=self._headers_request
         )
-        print(response.text)
 
         try:
             data = response.json()
@@ -179,7 +178,6 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
         if self._logged:
             try:
                 res = self.request('admin/system?form=logout', 'operation=write')
-                print(res)
             except Exception as e:
                 error = ("TplinkRouter - {} - Cannot logout! Error - {}"
                          .format(self.__class__.__name__, e))
@@ -190,3 +188,114 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
                 self._logged = False
                 self._stok = ''
                 self._sysauth = ''
+
+
+    def get_status(self) -> Status:
+        status_device = self.request('admin/status?form=status_device', 'operation=read')
+        # example answer
+        # {"success":true,"data":{"wired_dhcp":"1","wired_ip":"192.168.1.4","wired_type":"0"}}
+        ap_status = self.request('admin/status?form=ap_status', 'operation=read', ignore_errors=True)
+        # example answer
+        """
+        {
+  "success": true,
+  "data": {
+    "wireless_2g_encryption": true,
+    "show2gFlag": true,
+    "phyconn": "connected",
+    "wireless_5g_enable": "on",
+    "internet_status": "connected",
+    "wireless_2g_enable": "on",
+    "wireless_5g_encryption": true,
+    "opMode": "0",
+    "show5gFlag": true,
+    "wirelessCount": 8,
+    "wirelessGrid": [
+      {
+        "mac": "7C-2C-67-D9-E9-14",
+        "type": "2.4GHz",
+        "name": "esp32c3-D9E914",
+        "conn_type": "wireless",
+        "rxrate": 108,
+        "txrate": 150,
+        "ipaddr": "192.168.1.52",
+        "ip": "192.168.1.52"
+      },
+      {
+        "mac": "26-96-9F-67-1E-C5",
+        "type": "5GHz",
+        "name": "Mac",
+        "conn_type": "wireless",
+        "rxrate": 648,
+        "txrate": 960,
+        "ipaddr": "192.168.1.55",
+        "ip": "192.168.1.55"
+      },
+    ]
+  }
+    }"""
+        guest_status = self.request('admin/status?form=guest', "operation=read", ignore_response=True) or []
+        # example answer
+        """
+        {
+  "success": true,
+  "data": [
+    {
+      "mac": "B0-4A-39-98-20-AD",
+      "type": "2.4GHz",
+      "name": "roborock-vacuum-a51",
+      "conn_type": "wireless",
+      "rxrate": 150,
+      "txrate": 150,
+      "ipaddr": "192.168.1.51",
+      "ip": "192.168.1.51"
+    },
+    {
+      "mac": "FC-3C-D7-2A-DE-10",
+      "type": "2.4GHz",
+      "name": "wlan0",
+      "conn_type": "wireless",
+      "rxrate": 52,
+      "txrate": 65,
+      "ipaddr": "192.168.1.54",
+      "ip": "192.168.1.54"
+    }
+  ]
+}"""
+        guest_settings = self.request('admin/extend?form=guest_settings', 'operation=read', ignore_errors=True)
+        # example answer
+        """{"success":true,"data":{"enable_5g":"off","region_status":1,"hide_5g":"off","hide_2g":"off","show2gFlag":"true","mesh_enable":"off","password":"****","show5gFlag":"true","ap_support_mesh":"0","sync_status":"0","ssid_2g":"****","sec":"wpa2/wpa3","ssid_5g":"****","enable_2g":"on"}}"""
+
+        status = Status()
+        status._wan_ipv4_addr = get_ip(status_device.get('wired_ip'))
+        status.wifi_clients_total = ap_status.get('wirelessCount')
+        status.guest_clients_total = len(guest_status)
+        status.guest_2g_enable = self._str2bool(guest_settings.get('enable_2g'))
+        status.guest_5g_enable = self._str2bool(guest_settings.get("enable_5g"))
+        status.wifi_2g_enable = self._str2bool(ap_status.get('wireless_2g_enable'))
+        status.wifi_5g_enable = self._str2bool(ap_status.get('wireless_5g_enable'))
+
+        devices = {}
+
+        def _add_device(conn: Connection, item: dict) -> None:
+            devices[item['mac']] = Device(
+                conn,
+                get_mac(item.get('mac', '00-00-00-00-00-00').replace('-', ':')),
+                get_ip(item['ipaddr']),
+                item['name'],
+                down_speed=item['rxrate'],
+                up_speed=item['txrate'],
+            )
+
+        for item in ap_status.get('wirelessGrid', []):
+            type = self._map_wire_type(item.get('type'))
+            _add_device(type, item)
+
+        for item in guest_status:
+            type = self._map_wire_type(item.get('type'), False)
+            _add_device(type, item)
+
+        status.devices = list(devices.values())
+        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+
+        return status
