@@ -1,6 +1,6 @@
 from logging import Logger
 
-from tplinkrouterc6u import TPLinkXDRClient
+from tplinkrouterc6u import TPLinkXDRClient, TplinkRe700XRouter
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkRouter
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
@@ -16,8 +16,12 @@ from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 
 class TplinkRouterProvider:
     @staticmethod
-    def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
+    def get_client(host: str, password: str | None = None, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
+        if password is None:
+            router = TplinkRe700XRouter(host, '', username, logger, verify_ssl, timeout)
+            if router.supports():
+                return router
         for client in [TplinkC5400XRouter, TPLinkVRClient, TPLinkEXClient, TPLinkMRClient, TPLinkDecoClient,
                        TPLinkXDRClient, TplinkRouter, TplinkC80Router, TplinkWDRRouter]:
             router = client(host, password, username, logger, verify_ssl, timeout)

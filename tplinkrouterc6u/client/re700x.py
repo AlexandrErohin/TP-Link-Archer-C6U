@@ -1,6 +1,7 @@
 from hashlib import md5
 from re import search
 from json import loads
+from typing import List
 from urllib.parse import urlencode
 from requests import post, Response
 from macaddress import EUI48
@@ -54,7 +55,7 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
             "Sec-Fetch-Site": "same-origin"
         }
 
-    def identify(self) -> bool:
+    def supports(self) -> bool:
         """
         Identify if the router is a RE700X
         """
@@ -107,8 +108,6 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
             raise ClientException(error)
 
     def authorize(self) -> None:
-        if not self.identify():
-            raise ClientError('This router is not a RE700X!')
         if self._pwdNN == '':
             self._request_pwd()
 
@@ -299,3 +298,23 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
         return status
+
+    def get_ipv4_reservations(self):
+        # No such thing
+        return []
+
+    def get_ipv4_dhcp_leases(self) -> List[IPv4DHCPLease]:
+        leases = []
+        data = self.request("admin/dhcps?form=client", 'operation=read', ignore_response=True)
+        # example answer
+        """
+        {"success":true,"data":[{"leasetime":"00:00:38","key":"0","macaddr":"a8:46:74:46:14:f8","ipaddr":"192.168.1.59","name":"bedroom-ble"}]}
+        """
+        for client in data:
+            leases.append(IPv4DHCPLease(
+                get_mac(client.get('macaddr', '00:00:00:00:00:00')),
+                get_ip(client.get('ipaddr')),
+                client.get('name', ''),
+                client.get('leasetime', ''),
+            ))
+        return leases
