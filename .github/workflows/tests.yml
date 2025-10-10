@@ -1,0 +1,49 @@
+name: Tests
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "tplinkrouterc6u/**"
+      - "test/**"
+      - "requirements.txt"
+      - "setup.py"
+      - ".flake8"
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "tplinkrouterc6u/**"
+      - "test/**"
+      - "requirements.txt"
+      - "setup.py"
+      - ".flake8"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        name: Setup Python ${{ matrix.python-version }}
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Install pip
+        run: |
+          python -m pip install --upgrade pip pytest
+      - name: Install package
+        run: |
+          # this needs to suffice for passing tests as the
+          # package needs to pull its own dependencies when installed
+          pip install -e .
+      - name: Test with pytest
+        run: |
+          pytest test
+      - name: Run flake8
+        uses: py-actions/flake8@v2
