@@ -1,59 +1,35 @@
-from hashlib import md5
 from re import search
-from json import loads
 from typing import List
-from urllib.parse import urlencode
-from requests import post, Response
-from macaddress import EUI48
-from ipaddress import IPv4Address
+from requests import post
 from logging import Logger
 
-from tplinkrouterc6u.client.c6u import TplinkEncryption, TplinkBaseRouter
+from tplinkrouterc6u.client_abstract import AbstractRouter, IPv4Status
+from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRequest
 from tplinkrouterc6u.common.helper import get_ip, get_mac
-from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
-    Firmware,
     Status,
     Device,
-    IPv4Reservation,
-    IPv4DHCPLease,
-    IPv4Status,
-    VPNStatus,
+    IPv4DHCPLease, Firmware,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
-from tplinkrouterc6u.client_abstract import AbstractRouter
-from abc import abstractmethod
 
 
-class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
+class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
     def __init__(self, host: str, password: str, logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, "", logger, verify_ssl, timeout)
 
-        self._url_firmware = 'admin/firmware?form=upgrade'
-        self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
-        self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
-        self._url_openvpn = 'admin/openvpn?form=config'
-        self._url_pptpd = 'admin/pptpd?form=config'
-        self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
-        self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
+        referer = '{}/webpages/index.html'.format(self.host)
+        self._headers_request = {'Referer': referer}
+        self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
+        self._url_firmware = "admin/firmware?form=upgrade"
 
-        self._headers_request = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "If-Modified-Since": "0",
-            "X-Requested-With": "XMLHttpRequest",
-            "Origin": self.host,
-            "Connection": "keep-alive",
-            "Referer": "{}/webpages/login.html?v=62c60c5d".format(self.host),
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin"
-        }
+    def get_firmware(self) -> Firmware:
+        data = self.request(self._url_firmware, 'operation=read')
+        firmware = Firmware(data.get('hardware_version', ''), data.get('model', ''), data.get('firmware_version', ''))
+
+        return firmware
 
     def supports(self) -> bool:
         """
@@ -81,35 +57,8 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
                 self._logger.debug(error)
             return False
 
-    def _request_pwd(self) -> None:
-        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
-
-        # If possible implement RSA encryption of password here.
-        response = post(
-            url, data={'operation': 'read'},
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-            headers=self._headers_request
-        )
-
-        try:
-            data = response.json()
-
-            args = data[self._data_block]['password']
-
-            self._pwdNN = args[0]
-            self._pwdEE = args[1]
-
-        except Exception as e:
-            error = ('TplinkRouter - {} - Unknown error for pwd! Error - {}; Response - {}'
-                     .format(self.__class__.__name__, e, response.text))
-            if self._logger:
-                self._logger.debug(error)
-            raise ClientException(error)
 
     def authorize(self) -> None:
-        if self._pwdNN == '':
-            self._request_pwd()
 
         response = post(
             '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host),
@@ -318,3 +267,12 @@ class TplinkRe700XRouter(TplinkEncryption, TplinkBaseRouter):
                 client.get('leasetime', ''),
             ))
         return leases
+
+    def reboot(self):
+        raise NotImplementedError()
+
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        raise NotImplementedError()
+
+    def get_ipv4_status(self) -> IPv4Status:
+        raise NotImplementedError()

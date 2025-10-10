@@ -16,10 +16,11 @@ from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 
 class TplinkRouterProvider:
     @staticmethod
-    def get_client(host: str, password: str | None = None, username: str = 'admin', logger: Logger = None,
+    def get_client(host: str, password: str, username: str | None = None, logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        if password is None:
-            router = TplinkRe700XRouter(host, '', username, logger, verify_ssl, timeout)
+        if username is None:
+            router = TplinkRe700XRouter(
+                host=host, password=password, logger=logger, verify_ssl=verify_ssl, timeout=timeout)
             if router.supports():
                 return router
         for client in [TplinkC5400XRouter, TPLinkVRClient, TPLinkEXClient, TPLinkMRClient, TPLinkDecoClient,
