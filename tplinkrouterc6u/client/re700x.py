@@ -24,6 +24,46 @@ class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
         self._headers_request = {'Referer': referer}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
         self._url_firmware = "admin/firmware?form=upgrade"
+        self._headers_request = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "If-Modified-Since": "0",
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": self.host,
+            "Connection": "keep-alive",
+            "Referer": "{}/webpages/login.html?v=12c60c5d".format(self.host),
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin"
+        }
+
+    @staticmethod
+    def _str2bool(v) -> bool | None:
+        return str(v).lower() in ("yes", "true", "on") if v is not None else None
+
+    @staticmethod
+    def _map_wire_type(data: str | None, host: bool = True) -> Connection:
+        result = Connection.UNKNOWN
+        if data is None:
+            return result
+        if data == 'wired':
+            result = Connection.WIRED
+        if data.startswith('2.4'):
+            result = Connection.HOST_2G if host else Connection.GUEST_2G
+        elif data.startswith('5'):
+            result = Connection.HOST_5G if host else Connection.GUEST_5G
+        elif data.startswith('6'):
+            result = Connection.HOST_6G if host else Connection.GUEST_6G
+        elif data.startswith('iot_2'):
+            result = Connection.IOT_2G
+        elif data.startswith('iot_5'):
+            result = Connection.IOT_5G
+        elif data.startswith('iot_6'):
+            result = Connection.IOT_6G
+        return result
 
     def get_firmware(self) -> Firmware:
         data = self.request(self._url_firmware, 'operation=read')
@@ -253,12 +293,12 @@ class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
         return []
 
     def get_ipv4_dhcp_leases(self) -> List[IPv4DHCPLease]:
-        leases = []
-        data = self.request("admin/dhcps?form=client", 'operation=read', ignore_response=True)
+        data = self.request("admin/dhcps?form=client", 'operation=load')
         # example answer
         """
         {"success":true,"data":[{"leasetime":"00:00:38","key":"0","macaddr":"a8:46:74:46:14:f8","ipaddr":"192.168.1.59","name":"bedroom-ble"}]}
         """
+        leases = []
         for client in data:
             leases.append(IPv4DHCPLease(
                 get_mac(client.get('macaddr', '00:00:00:00:00:00')),
