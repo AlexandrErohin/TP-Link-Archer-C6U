@@ -56,6 +56,6 @@ jobs:
       - name: Install package
         run: |
           pip install tplinkrouterc6u
-      - name: Test with unittest
+      - name: Test with pytest
         run: |
-          pytest tests
+          pytest test
