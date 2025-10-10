@@ -21,11 +21,12 @@ class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
         self,
         host: str,
         password: str,
+        username: str = "admin",
         logger: Logger = None,
         verify_ssl: bool = True,
         timeout: int = 30,
     ) -> None:
-        super().__init__(host, password, "", logger, verify_ssl, timeout)
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         referer = "{}/webpages/index.html".format(self.host)
         self._headers_request = {"Referer": referer}
