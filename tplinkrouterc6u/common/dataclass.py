@@ -1,31 +1,29 @@
 from macaddress import EUI48
 from ipaddress import IPv4Address
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from tplinkrouterc6u.common.package_enum import Connection
 
 
 @dataclass
 class Firmware:
-    def __init__(self, hardware: str, model: str, firmware: str) -> None:
-        self.hardware_version = hardware
-        self.model = model
-        self.firmware_version = firmware
+    hardware_version: str
+    model: str
+    firmware_version: str
 
 
 @dataclass
 class Device:
-    def __init__(self, type: Connection, macaddr: EUI48, ipaddr: IPv4Address, hostname: str) -> None:
-        self.type = type
-        self._macaddr = macaddr
-        self._ipaddr = ipaddr
-        self.hostname = hostname
-        self.packets_sent: int | None = None
-        self.packets_received: int | None = None
-        self.down_speed: int | None = None
-        self.up_speed: int | None = None
-        self.signal: int | None = None
-        self.active: bool = True
+    type: Connection
+    _macaddr: EUI48
+    _ipaddr: IPv4Address
+    hostname: str
+    packets_sent: int | None = None
+    packets_received: int | None = None
+    down_speed: int | None = None
+    up_speed: int | None = None
+    signal: int | None = None
+    active: bool = True
 
     @property
     def macaddr(self):
@@ -46,31 +44,30 @@ class Device:
 
 @dataclass
 class Status:
-    def __init__(self) -> None:
-        self._wan_macaddr: EUI48 | None = None
-        self._lan_macaddr: EUI48
-        self._wan_ipv4_addr: IPv4Address | None = None
-        self._lan_ipv4_addr: IPv4Address | None = None
-        self._wan_ipv4_gateway: IPv4Address | None = None
-        self.wired_total: int = 0
-        self.wifi_clients_total: int = 0
-        self.guest_clients_total: int = 0
-        self.iot_clients_total: int | None = None
-        self.clients_total: int = 0
-        self.guest_2g_enable: bool
-        self.guest_5g_enable: bool | None = None
-        self.guest_6g_enable: bool | None = None
-        self.iot_2g_enable: bool | None = None
-        self.iot_5g_enable: bool | None = None
-        self.iot_6g_enable: bool | None = None
-        self.wifi_2g_enable: bool
-        self.wifi_5g_enable: bool | None = None
-        self.wifi_6g_enable: bool | None = None
-        self.wan_ipv4_uptime: int | None = None
-        self.mem_usage: float | None = None
-        self.cpu_usage: float | None = None
-        self.conn_type: str | None = None
-        self.devices: list[Device] = []
+    _wan_macaddr: EUI48 | None = None
+    _lan_macaddr: EUI48 = None
+    _wan_ipv4_addr: IPv4Address | None = None
+    _lan_ipv4_addr: IPv4Address | None = None
+    _wan_ipv4_gateway: IPv4Address | None = None
+    wired_total: int = 0
+    wifi_clients_total: int = 0
+    guest_clients_total: int = 0
+    iot_clients_total: int | None = None
+    clients_total: int = 0
+    guest_2g_enable: bool | None = None
+    guest_5g_enable: bool | None = None
+    guest_6g_enable: bool | None = None
+    iot_2g_enable: bool | None = None
+    iot_5g_enable: bool | None = None
+    iot_6g_enable: bool | None = None
+    wifi_2g_enable: bool | None = None
+    wifi_5g_enable: bool | None = None
+    wifi_6g_enable: bool | None = None
+    wan_ipv4_uptime: int | None = None
+    mem_usage: float | None = None
+    cpu_usage: float | None = None
+    conn_type: str | None = None
+    devices: list[Device] = field(default_factory=list)
 
     @property
     def wan_macaddr(self) -> str | None:
