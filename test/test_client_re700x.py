@@ -97,7 +97,25 @@ class TestTPLinkClientRe700X(TestCase):
                 elif path == "admin/extend?form=guest_settings":
                     return loads(
                         """
-                        {"success":true,"data":{"enable_5g":"off","region_status":1,"hide_5g":"off","hide_2g":"off","show2gFlag":"true","mesh_enable":"off","password":"***","show5gFlag":"true","ap_support_mesh":"0","sync_status":"0","ssid_2g":"XYZ","sec":"wpa2/wpa3","ssid_5g":"TP-Link_Guest_5G","enable_2g":"on"}}"""
+                        {
+  "success": true,
+  "data": {
+    "enable_5g": "off",
+    "region_status": 1,
+    "hide_5g": "off",
+    "hide_2g": "off",
+    "show2gFlag": "true",
+    "mesh_enable": "off",
+    "password": "***",
+    "show5gFlag": "true",
+    "ap_support_mesh": "0",
+    "sync_status": "0",
+    "ssid_2g": "XYZ",
+    "sec": "wpa2/wpa3",
+    "ssid_5g": "TP-Link_Guest_5G",
+    "enable_2g": "on"
+  }
+}"""
                     )["data"]
                 raise ClientException()
 
