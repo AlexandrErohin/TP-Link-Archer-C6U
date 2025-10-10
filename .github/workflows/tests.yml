@@ -5,19 +5,21 @@ on:
       - "**"
     paths:
       - ".github/workflows/tests.yml"
-      - "src/**"
+      - "tplinkrouterc6u/**"
       - "test/**"
       - "requirements.txt"
       - "setup.py"
+      - ".flake8"
   push:
     branches:
       - "**"
     paths:
       - ".github/workflows/tests.yml"
-      - "src/**"
+      - "tplinkrouterc6u/**"
       - "test/**"
       - "requirements.txt"
       - "setup.py"
+      - ".flake8"
 
 jobs:
   ci:
