@@ -7,11 +7,17 @@ from tplinkrouterc6u.client.c6u import TplinkBaseRouter
 
 class TplinkC5400XRouter(TplinkBaseRouter):
     def supports(self) -> bool:
-        return len(self.password) >= 200
+        try:
+            self.authorize()
+            return True
+        except ClientException as e:
+            if self._logger:
+                self._logger.debug("TplinkRouter - C5400X - Cannot authorize - not supported! Error - {}".format(e))
+            return False
 
     def authorize(self) -> None:
         if len(self.password) < 200:
-            raise Exception('You need to use web encrypted password instead. Check the documentation!')
+            raise ClientException('You need to use web encrypted password instead. Check the documentation!')
 
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 

@@ -111,6 +111,10 @@ class TplinkRe700XRouter(AbstractRouter, TplinkRequest):
             return False
 
     def authorize(self) -> None:
+        if len(self.password) < 200:
+            raise Exception(
+                "You need to use web encrypted password instead. Check the documentation!"
+            )
         response = post(
             "{}/cgi-bin/luci/;stok=/login?form=login".format(self.host),
             data={"operation": "login", "password": self.password},
