@@ -36,15 +36,14 @@ jobs:
           allow-prereleases: true
       - name: Install pip
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip pytest
       - name: Install package
         run: |
+          # this needs to suffice for passing tests as the
+          # package needs to pull its own dependencies when installed
           pip install -e .
-      - name: Install dependencies
+      - name: Test with pytest
         run: |
-          pip install -r requirements.txt
-      - name: Test with unittest
-        run: |
-          python -m unittest discover -s ./test
+          pytest tests
       - name: Run flake8
         uses: py-actions/flake8@v2
