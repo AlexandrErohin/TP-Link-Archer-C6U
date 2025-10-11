@@ -212,6 +212,8 @@ class TPLinkMRClientBase(AbstractRouter):
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
+        status = self.populate_lte_status(status)
+
         return status
 
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
@@ -682,8 +684,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
             elif status == '2':
                 raise ClientError('Cannot send USSD!')
 
-    def get_lte_status(self) -> LTEStatus:
-        status = LTEStatus()
+    def populate_lte_status(self, status) -> Status:
         acts = [
             self.ActItem(self.ActItem.GET, 'WAN_LTE_LINK_CFG', '2,1,0,0,0,0',
                          attrs=['enable', 'connectStatus', 'networkType', 'roamingStatus', 'simStatus']),
