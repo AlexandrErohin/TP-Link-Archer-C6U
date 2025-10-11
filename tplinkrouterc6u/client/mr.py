@@ -18,7 +18,6 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     SMS,
-    LTEStatus,
     VPNStatus,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
