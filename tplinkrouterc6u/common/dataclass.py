@@ -274,6 +274,36 @@ class LTEStatus:
     rsrq: int | None = None
     snr: int | None = None
     isp_name: str | None = None
+    network_types = {
+        0: "No Service",
+        1: "GSM",
+        2: "WCDMA",
+        3: "4G LTE",
+        4: "TD-SCDMA",
+        5: "CDMA 1x",
+        6: "CDMA 1x Ev-Do",
+        7: "4G+ LTE"
+    }
+    sim_statuses = {
+        0: "No SIM card detected or SIM card error.",
+        1: "No SIM card detected.",
+        2: "SIM card error.",
+        3: "SIM card prepared.",
+        4: "SIM locked.",
+        5: "SIM unlocked. Authentication succeeded.",
+        6: "PIN locked.",
+        7: "SIM card is locked permanently.",
+        8: "suspension of transmission",
+        9: "Unopened"
+    }
+
+    @property
+    def network_type_info(self) -> str:
+        return self.network_types.get(self.network_type, "Unknown network type")
+
+    @property
+    def sim_status_info(self) -> str:
+        return self.sim_statuses.get(self.sim_status, "Unknown SIM status")
 
 
 @dataclass

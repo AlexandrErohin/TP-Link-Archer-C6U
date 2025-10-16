@@ -226,7 +226,9 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | enable | is enabled | int |
 | connect_status | connect status | int |
 | network_type | network type | int |
+| network_type_info | Example: 4G LTE  | str |
 | sim_status | sim status | int |
+| sim_status_info | Example: SIM locked. | str |
 | total_statistics | total statistics in bytes | int |
 | cur_rx_speed | current download speed in bytes per second  | int |
 | cur_tx_speed | current upload speed in bytes per second  | int |
@@ -236,6 +238,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | rsrq | RSRQ  | int |
 | snr | SNR  | int |
 | isp_name | ISP name  | str |
+| network_types | All possible network types - {0: "No Service", 1: "GSM", 2: "WCDMA", 3: "4G LTE", 4: "TD-SCDMA", 5: "CDMA 1x", 6: "CDMA 1x Ev-Do", 7: "4G+ LTE"} | dict |
+| sim_statuses | All possible sim statuses - {0: "No SIM card detected or SIM card error.", 1: "No SIM card detected.", 2: "SIM card error.", 3: "SIM card prepared.", 4: "SIM locked.", 5: "SIM unlocked. Authentication succeeded.", 6: "PIN locked.", 7: "SIM card is locked permanently.", 8: "suspension of transmission", 9: "Unopened"} | dict |
 
 ## Enum
 ### <a id="connection">Connection</a>
