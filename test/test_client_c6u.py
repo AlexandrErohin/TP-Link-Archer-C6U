@@ -769,6 +769,69 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(result.wan_ipv4_gateway, '0.0.0.0')
         self.assertEqual(result.lan_macaddr, '06-E6-97-9E-23-F5')
 
+    def test_get_status_wifi_disabled(self) -> None:
+        """Test that get_status gracefully handles when WiFi is disabled and wireless statistics fail."""
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "wan_macaddr": "06:e6:97:9e:23:f6",
+            "wan_ipv4_ipaddr": "192.168.1.1",
+            "wan_ipv4_gateway": "192.168.1.254",
+            "lan_ipv4_ipaddr": "192.168.0.1",
+            "mem_usage": 0.43,
+            "cpu_usage": 0.28,
+            "conn_type": "1",
+            "access_devices_wired": [
+                {
+                    "wire_type": "wired",
+                    "macaddr": "3d:24:25:24:30:79",
+                    "ipaddr": "192.168.1.228",
+                    "hostname": "SERVER"
+                }
+            ],
+            "access_devices_wireless_host": [],
+            "access_devices_wireless_guest": [],
+            "wireless_2g_enable": "off",
+            "wireless_5g_enable": "off",
+            "guest_2g_enable": "off",
+            "guest_5g_enable": "off"
+        }
+    }
+    '''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    # Simulate the error that occurs when WiFi is disabled
+                    from tplinkrouterc6u.common.exception import ClientError
+                    raise ClientError('TplinkRouter - An unknown response - Expecting value: line 1 column 1 (char 0)')
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_status()
+
+        # Should complete successfully without crashing
+        self.assertIsInstance(result, Status)
+        self.assertEqual(result.wan_macaddr, '06-E6-97-9E-23-F6')
+        self.assertEqual(result.lan_macaddr, '06-E6-97-9E-23-F5')
+        self.assertEqual(result.wan_ipv4_addr, '192.168.1.1')
+        self.assertEqual(result.wan_ipv4_gateway, '192.168.1.254')
+        self.assertEqual(result.lan_ipv4_addr, '192.168.0.1')
+        self.assertEqual(result.wired_total, 1)
+        self.assertEqual(result.wifi_clients_total, 0)
+        self.assertEqual(result.guest_clients_total, 0)
+        self.assertEqual(result.clients_total, 1)
+        self.assertEqual(result.wifi_2g_enable, False)
+        self.assertEqual(result.wifi_5g_enable, False)
+        # Devices list should only contain wired devices
+        self.assertEqual(len(result.devices), 1)
+        self.assertEqual(result.devices[0].type, Connection.WIRED)
+
     def test_vpn_status(self) -> None:
         response_openvpn_read = """
         {
