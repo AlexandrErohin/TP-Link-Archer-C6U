@@ -360,14 +360,19 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 devices[item['mac']].up_speed = item.get('uploadSpeed')
                 devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
 
-        for item in self.request('admin/wireless?form=statistics', 'operation=load'):
-            if item['mac'] not in devices:
-                status.wifi_clients_total += 1
-                type = self._map_wire_type(item.get('type'))
-                devices[item['mac']] = Device(type, EUI48(item['mac']), IPv4Address('0.0.0.0'),
-                                              '')
-            devices[item['mac']].packets_sent = item.get('txpkts')
-            devices[item['mac']].packets_received = item.get('rxpkts')
+        try:
+            wireless_stats = self.request('admin/wireless?form=statistics', 'operation=load')
+            for item in wireless_stats:
+                if item['mac'] not in devices:
+                    status.wifi_clients_total += 1
+                    type = self._map_wire_type(item.get('type'))
+                    devices[item['mac']] = Device(type, EUI48(item['mac']), IPv4Address('0.0.0.0'),
+                                                  '')
+                devices[item['mac']].packets_sent = item.get('txpkts')
+                devices[item['mac']].packets_received = item.get('rxpkts')
+        except Exception:
+            # WiFi might be disabled on the router, skip wireless statistics
+            pass
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
