@@ -5,6 +5,9 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
 ![Python versions](https://img.shields.io/pypi/pyversions/tplinkrouterc6u)
 
+> [!WARNING]
+> A new router firmware update breaks the compatibility. Please try [this fix](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/220#issuecomment-3396658175) 
+
 ## Installation
 `pip install tplinkrouterc6u`
 
@@ -269,14 +272,16 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer A20 v1.0
 - Archer AX10 v1.0
 - Archer AX12 v1.0
+- Archer AX17 v1.0
 - Archer AX20 (v1.0, v3.0)
 - Archer AX21 (v1.20, v3.0)
 - Archer AX23 (v1.0, v1.2)
 - Archer AX50 v1.0
-- Archer AX53 v2
+- Archer AX53 (v1.0, v2)
 - Archer AX55 (v1.0, V1.60, v4.0)
+- Archer AX58 v1.0
 - Archer AX72 V1
-- Archer AX73 V1
+- Archer AX73 (V1, V2.0)
 - Archer AX75 V1
 - Archer AX90 V1.20
 - Archer AXE75 V1
@@ -306,6 +311,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer MR200 (v5, v5.3, v6.0)
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3)
+- Archer NX200
 - Archer VR400 v3
 - Archer VR600 v3
 - Archer VR900v
@@ -342,6 +348,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-XDR3010 V2
 - TL-WDR3600 V1
 - VX420-G2h v1.1
+- VX800v v1
 - XC220-G3v v2.30
 ### <a id="mercusys">MERCUSYS routers</a>
 - MR47BE v1.0
