@@ -54,7 +54,7 @@ class TPLinkMR200Client(TPLinkMRClient):
         # Try to extract token
         r = self.req.get(self.host)
         try:
-            self._token = search(r'var token="(.*)";', r.text).group(1)
+            self.req.headers["TokenID"] = search(r'var token="(.*)";', r.text).group(1)
         except AttributeError:
             raise AuthorizeError()
 
@@ -262,7 +262,7 @@ class TPLinkMR200Client(TPLinkMRClient):
         ret_code = self._parse_ret_val(response)
 
         if ret_code == self.HTTP_RET_OK:
-            self._token = None
+            del self.req.headers["TokenID"]
 
     def send_sms(self, phone_number: str, message: str) -> None:
         acts = [
@@ -379,5 +379,34 @@ class TPLinkMR200Client(TPLinkMRClient):
                 return self.__get_params(True)
             raise ClientException()
 
-    def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
-        return super()._request(url, method, data_str, False, is_login)
+    def req_act(self, acts: list):
+        '''
+        Requests ACTs via the cgi_gdpr proxy
+        '''
+        act_types = []
+        act_data = []
+
+        for act in acts:
+            act_types.append(str(act.type))
+            act_data.append('[{}#{}#{}]{},{}\r\n{}\r\n'.format(
+                act.oid,
+                act.stack,
+                act.pstack,
+                len(act_types) - 1,  # index, starts at 0
+                len(act.attrs),
+                '\r\n'.join(act.attrs)
+            ))
+
+        data = ''.join(act_data)
+        url = f"{self.host}/cgi?" + '&'.join(act_types)
+        (code, response) = self.req.post(url, data=data)
+
+        if code != 200:
+            error = 'TplinkRouter - MR200 -  Response with error; Request {} - Response {}'.format(data, response)
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientError(error)
+
+        result = self._merge_response(response)
+
+        return response, result.get('0') if len(result) == 1 and result.get('0') else result
