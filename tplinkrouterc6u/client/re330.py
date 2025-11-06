@@ -227,10 +227,10 @@ class TplinkRE330Router(AbstractRouter):
 
         return response_text[2][-1:] == '1'
 
-    def reboot(self) -> None: # TODO: Check
+    def reboot(self) -> None:
         self.request(6, 1, True)
 
-    def set_wifi(self, wifi: Connection, enable: bool) -> None: # TODO: Check
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
         enable_string = f'bEnable {int(enable)}'
         text = f'id {RouterConstants.CONNECTION_REQUESTS_MAP[wifi]}\r\n{enable_string}'
         body = self._encrypt_body(text)
@@ -284,7 +284,7 @@ class TplinkRE330Router(AbstractRouter):
         ipv4status._lan_ipv4_netmask = IPv4Address(network_info['lan_mask'])
         return ipv4status
 
-    def get_ipv4_reservations(self) -> list[IPv4Reservation]: # TODO: Fail?
+    def get_ipv4_reservations(self) -> list[IPv4Reservation]:
         body = self._encrypt_body('12|1,0,0')
 
         response = self.request(2, 1, True, data=body)
