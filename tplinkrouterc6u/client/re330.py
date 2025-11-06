@@ -26,22 +26,14 @@ class RouterConstants:
 
     HOST_WIFI_2G_REQUEST = '33|1,1,0'
     HOST_WIFI_5G_REQUEST = '33|2,1,0'
-    GUEST_WIFI_2G_REQUEST = '33|1,2,0'
-    GUEST_WIFI_5G_REQUEST = '33|2,2,0'
-    IOT_WIFI_2G_REQUEST = '33|1,9,0'
-    IOT_WIFI_5G_REQUEST = '33|2,9,0'
 
     CONNECTION_REQUESTS_MAP = {
-            Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
-            Connection.HOST_5G: HOST_WIFI_5G_REQUEST,
-            Connection.GUEST_2G: GUEST_WIFI_2G_REQUEST,
-            Connection.GUEST_5G: GUEST_WIFI_5G_REQUEST,
-            Connection.IOT_2G: IOT_WIFI_2G_REQUEST,
-            Connection.IOT_5G: IOT_WIFI_5G_REQUEST
-        }
+        Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
+        Connection.HOST_5G: HOST_WIFI_5G_REQUEST,
+    }
 
     CONNECTION_TYPE_MAP = {
-        '0': "Dynamic IP",
+        '0': 'Dynamic IP',
         '1': 'Static IP',
         '2': 'PPPoE',
         '3': 'L2TP',
@@ -61,6 +53,7 @@ class RouterConfig:
 @dataclass
 class EncryptionState:
     """Holds encryption-related state."""
+
     def __init__(self):
         self.nn_rsa = ''
         self.ee_rsa = ''
@@ -87,6 +80,9 @@ class TplinkRE330Router(AbstractRouter):
             'Referer': self.host + '/'
         }
 
+    def _init_session(self) -> None:
+        self._session.get(self.host + "/", headers=self._headers)
+
     def supports(self) -> bool:
         try:
             response = self.request(2, 0, data='50|1,0,0')
@@ -96,7 +92,7 @@ class TplinkRE330Router(AbstractRouter):
 
     def authorize(self) -> None:
         # Init session and connexion
-        self._session.get(self.host + "/", headers=self._headers)
+        self._init_session()
         encoded_password = TplinkRE330Router._encrypt_password(self.password)
 
         # Get token encryption strings and encrypt the password
@@ -125,7 +121,7 @@ class TplinkRE330Router(AbstractRouter):
         # Register AES string for decryption on server side
         self.request(16, 0, True, data=f'set {aes_string_encrypted}')
 
-    def logout(self) -> None: # Done
+    def logout(self) -> None:
         self.request(11, 0, True)
 
     def get_firmware(self) -> Firmware:
@@ -146,9 +142,7 @@ class TplinkRE330Router(AbstractRouter):
         device_data_request = '13|1,0,0'
         all_requests = [
             mac_info_request, lan_ip_request, wan_ip_request, device_data_request,
-            RouterConstants.HOST_WIFI_2G_REQUEST, RouterConstants.HOST_WIFI_5G_REQUEST,
-            RouterConstants.GUEST_WIFI_2G_REQUEST, RouterConstants.GUEST_WIFI_5G_REQUEST,
-            RouterConstants.IOT_WIFI_2G_REQUEST, RouterConstants.IOT_WIFI_5G_REQUEST
+            RouterConstants.HOST_WIFI_2G_REQUEST, RouterConstants.HOST_WIFI_5G_REQUEST
         ]
         request_text = '#'.join(all_requests)
         body = self._encrypt_body(request_text)
@@ -191,10 +185,6 @@ class TplinkRE330Router(AbstractRouter):
 
         status.wifi_2g_enable = wifi_status[Connection.HOST_2G]
         status.wifi_5g_enable = wifi_status[Connection.HOST_5G]
-        status.guest_2g_enable = wifi_status[Connection.GUEST_2G]
-        status.guest_5g_enable = wifi_status[Connection.GUEST_5G]
-        status.iot_2g_enable = wifi_status[Connection.IOT_2G]
-        status.iot_5g_enable = wifi_status[Connection.IOT_5G]
 
         status.wired_total = sum(1 for device in mapped_devices if device.type == Connection.WIRED)
         status.wifi_clients_total = sum(1 for device in mapped_devices
@@ -211,7 +201,6 @@ class TplinkRE330Router(AbstractRouter):
 
     def set_led_status(self, status: bool) -> None:
         text = f'id 112|1,0,0\r\nenable {1 if status else 0}\r\n'
-        print(text)
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
 
@@ -339,8 +328,8 @@ class TplinkRE330Router(AbstractRouter):
                 connection_type = Connection.UNKNOWN
 
             device_to_add = Device(connection_type, EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
-            device_to_add.up_speed = 0 # Not supported by the router
-            device_to_add.down_speed = 0 # Not supported by the router
+            device_to_add.up_speed = 0  # Not supported by the router
+            device_to_add.down_speed = 0  # Not supported by the router
             device_to_add.active = device['online'] == '1'
             mapped_devices.append(device_to_add)
         return mapped_devices
@@ -414,7 +403,8 @@ class TplinkRE330Router(AbstractRouter):
         if use_token:
             url += f"&id={self._encryption.token}"
         try:
-            response = self._session.post(url, data=data, timeout=self.timeout, verify=self._verify_ssl, headers=self._headers)
+            response = self._session.post(url, data=data, timeout=self.timeout,
+                                          verify=self._verify_ssl, headers=self._headers)
             # Raises exception for 4XX/5XX status codes for all requests except 1st in authorize
             if not (code == 7 and asyn == 1 and use_token is False and data is None):
                 response.raise_for_status()
