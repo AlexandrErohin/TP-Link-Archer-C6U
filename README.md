@@ -350,6 +350,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - VX420-G2h v1.1
 - VX800v v1
 - XC220-G3v v2.30
+- RE330 v1
 ### <a id="mercusys">MERCUSYS routers</a>
 - MR47BE v1.0
 - MR50G 1.0
