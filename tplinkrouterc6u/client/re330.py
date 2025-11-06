@@ -209,6 +209,24 @@ class TplinkRE330Router(AbstractRouter):
         status.devices = mapped_devices
         return status
 
+    def set_led_status(self, status: bool) -> None:
+        text = f'id 112|1,0,0\r\nenable {1 if status else 0}\r\n'
+        print(text)
+        body = self._encrypt_body(text)
+        self.request(1, 0, True, data=body)
+
+    def get_led_status(self) -> bool:
+        text = '112|1,0,0'
+        body = self._encrypt_body(text)
+        response = self.request(2, 0, True, data=body)
+
+        response_text = self._decrypt_data(response.text)
+        response_text = response_text.splitlines()
+        if len(response_text) < 3:
+            raise ClientException("Invalid response for LED status from router")
+
+        return response_text[2][-1:] == '1'
+
     def reboot(self) -> None: # TODO: Check
         self.request(6, 1, True)
 
