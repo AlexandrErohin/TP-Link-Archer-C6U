@@ -10,6 +10,8 @@ from Crypto.Util.Padding import pad, unpad
 from macaddress import EUI48
 import requests
 from requests import Session
+from datetime import datetime
+import random
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
@@ -21,7 +23,6 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 class RouterConstants:
     AUTH_TOKEN_INDEX1 = 3
     AUTH_TOKEN_INDEX2 = 4
-    DEFAULT_AES_VALUE = "0000000000000000"
 
     HOST_WIFI_2G_REQUEST = '33|1,1,0'
     HOST_WIFI_5G_REQUEST = '33|2,1,0'
@@ -113,8 +114,7 @@ class TplinkRE330Router(AbstractRouter):
         self._encryption.seq = responseText[3]
 
         # Generate key and initialization vector
-        self._encryption.key_aes = RouterConstants.DEFAULT_AES_VALUE
-        self._encryption.iv_aes = RouterConstants.DEFAULT_AES_VALUE
+        self._encryption.key_aes, self._encryption.iv_aes = self._generate_AES_key()
         self._encryption.aes_string = f'k={self._encryption.key_aes}&i={self._encryption.iv_aes}'
 
         # Encrypt AES string
@@ -422,3 +422,11 @@ class TplinkRE330Router(AbstractRouter):
         except requests.exceptions.RequestException as e:
             self._logger.error(f"Network error: {e}")
             raise ClientException(f"Network error: {str(e)}") from e
+
+    @staticmethod
+    def _generate_AES_key() -> str:
+        KEY_LEN = int(128 / 8)
+        IV_LEN = 16
+        key = (str(int(datetime.now().timestamp())) + str(int(random.random()*1000000000)))[:KEY_LEN]
+        iv = (str(int(datetime.now().timestamp())) + str(int(random.random()*1000000000)))[:IV_LEN]
+        return key, iv
