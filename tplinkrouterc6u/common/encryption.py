@@ -86,7 +86,7 @@ class EncryptionWrapper:
 class EncryptionWrapperMR:
     RSA_USE_PKCS_V1_5 = False
     AES_KEY_LEN = 128 // 8
-    AES_IV_LEN = 16
+    AES_IV_LEN = 12 # previously 16
 
     def __init__(self) -> None:
         ts = str(round(time() * 1000))
@@ -100,34 +100,36 @@ class EncryptionWrapperMR:
         self._key = key
         self._iv = iv
 
-    def aes_encrypt(self, raw: str) -> str:
-        # pad to a multiple of 16 with pkcs7
-        data_padded = pad(raw.encode('utf8'), 16, 'pkcs7')
+    def aes_encrypt(self, raw: str) -> tuple[str, str]:
+        # not sure what the padding was for here:
+        # data_padded = pad(raw.encode('utf8'), 16, 'pkcs7')
 
         # encrypt the body
         aes_encryptor = self._make_aes_cipher()
-        encrypted_data_bytes = aes_encryptor.encrypt(data_padded)
-
-        # encode encrypted binary data to base64
-        return b64encode(encrypted_data_bytes).decode('utf8')
+        encrypted_data_bytes, tag = aes_encryptor.encrypt_and_digest(raw.encode('utf-8'))
+        return (
+            b64encode(encrypted_data_bytes).decode(),  # router expects b64 ciphertext
+            b64encode(tag).decode()  # router expects b64 tag (this is new)
+        )
 
     def aes_decrypt(self, data: str):
         # decode base64 string
-        encrypted_response_data = b64decode(data)
-
+        tag = b64decode(data[-24:])  # last 24 characters are the tag
+        encrypted_response_data = b64decode(data[:-24])
         # decrypt the response using our AES key
         aes_decryptor = self._make_aes_cipher()
-        response = aes_decryptor.decrypt(encrypted_response_data)
+        response = aes_decryptor.decrypt_and_verify(encrypted_response_data, tag)
 
-        # unpad using pkcs7
-        return unpad(response, 16, 'pkcs7').decode('utf8')
+        # not sure what unpad did here before:
+        # return unpad(response, 16, 'pkcs7').decode('utf8')
+        return response.decode('utf8')
 
     def get_signature(self, seq: int, is_login: bool, hash: str, nn: str, ee: str) -> str:
         if is_login:
             # on login we also send our AES key, which is subsequently
             # used for E2E encrypted communication
-
-            sign_data = 'key={}&iv={}&h={}&s={}'.format(self._key, self._iv, hash, seq)
+            # key and iv now base64 not like before
+            sign_data = 'key={}&iv={}&h={}&s={}'.format(b64encode(self._key.encode('utf-8')).decode(), b64encode(self._iv.encode('utf-8')).decode(), hash, seq)
         else:
             sign_data = 'h={}&s={}'.format(hash, seq)
 
@@ -179,7 +181,8 @@ class EncryptionWrapperMR:
         return signature
 
     def _make_aes_cipher(self) -> AES:
-        return AES.new(self._key.encode('utf8'), AES.MODE_CBC, iv=self._iv.encode('utf8'))
+        # consider renaming _iv to _nonce
+        return AES.new(self._key.encode('utf-8'), AES.MODE_GCM, nonce=self._iv.encode('utf-8'))
 
     @staticmethod
     def _make_rsa_pub_key(nn: str, ee: str):
