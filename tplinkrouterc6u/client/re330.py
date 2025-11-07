@@ -16,7 +16,7 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation
-from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus
+from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
 
@@ -62,6 +62,7 @@ class EncryptionState:
         self.iv_aes = ''
         self.aes_string = ''
         self.token = ''
+
 
 # Note: This router doesn't support VPN and up/down speeds per device
 class TplinkRE330Router(AbstractRouter):
@@ -357,7 +358,7 @@ class TplinkRE330Router(AbstractRouter):
         return "".join(result)
 
     @staticmethod
-    def _encode_token(encoded_password: str, response: str) -> str:
+    def _encode_token(encoded_password: str, response: requests.Response) -> str:
         response_text = response.text.splitlines()
         auth_info1 = response_text[RouterConstants.AUTH_TOKEN_INDEX1]
         auth_info2 = response_text[RouterConstants.AUTH_TOKEN_INDEX2]
@@ -414,7 +415,7 @@ class TplinkRE330Router(AbstractRouter):
             raise ClientException(f"Network error: {str(e)}") from e
 
     @staticmethod
-    def _generate_AES_key() -> str:
+    def _generate_AES_key() -> tuple[str, str]:
         KEY_LEN = int(128 / 8)
         IV_LEN = 16
         key = (str(int(datetime.now().timestamp())) + str(int(random.random()*1000000000)))[:KEY_LEN]

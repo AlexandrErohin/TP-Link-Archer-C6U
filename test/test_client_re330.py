@@ -2,7 +2,7 @@ from unittest import main, TestCase
 from ipaddress import IPv4Address
 from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
-from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
+from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease
 from tplinkrouterc6u import Connection, ClientException
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 
@@ -10,13 +10,14 @@ from tplinkrouterc6u.client.re330 import TplinkRE330Router
 IPV4_STATUS_RESPONSE = ('00000\r\nid 1|1,0,0\r\noldAuthKey \r\nsetWzd 1\r\nmode 3\r\nlogLevel 3\r\nfastpath 1\r\n'
                         'mac 0 00-00-00-00-00-01\r\nmac 1 00-00-00-00-00-02\r\nauthKey keykeykey\r\nid 4|1,0,0\r\n'
                         'ip 2.2.2.2\r\nmask 255.255.255.0\r\ngateway 3.3.3.3\r\ndns 0 1.1.1.1\r\n'
-                        'dns 1 8.8.8.8\r\nmode 0\r\nid 8|1,0,0\r\nmode 2\r\npoolStart 192.168.1.100\r\npoolEnd 192.168.1.199\r\n'
-                        'leaseTime 120\r\ndns 0 0.0.0.0\r\ndns 1 0.0.0.0\r\ngateway 0.0.0.0\r\nhostName \r\nid 22|1,0,0\r\n'
-                        'enable 1\r\nwirelessWanNoUsed 0\r\nlinkMode 0\r\nlinkType 0\r\nid 23|1,0,0\r\nip 4.4.4.4\r\n'
-                        'mask 255.255.252.0\r\ngateway 5.5.5.5\r\ndns 0 1.1.1.1\r\ndns 1 8.8.8.8\r\n'
+                        'dns 1 8.8.8.8\r\nmode 0\r\nid 8|1,0,0\r\nmode 2\r\npoolStart 192.168.1.100\r\n'
+                        'poolEnd 192.168.1.199\r\n'
+                        'leaseTime 120\r\ndns 0 0.0.0.0\r\ndns 1 0.0.0.0\r\ngateway 0.0.0.0\r\nhostName \r\n'
+                        'id 22|1,0,0\r\nenable 1\r\nwirelessWanNoUsed 0\r\nlinkMode 0\r\nlinkType 0\r\nid 23|1,0,0\r\n'
+                        'ip 4.4.4.4\r\nmask 255.255.252.0\r\ngateway 5.5.5.5\r\ndns 0 1.1.1.1\r\ndns 1 8.8.8.8\r\n'
                         'status 1\r\ncode 0\r\nupTime 0\r\ninPkts 0\r\ninOctets 0\r\noutPkts 0\r\noutOctets 0\r\n'
-                        'inRates 0\r\noutRates 0\r\ndualMode 0\r\ndualIp 0.0.0.0\r\ndualMask 0.0.0.0\r\ndualGateway 0.0.0.0\r\n'
-                        'dualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\ndualCode 0\r\ndualStatus 0')
+                        'inRates 0\r\noutRates 0\r\ndualMode 0\r\ndualIp 0.0.0.0\r\ndualMask 0.0.0.0\r\n'
+                        'dualGateway 0.0.0.0\r\ndualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\ndualCode 0\r\ndualStatus 0')
 
 STATUS_RESPONSE_TEXT = ('00000\r\nid 1|1,0,0\r\noldAuthKey \r\nsetWzd 1\r\nmode 3\r\nlogLevel 3\r\nfastpath 1\r\n'
                         'mac 0 00-00-00-00-00-01\r\nmac 1 00-00-00-00-00-02\r\nauthKey keykeykey\r\nid 4|1,0,0\r\n'
@@ -24,27 +25,32 @@ STATUS_RESPONSE_TEXT = ('00000\r\nid 1|1,0,0\r\noldAuthKey \r\nsetWzd 1\r\nmode 
                         'mode 0\r\nid 23|1,0,0\r\nip 4.4.4.4\r\nmask 255.255.255.0\r\ngateway 5.5.5.5\r\n'
                         'dns 0 1.1.1.1\r\ndns 1 8.8.8.8\r\nstatus 1\r\ncode 0\r\nupTime 0\r\ninPkts 0\r\ninOctets 0\r\n'
                         'outPkts 0\r\noutOctets 0\r\ninRates 0\r\noutRates 0\r\ndualMode 0\r\ndualIp 0.0.0.0\r\n'
-                        'dualMask 0.0.0.0\r\ndualGateway 0.0.0.0\r\ndualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\ndualCode 0\r\n'
-                        'dualStatus 0\r\nid 13|1,0,0\r\n'
-                        'ip 0 10.10.10.10\r\nip 1 11.11.11.11\r\nip 2 0.0.0.0\r\nip 3 0.0.0.0\r\nip 4 0.0.0.0\r\nip 5 0.0.0.0\r\n'
-                        'mac 0 00-00-00-00-00-03\r\nmac 1 00-00-00-00-00-04\r\nmac 2 00-00-00-00-00-00\r\nmac 3 00-00-00-00-00-00\r\nmac 4 00-00-00-00-00-00\r\nmac 5 00-00-00-00-00-00\r\n'
+                        'dualMask 0.0.0.0\r\ndualGateway 0.0.0.0\r\ndualDns 0 0.0.0.0\r\ndualDns 1 0.0.0.0\r\n'
+                        'dualCode 0\r\ndualStatus 0\r\nid 13|1,0,0\r\nip 0 10.10.10.10\r\nip 1 11.11.11.11\r\n'
+                        'ip 2 0.0.0.0\r\nip 3 0.0.0.0\r\nip 4 0.0.0.0\r\nip 5 0.0.0.0\r\nmac 0 00-00-00-00-00-03\r\n'
+                        'mac 1 00-00-00-00-00-04\r\nmac 2 00-00-00-00-00-00\r\nmac 3 00-00-00-00-00-00\r\n'
+                        'mac 4 00-00-00-00-00-00\r\nmac 5 00-00-00-00-00-00\r\n'
                         'reserved 0 \r\nreserved 1 \r\nreserved 2 \r\nreserved 3 \r\nreserved 4 \r\nreserved 5 \r\n'
-                        'bindEntry 0 0\r\nbindEntry 1 0\r\nbindEntry 2 0\r\nbindEntry 3 0\r\nbindEntry 4 0\r\nbindEntry 5 0\r\n'
-                        'staMgtEntry 0 0\r\nstaMgtEntry 1 0\r\nstaMgtEntry 2 0\r\nstaMgtEntry 3 0\r\nstaMgtEntry 4 0\r\nstaMgtEntry 5 0\r\n'
-                        'type 0 3\r\ntype 1 1\r\ntype 2 0\r\ntype 3 0\r\ntype 4 0\r\ntype 5 0\r\n'
-                        'online 0 1\r\nonline 1 1\r\nonline 2 0\r\nonline 3 0\r\nonline 4 0\r\nonline 5 0\r\n'
-                        'name 0 ANONYMOUS\r\nname 1 BANANA-12\r\nname 2 \r\nname 3 \r\nname 4 \r\nname 5 \r\n'
-                        'DevType 0 OTHER\r\nDevType 1 OTHER\r\nDevType 2 \r\nDevType 3 \r\nDevType 4 \r\nDevType 5 \r\n'
-                        'id 33|1,1,0\r\nuUnit 0\r\ncSsidPrefix \r\nuRadiusIp 0.0.0.0\r\nuRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\n'
-                        'uKeyLength 0 0\r\nuKeyLength 1 0\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0 \r\ncKeyVal 1 \r\ncKeyVal 2 \r\ncKeyVal 3 \r\n'
-                        'uRadiusPort 1812\r\nuKeyType 1\r\nuDefaultKey 1\r\nbEnable 1\r\nbBcastSsid 1\r\ncSsid SuperWifi\r\n'
-                        'bSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3\r\nuRadiusSecOpt 3\r\nuPSKSecOpt 2\r\nuRadiusEncryptType 4\r\n'
-                        'uPSKEncryptType 3\r\ncRadiusSecret \r\ncPskSecret YouThoughtIdForgetMyKey?\r\nbSecCheck 0\r\nbEnabled 1\r\nbPinEnabled 0\r\n'
-                        'cUsrPIN 11100111\r\nbConfigured 0\r\nbIsLocked 0\r\nid 33|2,1,0\r\nuUnit 0\r\ncSsidPrefix \r\nuRadiusIp 0.0.0.0\r\n'
-                        'uRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\nuKeyLength 1 0\r\nuKeyLength 2 0\r\nuKeyLength 3 0'
-                        '\r\ncKeyVal 0 \r\ncKeyVal 1 \r\ncKeyVal 2 \r\ncKeyVal 3 \r\nuRadiusPort 1812\r\nuKeyType 1\r\nuDefaultKey 1\r\nbEnable 1\r\n'
-                        'bBcastSsid 1\r\ncSsid SuperWifi\r\nbSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3\r\nuRadiusSecOpt 3\r\nuPSKSecOpt 2\r\n'
-                        'uRadiusEncryptType 4\r\nuPSKEncryptType 3\r\ncRadiusSecret \r\ncPskSecret YouThoughtIdForgetMyKey?\r\nbSecCheck 0\r\n'
+                        'bindEntry 0 0\r\nbindEntry 1 0\r\nbindEntry 2 0\r\nbindEntry 3 0\r\nbindEntry 4 0\r\n'
+                        'bindEntry 5 0\r\nstaMgtEntry 0 0\r\nstaMgtEntry 1 0\r\nstaMgtEntry 2 0\r\nstaMgtEntry 3 0\r\n'
+                        'staMgtEntry 4 0\r\nstaMgtEntry 5 0\r\ntype 0 3\r\ntype 1 1\r\ntype 2 0\r\ntype 3 0\r\n'
+                        'type 4 0\r\ntype 5 0\r\nonline 0 1\r\nonline 1 1\r\nonline 2 0\r\nonline 3 0\r\nonline 4 0\r\n'
+                        'online 5 0\r\nname 0 ANONYMOUS\r\nname 1 BANANA-12\r\nname 2 \r\nname 3 \r\nname 4 \r\n'
+                        'name 5 \r\nDevType 0 OTHER\r\nDevType 1 OTHER\r\nDevType 2 \r\nDevType 3 \r\nDevType 4 \r\n'
+                        'DevType 5 \r\nid 33|1,1,0\r\nuUnit 0\r\ncSsidPrefix \r\nuRadiusIp 0.0.0.0\r\n'
+                        'uRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\nuKeyLength 1 0\r\n'
+                        'uKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0 \r\ncKeyVal 1 \r\ncKeyVal 2 \r\ncKeyVal 3 \r\n'
+                        'uRadiusPort 1812\r\nuKeyType 1\r\nuDefaultKey 1\r\nbEnable 1\r\nbBcastSsid 1\r\n'
+                        'cSsid SuperWifi\r\nbSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3\r\nuRadiusSecOpt 3\r\n'
+                        'uPSKSecOpt 2\r\nuRadiusEncryptType 4\r\nuPSKEncryptType 3\r\ncRadiusSecret \r\n'
+                        'cPskSecret YouThoughtIdForgetMyKey?\r\nbSecCheck 0\r\nbEnabled 1\r\nbPinEnabled 0\r\n'
+                        'cUsrPIN 11100111\r\nbConfigured 0\r\nbIsLocked 0\r\nid 33|2,1,0\r\nuUnit 0\r\ncSsidPrefix \r\n'
+                        'uRadiusIp 0.0.0.0\r\nuRadiusGKUpdateIntvl 0\r\nuPskGKUpdateIntvl 0\r\nuKeyLength 0 0\r\n'
+                        'uKeyLength 1 0\r\nuKeyLength 2 0\r\nuKeyLength 3 0\r\ncKeyVal 0 \r\ncKeyVal 1 \r\n'
+                        'cKeyVal 2 \r\ncKeyVal 3 \r\nuRadiusPort 1812\r\nuKeyType 1\r\nuDefaultKey 1\r\nbEnable 1\r\n'
+                        'bBcastSsid 1\r\ncSsid SuperWifi\r\nbSecurityEnable 1\r\nuAuthType 3\r\nuWEPSecOpt 3\r\n'
+                        'uRadiusSecOpt 3\r\nuPSKSecOpt 2\r\nuRadiusEncryptType 4\r\nuPSKEncryptType 3\r\n'
+                        'cRadiusSecret \r\ncPskSecret YouThoughtIdForgetMyKey?\r\nbSecCheck 0\r\n'
                         'bEnabled 1\r\nbPinEnabled 0\r\ncUsrPIN 11100111\r\nbConfigured 0\r\nbIsLocked 0')
 
 
@@ -76,8 +82,10 @@ class TplinkRE330RouterTest(TplinkRE330Router):
         if code == 7 and asyn == 1:
             if use_token is False:
                 # Authorization
-                return ResponseMock('00007\r\n00004\r\n00002\r\nBC97577E65233B3E1137C61091D64176C334E52AD78FFBDDABC826B685435E'
-                                    '9D3DE83FE70C2AC62D6B13BD8EADA10B5623F9354DA0E99636A4F5519CA2DC2DC3\r\n12345656\r\n00000')
+                return ResponseMock('00007\r\n00004\r\n00002\r\n'
+                                    'BC97577E65233B3E1137C61091D64176C334E52AD78FFBDDABC826B685435E'
+                                    '9D3DE83FE70C2AC62D6B13BD8EADA10B5623F9354DA0E99636A4F5519CA2DC2DC3\r\n'
+                                    '12345656\r\n00000')
             elif use_token is True:
                 return ResponseMock('00000')
         elif code == 16 and asyn == 0:
@@ -101,8 +109,8 @@ class TestTPLinkClient(TestCase):
 
     def test_supports(self) -> None:
         response = ('00000\r\nid 50|1,0,0\r\ncurrentLanguage\r\n'
-                    'languageList bg_BG,cs_CZ,de_DE,en_US,es_ES,es_LA,fr_FR,hu_HU,it_IT,ja_JP,ko_KR,nl_NL,pl_PL,pt_BR,pt_PT,ro_RO,ru_RU,sk_SK,tr_TR,uk_UA,vi_VN,zh_TW\r\n'
-                    'setByUser 0')
+                    'languageList bg_BG,cs_CZ,de_DE,en_US,es_ES,es_LA,fr_FR,hu_HU,it_IT,ja_JP,ko_KR,nl_NL,pl_PL,pt_BR,'
+                    'pt_PT,ro_RO,ru_RU,sk_SK,tr_TR,uk_UA,vi_VN,zh_TW\r\nsetByUser 0')
 
         client = TplinkRE330RouterTest('', '')
         client.response = response
@@ -120,10 +128,11 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(encryption.seq, '12345656')
 
     def test_get_firmware(self) -> None:
-        response = ('00000\r\nid 0|1,0,0\r\nfullName TP-Link%20Wireless%20Extender%20RE330\r\n'
-                    'facturer TP-Link\r\nmodelName RE330\r\nmodelVer 1\r\nsoftVer 1.0.23%20Build%20230418%20Rel.60395n\r\n'
-                    'hardVer %20RE330%201.0\r\nprodId 0x3300001\r\ncloudShouldActive 1\r\ncountryId 0x0\r\nspecialId 0x5545\r\n'
-                    'countryCode 0x4544\r\nmainVer 0x5a010017\r\nminorVer 0x1\r\noemId 0x1\r\ndeviceId 8002A1F018FA0C879DB62FA981FB0D1D231D490F\r\n'
+        response = ('00000\r\nid 0|1,0,0\r\nfullName TP-Link%20Wireless%20Extender%20RE330\r\nfacturer TP-Link\r\n'
+                    'modelName RE330\r\nmodelVer 1\r\nsoftVer 1.0.23%20Build%20230418%20Rel.60395n\r\n'
+                    'hardVer %20RE330%201.0\r\nprodId 0x3300001\r\ncloudShouldActive 1\r\ncountryId 0x0\r\n'
+                    'specialId 0x5545\r\ncountryCode 0x4544\r\nmainVer 0x5a010017\r\nminorVer 0x1\r\noemId 0x1\r\n'
+                    'deviceId 8002A1F018FA0C879DB62FA981FB0D1D231D490F\r\n'
                     'hardwareId 5E055ADC85F0800C6C3044E5A3180E2A\r\nfirmwareId FFFFFFFFFFFFFFFFFFFF033001004555\r\n'
                     'oem_id B30DDAF6C31C08B9C50A48B0B9168003\r\nfacturerType 0')
 
