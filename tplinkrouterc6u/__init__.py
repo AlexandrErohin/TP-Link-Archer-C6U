@@ -10,6 +10,7 @@ from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
+from tplinkrouterc6u.client.re330 import TplinkRE330Router
 from tplinkrouterc6u.provider import TplinkRouterProvider
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
