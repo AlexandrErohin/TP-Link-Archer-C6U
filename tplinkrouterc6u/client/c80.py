@@ -1,12 +1,9 @@
 from dataclasses import dataclass
 from logging import Logger
 from urllib import parse
-from base64 import b64encode, b64decode
 from collections import defaultdict
 from ipaddress import IPv4Address
 import re
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
 from macaddress import EUI48
 import requests
 from requests import Session
@@ -21,7 +18,6 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 class RouterConstants:
     AUTH_TOKEN_INDEX1 = 3
     AUTH_TOKEN_INDEX2 = 4
-    DEFAULT_AES_VALUE = "0000000000000000"
 
     HOST_WIFI_2G_REQUEST = '33|1,1,0'
     HOST_WIFI_5G_REQUEST = '33|2,1,0'
@@ -64,9 +60,7 @@ class EncryptionState:
         self.nn_rsa = ''
         self.ee_rsa = ''
         self.seq = ''
-        self.key_aes = ''
-        self.iv_aes = ''
-        self.aes_string = ''
+        self.aes = EncryptionWrapper()
         self.token = ''
 
 
@@ -105,14 +99,11 @@ class TplinkC80Router(AbstractRouter):
         self._encryption.nn_rsa = responseText[2]
         self._encryption.seq = responseText[3]
 
-        # Generate key and initialization vector
-        self._encryption.key_aes = RouterConstants.DEFAULT_AES_VALUE
-        self._encryption.iv_aes = RouterConstants.DEFAULT_AES_VALUE
-        self._encryption.aes_string = f'k={self._encryption.key_aes}&i={self._encryption.iv_aes}'
-
         # Encrypt AES string
-        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(self._encryption.aes_string, self._encryption.nn_rsa,
+        aes_string_encrypted = EncryptionWrapper.rsa_encrypt(self._encryption.aes._get_aes_string(),
+                                                             self._encryption.nn_rsa,
                                                              self._encryption.ee_rsa)
+
         # Register AES string for decryption on server side
         self.request(16, 0, True, data=f'set {aes_string_encrypted}')
         # Some auth request, might be redundant
@@ -368,7 +359,7 @@ class TplinkC80Router(AbstractRouter):
 
     def _get_signature(self, datalen: int) -> str:
         encryption = self._encryption
-        r = f'{encryption.aes_string}&s={str(int(encryption.seq) + datalen)}'
+        r = f'{encryption.aes._get_aes_string()}&s={str(int(encryption.seq) + datalen)}'
         e = ''
         n = 0
         while n < len(r):
@@ -377,24 +368,12 @@ class TplinkC80Router(AbstractRouter):
         return e
 
     def _encrypt_body(self, text: str) -> str:
-        encryption = self._encryption
-
-        key_bytes = encryption.key_aes.encode("utf-8")
-        iv_bytes = encryption.iv_aes.encode("utf-8")
-
-        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
-        data = b64encode(cipher.encrypt(pad(text.encode("utf-8"), AES.block_size))).decode()
-
+        data = self._encryption.aes.aes_encrypt(text)
         sign = self._get_signature(len(data))
         return f'sign={sign}\r\ndata={data}'
 
     def _decrypt_data(self, encrypted_text: str) -> str:
-        key_bytes = self._encryption.key_aes.encode("utf-8")
-        iv_bytes = self._encryption.iv_aes.encode("utf-8")
-
-        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
-        decrypted_padded = cipher.decrypt(b64decode(encrypted_text))
-        return unpad(decrypted_padded, AES.block_size).decode("utf-8")
+        return self._encryption.aes.aes_decrypt(encrypted_text)
 
     def _extract_value(self, response_list, prefix):
         return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
