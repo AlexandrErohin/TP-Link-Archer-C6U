@@ -116,6 +116,8 @@ class TPLinkXDRClient(AbstractRouter):
             dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
             dev.up_speed = item['up_speed']
             dev.down_speed = item['down_speed']
+            if 'online' in item:
+                dev.active = item['online'] == '1'
             status.devices.append(dev)
         return status
 
