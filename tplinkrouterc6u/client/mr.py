@@ -96,10 +96,7 @@ class TPLinkMRClientBase(AbstractRouter):
             return False
 
     def authorize(self) -> None:
-        '''
-        Establishes a login session to the host using provided credentials
-        '''
-        # hash the password
+        self._token = None
 
         # request the RSA public key from the host
         self._nn, self._ee, self._seq = self._req_rsa_key()
@@ -595,15 +592,13 @@ class TPLinkMRClientBaseGCM(TPLinkMRClientBase):
         self._encryption = EncryptionWrapperMRGCM()
 
     def supports(self) -> bool:
-        support = False
         try:
-            if super().supports():
-                self.authorize()
-                support = True
+            self.authorize()
+            return True
         except Exception:
             pass
-        finally:
-            return support
+
+        return False
 
     def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
         headers = self.HEADERS
