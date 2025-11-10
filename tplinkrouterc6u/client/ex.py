@@ -277,10 +277,10 @@ class TPLinkEXClient(TPLinkMRClientBase):
             b64encode(bytes(self.password, "utf-8")).decode("utf-8")
         )
 
-        sign, data = self._prepare_data(login_data, True)
+        sign, data, tag = self._prepare_data(login_data, True)
         assert len(sign) == 256
 
-        request_data = f"sign={sign}\r\ndata={data}\r\n"
+        request_data = f"sign={sign}\r\ndata={data}\r\ntag={tag}\r\n"
 
         url = f"{self.host}/cgi_gdpr?9"
         (code, response) = self._request(url, data_str=request_data)
