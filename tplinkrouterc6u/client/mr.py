@@ -534,8 +534,8 @@ class TPLinkMRClientBase(AbstractRouter):
 
         # encrypt request data if needed (for the /cgi_gdpr endpoint)
         if encrypt:
-            sign, data = self._prepare_data(data_str, is_login)
-            data = 'sign={}\r\ndata={}\r\n'.format(sign, data)
+            sign, data ,tag = self._prepare_data(data_str, is_login)
+            data = 'sign={}\r\ndata={}\r\ntag={}\r\n'.format(sign, data, tag)
         else:
             data = data_str
 
@@ -578,13 +578,13 @@ class TPLinkMRClientBase(AbstractRouter):
         return int(result.group(1))
 
     def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
-        encrypted_data = self._encryption.aes_encrypt(data)
+        encrypted_data, tag = self._encryption.aes_encrypt(data)
         data_len = len(encrypted_data)
         # get encrypted signature
         signature = self._encryption.get_signature(int(self._seq) + data_len, is_login, self._hash, self._nn, self._ee)
 
         # format expected raw request data
-        return signature, encrypted_data
+        return signature, encrypted_data, tag
 
 
 class TPLinkMRClient(TPLinkMRClientBase):
