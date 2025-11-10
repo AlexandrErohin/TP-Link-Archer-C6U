@@ -81,37 +81,45 @@ class TPLinkMR200Client(TPLinkMRClient):
         ]
         _, values = self.req_act(acts)
 
-        if values['0'].__class__ == list:
-            values['0'] = values['0'][0]
+        # Safe access for '0'
+        data0 = values.get('0', values)  # fallback to full dict if '0' key doesn't exist
+        if isinstance(data0, list):
+            data0 = data0[0]
 
-        status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
-        status._lan_ipv4_addr = IPv4Address(values['0']['IPInterfaceIPAddress'])
+        status._lan_macaddr = EUI48(data0['X_TP_MACAddress'])
+        status._lan_ipv4_addr = IPv4Address(data0['IPInterfaceIPAddress'])
 
         for item in self._to_list(values.get('1')):
-            if int(item['enable']) == 0 and values.get('1').__class__ == list:
+            if int(item.get('enable', 1)) == 0:
                 continue
-            status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
-            status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
-            status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
+            status._wan_macaddr = EUI48(item.get('MACAddress')) if item.get('MACAddress') else None
+            status._wan_ipv4_addr = IPv4Address(item.get('externalIPAddress'))
+            status._wan_ipv4_gateway = IPv4Address(item.get('defaultGateway'))
             status.conn_type = item.get('name', '')
 
-        if values['2'].__class__ != list:
-            status.wifi_2g_enable = bool(int(values['2']['enable']))
-        else:
-            status.wifi_2g_enable = bool(int(values['2'][0]['enable']))
-            status.wifi_5g_enable = bool(int(values['2'][1]['enable']))
+        # Wifi status
+        wifi_data = values.get('2', {})
+        if isinstance(wifi_data, dict):
+            status.wifi_2g_enable = bool(int(wifi_data.get('enable', 0)))
+        elif isinstance(wifi_data, list):
+            status.wifi_2g_enable = bool(int(wifi_data[0].get('enable', 0)))
+            if len(wifi_data) > 1:
+                status.wifi_5g_enable = bool(int(wifi_data[1].get('enable', 0)))
 
-        if values['3'].__class__ != list:
-            status.guest_2g_enable = bool(int(values['3']['enable']))
-        else:
-            status.guest_2g_enable = bool(int(values['3'][0]['enable']))
-            status.guest_5g_enable = bool(int(values['3'][1]['enable']))
+        guest_data = values.get('3', {})
+        if isinstance(guest_data, dict):
+            status.guest_2g_enable = bool(int(guest_data.get('enable', 0)))
+        elif isinstance(guest_data, list):
+            status.guest_2g_enable = bool(int(guest_data[0].get('enable', 0)))
+            if len(guest_data) > 1:
+                status.guest_5g_enable = bool(int(guest_data[1].get('enable', 0)))
 
+        # Devices
         devices = {}
         for val in self._to_list(values.get('4')):
-            if int(val['active']) == 0:
+            if int(val.get('active', 0)) == 0:
                 continue
-            conn = self.CLIENT_TYPES.get(int(val['X_TP_ConnType']))
+            conn = self.CLIENT_TYPES.get(int(val.get('X_TP_ConnType', -1)))
             if conn is None:
                 continue
             elif conn == Connection.WIRED:
@@ -120,21 +128,25 @@ class TPLinkMR200Client(TPLinkMRClient):
                 status.guest_clients_total += 1
             elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
-            devices[val['MACAddress']] = Device(conn,
-                                                EUI48(val['MACAddress']),
-                                                IPv4Address(val['IPAddress']),
-                                                val['hostName'])
+            devices[val['MACAddress']] = Device(
+                conn,
+                EUI48(val['MACAddress']),
+                IPv4Address(val['IPAddress']),
+                val.get('hostName', '')
+            )
 
         for val in self._to_list(values.get('5')):
-            if val['associatedDeviceMACAddress'] not in devices:
+            mac = val.get('associatedDeviceMACAddress')
+            if mac not in devices:
                 status.wifi_clients_total += 1
-                devices[val['associatedDeviceMACAddress']] = Device(
+                devices[mac] = Device(
                     Connection.HOST_2G,
-                    EUI48(val['associatedDeviceMACAddress']),
+                    EUI48(mac),
                     IPv4Address('0.0.0.0'),
-                    '')
-            devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
-            devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
+                    ''
+                )
+            devices[mac].packets_sent = int(val.get('X_TP_TotalPacketsSent', 0))
+            devices[mac].packets_received = int(val.get('X_TP_TotalPacketsReceived', 0))
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
@@ -219,31 +231,24 @@ class TPLinkMR200Client(TPLinkMRClient):
     def get_vpn_status(self) -> VPNStatus:
         status = VPNStatus()
         acts = [
-            self.ActItem(self.ActItem.GET, 'OPENVPN'),
-            self.ActItem(self.ActItem.GET, 'PPTPVPN'),
-            self.ActItem(self.ActItem.GL, 'OVPN_CLIENT'),
-            self.ActItem(self.ActItem.GL, 'PVPN_CLIENT'),
+            self.ActItem(self.ActItem.GL, 'IPSEC_CFG'),
         ]
         _, values = self.req_act(acts)
 
-        status.openvpn_enable = values['0']['enable'] == '1'
-        status.pptpvpn_enable = values['1']['enable'] == '1'
-
-        for item in values['2']:
-            if item['connAct'] == '1':
-                status.openvpn_clients_total += 1
-
-        for item in values['3']:
-            if item['connAct'] == '1':
-                status.pptpvpn_clients_total += 1
+        status.ipsecvpn_enable = values.get('enable') == '1'
 
         return status
 
     def set_vpn(self, vpn: VPN, enable: bool) -> None:
         acts = [
-            self.ActItem(self.ActItem.SET, vpn.value, attrs=['enable={}'.format(int(enable))])
+            self.ActItem(
+                self.ActItem.SET, 
+                'IPSEC_CFG',
+                '1,0,0,0,0,0',
+                attrs=['enable={}'.format(int(enable))]
+            )
         ]
-
+        
         self.req_act(acts)
 
     def logout(self) -> None:
@@ -298,17 +303,19 @@ class TPLinkMR200Client(TPLinkMRClient):
 
         return messages
 
-    def set_sms_read(self, sms: SMS) -> None:
+    def set_sms_read(self, sms) -> None:
+        sms_id = sms.id if hasattr(sms, 'id') else sms
         acts = [
             self.ActItem(
-                self.ActItem.SET, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0', attrs=['unread=0']),
+                self.ActItem.SET, 'LTE_SMS_RECVMSGENTRY', f'{sms_id},0,0,0,0,0', attrs=['unread=0']),
         ]
         self.req_act(acts)
 
-    def delete_sms(self, sms: SMS) -> None:
+    def delete_sms(self, sms) -> None:
+        sms_id = sms.id if hasattr(sms, 'id') else sms
         acts = [
             self.ActItem(
-                self.ActItem.DEL, 'LTE_SMS_RECVMSGENTRY', f'{sms.id},0,0,0,0,0'),
+                self.ActItem.DEL, 'LTE_SMS_RECVMSGENTRY', f'{sms_id},0,0,0,0,0'),
         ]
         self.req_act(acts)
 
@@ -339,30 +346,31 @@ class TPLinkMR200Client(TPLinkMRClient):
 
     def get_lte_status(self) -> LTEStatus:
         status = LTEStatus()
-        acts = [
-            self.ActItem(self.ActItem.GET, 'WAN_LTE_LINK_CFG', '2,1,0,0,0,0'),
-            self.ActItem(self.ActItem.GET, 'WAN_LTE_INTF_CFG', '2,0,0,0,0,0'),
-            self.ActItem(self.ActItem.GET, 'LTE_NET_STATUS', '2,1,0,0,0,0'),
-            self.ActItem(self.ActItem.GET, 'LTE_PROF_STAT', '2,1,0,0,0,0'),
-        ]
-        _, values = self.req_act(acts)
+        
+        _, link_data = self.req_act([
+            self.ActItem(self.ActItem.GET, 'WAN_LTE_LINK_CFG', '2,1,0,0,0,0')
+        ])
+        _, intf_data = self.req_act([
+            self.ActItem(self.ActItem.GET, 'WAN_LTE_INTF_CFG', '2,0,0,0,0,0')
+        ])
+        _, wan_data = self.req_act([
+            self.ActItem(self.ActItem.GET, 'LTE_WAN_CFG', '2,1,0,0,0,0')
+        ])
+       
+        status.enable = link_data.get('enable', 0)
+        status.connect_status = link_data.get('connectStatus', 0)
+        status.network_type = link_data.get('networkType', 0)
+        status.sim_status = link_data.get('simStatus', 0)
+        status.sig_level = link_data.get('signalStrength', 0)
+        
+        status.total_statistics = intf_data.get('totalStatistics', 0)
+        status.cur_rx_speed = intf_data.get('curRxSpeed', 0)
+        status.cur_tx_speed = intf_data.get('curTxSpeed', 0)
+        
+        status.isp_name = wan_data.get('profileName', '')
 
-        status.enable = int(values['0']['enable'])
-        status.connect_status = int(values['0']['connectStatus'])
-        status.network_type = int(values['0']['networkType'])
-        status.sim_status = int(values['0']['simStatus'])
-
-        status.total_statistics = int(float(values['1']['totalStatistics']))
-        status.cur_rx_speed = int(values['1']['curRxSpeed'])
-        status.cur_tx_speed = int(values['1']['curTxSpeed'])
-
-        status.sms_unread_count = int(values['2']['smsUnreadCount'])
-        status.sig_level = int(values['2']['sigLevel'])
-        status.rsrp = int(values['2']['rfInfoRsrp'])
-        status.rsrq = int(values['2']['rfInfoRsrq'])
-        status.snr = int(values['2']['rfInfoSnr'])
-
-        status.isp_name = values['3']['ispName']
+        sms_list = self.get_sms()
+        status.sms_unread_count = sum(1 for m in sms_list if getattr(m, 'unread', False))
 
         return status
 
@@ -399,14 +407,16 @@ class TPLinkMR200Client(TPLinkMRClient):
 
         data = ''.join(act_data)
         url = f"{self.host}/cgi?" + '&'.join(act_types)
-        (code, response) = self.req.post(url, data=data)
+        response = self.req.post(url, data=data)
+        code = response.status_code
 
         if code != 200:
-            error = 'TplinkRouter - MR200 -  Response with error; Request {} - Response {}'.format(data, response)
+            error = 'TplinkRouter - MR200 -  Response with error; Request {} - Response {}'.format(data, response.text)
             if self._logger:
                 self._logger.debug(error)
             raise ClientError(error)
 
-        result = self._merge_response(response)
+        # Convert Response to string for _merge_response
+        result = self._merge_response(response.text)
 
         return response, result.get('0') if len(result) == 1 and result.get('0') else result
