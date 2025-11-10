@@ -15,9 +15,10 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Status,
     VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
-from tplinkrouterc6u.client.mr import TPLinkMRClientBase
+from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
 
 
+# Class for EX series routers which supports old firmwares with AES cipher CBC mode
 class TPLinkEXClient(TPLinkMRClientBase):
     WIFI_SET = {
         Connection.HOST_2G: '1,0,0,0,0,0',
@@ -277,10 +278,10 @@ class TPLinkEXClient(TPLinkMRClientBase):
             b64encode(bytes(self.password, "utf-8")).decode("utf-8")
         )
 
-        sign, data, tag = self._prepare_data(login_data, True)
+        sign, data = self._prepare_data(login_data, True)
         assert len(sign) == 256
 
-        request_data = f"sign={sign}\r\ndata={data}\r\ntag={tag}\r\n"
+        request_data = f"sign={sign}\r\ndata={data}\r\n"
 
         url = f"{self.host}/cgi_gdpr?9"
         (code, response) = self._request(url, data_str=request_data)
@@ -331,3 +332,39 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
 
         self.req_act(acts)
+
+
+# Class for EX series routers which supports AES cipher GCM mode
+class TPLinkEXClientGCM(TPLinkMRClientBaseGCM, TPLinkEXClient):
+
+    def _req_login(self) -> None:
+        login_data = ('{"data":{"UserName":"%s","Passwd":"%s","Action": "1","stack":"0,0,0,0,0,0",'
+                      '"pstack":"0,0,0,0,0,0"},"operation":"cgi","oid":"/cgi/login"}') % (
+            b64encode(bytes(self.username, "utf-8")).decode("utf-8"),
+            b64encode(bytes(self.password, "utf-8")).decode("utf-8")
+        )
+
+        sign, data, tag = self._prepare_data(login_data, True)
+        assert len(sign) == 256
+
+        request_data = f"sign={sign}\r\ndata={data}\r\ntag={tag}\r\n"
+
+        url = f"{self.host}/cgi_gdpr?9"
+        (code, response) = self._request(url, data_str=request_data)
+        response = self._encryption.aes_decrypt(response)
+
+        # parse and match return code
+        ret_code = self._parse_ret_val(response)
+        error = ''
+        if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
+            error = ('TplinkRouter - EX - Login failed, wrong user or password. '
+                     'Try to pass user instead of admin in username')
+        elif ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
+            error = 'TplinkRouter - EX - Login failed. Generic error code: {}'.format(ret_code)
+        elif ret_code != self.HTTP_RET_OK:
+            error = 'TplinkRouter - EX - Login failed. Unknown error code: {}'.format(ret_code)
+
+        if error:
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
