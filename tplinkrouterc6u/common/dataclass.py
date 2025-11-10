@@ -310,5 +310,6 @@ class LTEStatus:
 class VPNStatus:
     openvpn_enable: bool | None = None
     pptpvpn_enable: bool | None = None
+    ipsecvpn_enable: bool | None = None
     openvpn_clients_total: int = 0
     pptpvpn_clients_total: int = 0

@@ -264,6 +264,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 ### <a id="vpn">VPN</a>
 - VPN.OPEN_VPN
 - VPN.PPTP_VPN
+- VPN.IPSEC
 
 ## <a id="supports">Supported routers</a>
 - [TP-LINK routers](#tplink)
