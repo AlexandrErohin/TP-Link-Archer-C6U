@@ -16,7 +16,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
  - [pycryptodome](https://pypi.org/project/pycryptodome/)
 
 ## Usage
-Enter the host & credentials used to log in to your router management page. Username is admin by default. But you may pass username as third parameter
+Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
 
 ```python
 from tplinkrouterc6u import (
@@ -25,12 +25,14 @@ from tplinkrouterc6u import (
     TplinkC1200Router,
     TplinkC5400XRouter,
     TPLinkMRClient,
+    TPLinkMR200Client,
     TPLinkVRClient,
     TPLinkEXClient,
     TPLinkXDRClient,
     TPLinkDecoClient,
     TplinkC80Router,
     TplinkWDRRouter,
+    TplinkRE330Router,
     Connection
 )
 from logging import Logger
@@ -308,7 +310,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer C80 (1.0, 2.20)
 - Archer C5400X V1
 - Archer GX90 v1.0
-- Archer MR200 (v5, v5.3, v6.0)
+- Archer MR200 (v2, v5, v5.3, v6.0)
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3)
 - Archer NX200 v2.0
@@ -347,11 +349,13 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
 - TL-WDR3600 V1
+- TL-XDR6088 v1.0.30
 - VX420-G2h v1.1
 - VX800v v1
 - XC220-G3v v2.30
 - RE330 v1
 ### <a id="mercusys">MERCUSYS routers</a>
+- AC10 1.20
 - MR47BE v1.0
 - MR50G 1.0
 - H60XR 1.0
