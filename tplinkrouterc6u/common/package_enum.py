@@ -49,6 +49,7 @@ class Connection(Enum):
 class VPN(Enum):
     OPEN_VPN = 'OPENVPN'
     PPTP_VPN = 'PPTPVPN'
+    IPSEC = 'IPSEC'
 
     @property
     def lowercase(self) -> str:
