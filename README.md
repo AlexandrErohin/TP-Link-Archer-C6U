@@ -215,6 +215,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | --- |---|---|
 | openvpn_enable | OpenVPN is enabled | bool |
 | pptpvpn_enable | PPTPVPN is enabled | bool |
+| ipsecvpn_enable | IPSEC is enabled | bool |
 | openvpn_clients_total | OpenVPN clients connected | int |
 | pptpvpn_clients_total | PPTPVPN clients connected | int |
 
