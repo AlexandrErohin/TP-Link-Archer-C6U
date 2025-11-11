@@ -80,6 +80,7 @@ class TPLinkMRClientBase(AbstractRouter):
         if self._verify_ssl is False:
             self.req.verify = False
         self._token = None
+        self._authorized_at = None
         self._hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
         self._nn = None
         self._ee = None
@@ -96,6 +97,8 @@ class TPLinkMRClientBase(AbstractRouter):
             return False
 
     def authorize(self) -> None:
+        if self._token is not None and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
+            return
         self._token = None
 
         # request the RSA public key from the host
@@ -106,6 +109,7 @@ class TPLinkMRClientBase(AbstractRouter):
 
         # request TokenID
         self._token = self._req_token()
+        self._authorized_at = datetime.now()
 
     def reboot(self) -> None:
         acts = [
