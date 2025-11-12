@@ -360,6 +360,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 devices[item['mac']].up_speed = item.get('uploadSpeed')
                 devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
 
+        # Store main wifi count (so only the total will be incremented for any new devices from wireless statistics array)
+        status.main_wifi_clients_total = status.wifi_clients_total
+        
         try:
             wireless_stats = self.request('admin/wireless?form=statistics', 'operation=load')
             for item in wireless_stats:
@@ -376,6 +379,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        # Test in case iot_clients_total has already been set by smart_network code
+        if status.iot_clients_total is None:
+            status.iot_clients_total = status.wifi_clients_total - status.main_wifi_clients_total - status.guest_clients_total
 
         return status
 
