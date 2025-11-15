@@ -23,6 +23,15 @@ class Device:
     down_speed: int | None = None
     up_speed: int | None = None
     signal: int | None = None
+    online_time: float | None = None
+    traffic_usage: int | None = None
+    device_type: str | None = None
+    enable_limit: bool | None = None
+    download_limit: int | None = None
+    upload_limit: int | None = None
+    enable_priority: bool | None = None
+    tx_rate: int | None = None
+    rx_rate: int | None = None
     active: bool = True
 
     @property

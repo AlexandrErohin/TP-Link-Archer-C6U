@@ -269,6 +269,27 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
         self.request(path, data)
 
+    def get_guest_wifi_info(self) -> dict:
+        return self.request('admin/wireless?form=guest_2g&form=guest_5g&form=guest_2g5g', 'operation=read')
+
+    def set_guest_wifi_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_psk_key={password}'
+        self.request(path, data, ignore_response=True)
+
+    def set_guest_wifi_portal_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_portal_password={password}'
+        self.request(path, data, ignore_response=True)
+
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 
@@ -359,6 +380,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 devices[item['mac']].down_speed = item.get('downloadSpeed')
                 devices[item['mac']].up_speed = item.get('uploadSpeed')
                 devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
+                devices[item['mac']].online_time = float(item.get('onlineTime')) if item.get('onlineTime') is not None else None
+                devices[item['mac']].traffic_usage = int(item.get('trafficUsage')) if item.get('trafficUsage') is not None else None
+                devices[item['mac']].device_type = item.get('deviceType')
+                devices[item['mac']].enable_limit = self._str2bool(item.get('enableLimit'))
+                devices[item['mac']].download_limit = int(item.get('downloadLimit')) if item.get('downloadLimit') is not None else None
+                devices[item['mac']].upload_limit = int(item.get('uploadLimit')) if item.get('uploadLimit') is not None else None
+                devices[item['mac']].enable_priority = item.get('enablePriority')
+                devices[item['mac']].tx_rate = int(item.get('txrate')) if item.get('txrate') is not None else None
+                devices[item['mac']].rx_rate = int(item.get('rxrate')) if item.get('rxrate') is not None else None
+                devices[item['mac']].active = item.get('deviceTag') != 'offline'
 
         try:
             wireless_stats = self.request('admin/wireless?form=statistics', 'operation=load')
