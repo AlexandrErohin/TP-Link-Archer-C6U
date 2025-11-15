@@ -380,6 +380,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 devices[item['mac']].down_speed = item.get('downloadSpeed')
                 devices[item['mac']].up_speed = item.get('uploadSpeed')
                 devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
+                devices[item['mac']].online_time = float(item.get('onlineTime')) if item.get('onlineTime') is not None else None
+                devices[item['mac']].traffic_usage = int(item.get('trafficUsage')) if item.get('trafficUsage') is not None else None
+                devices[item['mac']].device_type = item.get('deviceType')
+                devices[item['mac']].enable_limit = self._str2bool(item.get('enableLimit'))
+                devices[item['mac']].download_limit = int(item.get('downloadLimit')) if item.get('downloadLimit') is not None else None
+                devices[item['mac']].upload_limit = int(item.get('uploadLimit')) if item.get('uploadLimit') is not None else None
+                devices[item['mac']].enable_priority = item.get('enablePriority')
+                devices[item['mac']].tx_rate = int(item.get('txrate')) if item.get('txrate') is not None else None
+                devices[item['mac']].rx_rate = int(item.get('rxrate')) if item.get('rxrate') is not None else None
+                devices[item['mac']].active = item.get('deviceTag') != 'offline'
 
         try:
             wireless_stats = self.request('admin/wireless?form=statistics', 'operation=load')
