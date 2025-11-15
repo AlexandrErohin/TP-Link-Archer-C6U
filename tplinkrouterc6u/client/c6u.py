@@ -269,6 +269,27 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
         self.request(path, data)
 
+    def get_guest_wifi_info(self) -> dict:
+        return self.request('admin/wireless?form=guest_2g&form=guest_5g&form=guest_2g5g', 'operation=read')
+
+    def set_guest_wifi_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_psk_key={password}'
+        self.request(path, data, ignore_response=True)
+
+    def set_guest_wifi_portal_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_portal_password={password}'
+        self.request(path, data, ignore_response=True)
+
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 
