@@ -23,5 +23,6 @@ from tplinkrouterc6u.common.dataclass import (
     SMS,
     LTEStatus,
     VPNStatus,
+    GuestWifiStatus,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

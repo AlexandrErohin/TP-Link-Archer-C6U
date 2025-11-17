@@ -322,3 +322,19 @@ class VPNStatus:
     ipsecvpn_enable: bool | None = None
     openvpn_clients_total: int = 0
     pptpvpn_clients_total: int = 0
+
+
+@dataclass
+class GuestWifiStatus:
+    guest_2g_enable: bool | None = None
+    guest_2g_ssid: str | None = None
+    guest_2g_encryption: str | None = None
+    guest_2g_psk_key: str | None = None
+    guest_2g_portal_enable: bool | None = None
+    guest_2g_portal_password: str | None = None
+    guest_5g_enable: bool | None = None
+    guest_5g_ssid: str | None = None
+    guest_5g_encryption: str | None = None
+    guest_5g_psk_key: str | None = None
+    guest_5g_portal_enable: bool | None = None
+    guest_5g_portal_password: str | None = None

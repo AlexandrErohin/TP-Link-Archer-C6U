@@ -10,10 +10,50 @@ from tplinkrouterc6u import (
     Device,
     ClientException,
     VPN,
+    GuestWifiStatus,
 )
 
 
 class TestTPLinkClient(TestCase):
+    def test_get_guest_wifi_info(self) -> None:
+        response_guest_wifi = '''
+        {
+            "success": true,
+            "data": {
+                "guest_2g_enable": "on",
+                "guest_2g_ssid": "guest_2g",
+                "guest_2g_encryption": "psk",
+                "guest_2g_psk_key": "password",
+                "guest_2g_portal_enable": "off",
+                "guest_5g_enable": "off",
+                "guest_5g_ssid": "guest_5g",
+                "guest_5g_encryption": "none",
+                "guest_5g_psk_key": ""
+            }
+        }
+        '''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/wireless?form=guest_2g&form=guest_5g&form=guest_2g5g':
+                    return loads(response_guest_wifi)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        guest_wifi_info = client.get_guest_wifi_info()
+
+        self.assertIsInstance(guest_wifi_info, GuestWifiStatus)
+        self.assertEqual(guest_wifi_info.guest_2g_enable, True)
+        self.assertEqual(guest_wifi_info.guest_2g_ssid, "guest_2g")
+        self.assertEqual(guest_wifi_info.guest_2g_encryption, "psk")
+        self.assertEqual(guest_wifi_info.guest_2g_psk_key, "password")
+        self.assertEqual(guest_wifi_info.guest_2g_portal_enable, False)
+        self.assertEqual(guest_wifi_info.guest_5g_enable, False)
+        self.assertEqual(guest_wifi_info.guest_5g_ssid, "guest_5g")
+        self.assertEqual(guest_wifi_info.guest_5g_encryption, "none")
+        self.assertEqual(guest_wifi_info.guest_5g_psk_key, "")
+
     def test_get_status(self) -> None:
         response_status = '''
 {
@@ -448,7 +488,9 @@ class TestTPLinkClient(TestCase):
   {
       "data": [
           {"mac": "06:82:9d:2b:8f:c6", "deviceTag":"2.4G", "isGuest":false, "ip":"192.168.1.186",
-          "deviceName":"name1", "uploadSpeed":12, "downloadSpeed":77},
+          "deviceName":"name1", "uploadSpeed":12, "downloadSpeed":77, "onlineTime": "123.45", "trafficUsage": "12345",
+          "deviceType": "pc", "enableLimit": "on", "downloadLimit": "100", "uploadLimit": "50", "enablePriority": "on",
+          "txrate": "1000", "rxrate": "2000"},
           {"mac": "fb:90:b8:2a:8a:b1", "deviceTag":"iot_2.4G", "isGuest":false, "ip":"192.168.1.187",
           "deviceName":"name2"},
           {"mac": "54:b3:a2:f7:be:ea", "deviceTag":"iot_5G", "isGuest":false, "ip":"192.168.1.188",
@@ -552,6 +594,15 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[2].packets_received, 4867482)
         self.assertEqual(status.devices[2].up_speed, 12)
         self.assertEqual(status.devices[2].down_speed, 77)
+        self.assertEqual(status.devices[2].online_time, 123.45)
+        self.assertEqual(status.devices[2].traffic_usage, 12345)
+        self.assertEqual(status.devices[2].device_type, "pc")
+        self.assertEqual(status.devices[2].enable_limit, True)
+        self.assertEqual(status.devices[2].download_limit, 100)
+        self.assertEqual(status.devices[2].upload_limit, 50)
+        self.assertEqual(status.devices[2].enable_priority, "on")
+        self.assertEqual(status.devices[2].tx_rate, 1000)
+        self.assertEqual(status.devices[2].rx_rate, 2000)
         self.assertIsInstance(status.devices[3], Device)
         self.assertEqual(status.devices[3].type, Connection.IOT_2G)
         self.assertEqual(status.devices[3].macaddr, 'FB-90-B8-2A-8A-B1')
@@ -671,37 +722,68 @@ class TestTPLinkClient(TestCase):
                 return None
 
         client = TPLinkRouterTest('', '')
-        result = client.set_wifi(Connection.HOST_2G, False)
-        self.assertIsNone(result)
+        client.set_wifi(Connection.HOST_2G, enable=False)
         self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_2g')
         self.assertEqual(check_data, 'operation=write&wireless_2g_enable=off')
-        client.set_wifi(Connection.HOST_2G, True)
+        client.set_wifi(Connection.HOST_2G, enable=True)
         self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_2g')
         self.assertEqual(check_data, 'operation=write&wireless_2g_enable=on')
-        client.set_wifi(Connection.HOST_5G, False)
+        client.set_wifi(Connection.HOST_5G, psk_key='new_password')
         self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_5g')
-        self.assertEqual(check_data, 'operation=write&wireless_5g_enable=off')
-        client.set_wifi(Connection.HOST_6G, True)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=wireless_6g')
-        self.assertEqual(check_data, 'operation=write&wireless_6g_enable=on')
-        client.set_wifi(Connection.GUEST_2G, True)
+        self.assertEqual(check_data, 'operation=write&wireless_5g_psk_key=new_password')
+        client.set_wifi(Connection.GUEST_2G, ssid='new_ssid', hidden='on')
         self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_2g')
-        self.assertEqual(check_data, 'operation=write&guest_2g_enable=on')
-        client.set_wifi(Connection.GUEST_5G, False)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_5g')
-        self.assertEqual(check_data, 'operation=write&guest_5g_enable=off')
-        client.set_wifi(Connection.GUEST_6G, True)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=guest_6g')
-        self.assertEqual(check_data, 'operation=write&guest_6g_enable=on')
-        client.set_wifi(Connection.IOT_2G, True)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_2g')
-        self.assertEqual(check_data, 'operation=write&iot_2g_enable=on')
-        client.set_wifi(Connection.IOT_5G, False)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_5g')
-        self.assertEqual(check_data, 'operation=write&iot_5g_enable=off')
-        client.set_wifi(Connection.IOT_6G, True)
-        self.assertEqual(check_url, 'admin/wireless?&form=guest&form=iot_6g')
-        self.assertEqual(check_data, 'operation=write&iot_6g_enable=on')
+        self.assertEqual(check_data, 'operation=write&guest_2g_ssid=new_ssid&guest_2g_hidden=on')
+
+    def test_set_guest_wifi_password(self) -> None:
+        check_url = ''
+        check_data = ''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.set_guest_wifi_password('new_password', band='2g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_2g')
+        self.assertEqual(check_data, 'operation=write&guest_2g_psk_key=new_password')
+
+        client.set_guest_wifi_password('new_password_5g', band='5g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_5g')
+        self.assertEqual(check_data, 'operation=write&guest_5g_psk_key=new_password_5g')
+
+        client.set_guest_wifi_password('new_password_2g5g', band='2g5g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_2g5g')
+        self.assertEqual(check_data, 'operation=write&guest_2g5g_psk_key=new_password_2g5g')
+
+    def test_set_guest_wifi_portal_password(self) -> None:
+        check_url = ''
+        check_data = ''
+
+        class TPLinkRouterTest(TplinkRouter):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.set_guest_wifi_portal_password('new_portal_password', band='2g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_2g')
+        self.assertEqual(check_data, 'operation=write&guest_2g_portal_password=new_portal_password')
+
+        client.set_guest_wifi_portal_password('new_portal_password_5g', band='5g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_5g')
+        self.assertEqual(check_data, 'operation=write&guest_5g_portal_password=new_portal_password_5g')
+
+        client.set_guest_wifi_portal_password('new_portal_password_2g5g', band='2g5g')
+        self.assertEqual(check_url, 'admin/wireless?form=guest&form=guest_2g5g')
+        self.assertEqual(check_data, 'operation=write&guest_2g5g_portal_password=new_portal_password_2g5g')
 
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'
