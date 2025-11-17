@@ -252,7 +252,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def authorize(self) -> bool:
         pass
 
-    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
+                 encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
+                 hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
+                 disabled_all: str = None, portal_password: str = None) -> None:
         values = {
             Connection.HOST_2G: 'wireless_2g',
             Connection.HOST_5G: 'wireless_5g',
@@ -264,11 +267,47 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             Connection.IOT_5G: 'iot_5g',
             Connection.IOT_6G: 'iot_6g',
         }
-        value = values.get(wifi)
-        path = f"admin/wireless?&form=guest&form={value}"
-        data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
-        self.request(path, data)
 
+        value = values.get(wifi)
+        if not value:
+            raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
+
+        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                   htmode, channel, txpower, disabled_all, portal_password]):
+            raise ValueError("At least one wireless setting must be provided")
+
+        data = "operation=write"
+
+        if enable is not None:
+            data += f"&{value}_enable={'on' if enable else 'off'}"
+        if ssid is not None:
+            data += f"&{value}_ssid={ssid}"
+        if hidden is not None:
+            data += f"&{value}_hidden={hidden}"
+        if encryption is not None:
+            data += f"&{value}_encryption={encryption}"
+        if psk_version is not None:
+            data += f"&{value}_psk_version={psk_version}"
+        if psk_cipher is not None:
+            data += f"&{value}_psk_cipher={psk_cipher}"
+        if psk_key is not None:
+            data += f"&{value}_psk_key={psk_key}"
+        if hwmode is not None:
+            data += f"&{value}_hwmode={hwmode}"
+        if htmode is not None:
+            data += f"&{value}_htmode={htmode}"
+        if channel is not None:
+            data += f"&{value}_channel={channel}"
+        if txpower is not None:
+            data += f"&{value}_txpower={txpower}"
+        if disabled_all is not None:
+            data += f"&{value}_disabled_all={disabled_all}"
+        if portal_password is not None:
+            data += f"&{value}_portal_password={portal_password}"
+
+        path = f"admin/wireless?&form=guest&form={value}"
+        self.request(path, data)
+    
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 
