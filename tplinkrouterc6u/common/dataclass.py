@@ -23,6 +23,15 @@ class Device:
     down_speed: int | None = None
     up_speed: int | None = None
     signal: int | None = None
+    online_time: float | None = None
+    traffic_usage: int | None = None
+    device_type: str | None = None
+    enable_limit: bool | None = None
+    download_limit: int | None = None
+    upload_limit: int | None = None
+    enable_priority: bool | None = None
+    tx_rate: int | None = None
+    rx_rate: int | None = None
     active: bool = True
 
     @property
@@ -313,3 +322,19 @@ class VPNStatus:
     ipsecvpn_enable: bool | None = None
     openvpn_clients_total: int = 0
     pptpvpn_clients_total: int = 0
+
+
+@dataclass
+class GuestWifiStatus:
+    guest_2g_enable: bool | None = None
+    guest_2g_ssid: str | None = None
+    guest_2g_encryption: str | None = None
+    guest_2g_psk_key: str | None = None
+    guest_2g_portal_enable: bool | None = None
+    guest_2g_portal_password: str | None = None
+    guest_5g_enable: bool | None = None
+    guest_5g_ssid: str | None = None
+    guest_5g_encryption: str | None = None
+    guest_5g_psk_key: str | None = None
+    guest_5g_portal_enable: bool | None = None
+    guest_5g_portal_password: str | None = None
