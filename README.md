@@ -298,6 +298,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer AX3000 V1
 - Archer AX6000 V1
 - Archer AX11000 V1
+- Archer BE220 v1.0
 - Archer BE230 v1.0
 - Archer BE400 v1.0
 - Archer BE550 v1.0
@@ -359,6 +360,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - VX420-G2h v1.1
 - VX800v v1
 - XC220-G3v v2.30
+- RE305 4.0
+- RE315 1.0
 - RE330 v1
 ### <a id="mercusys">MERCUSYS routers</a>
 - AC10 1.20
