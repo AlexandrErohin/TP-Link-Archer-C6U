@@ -22,12 +22,10 @@ class TPLinkMR200Client(TPLinkMRClient):
             return False
 
     def authorize(self) -> None:
-        params = self.__get_params()
+        self.__get_params()
 
         # Construct the RSA public key manually using modulus (n) and exponent (e)
-        n = int(params["nn"])
-        e = int(params["ee"])
-        pub_key = RSA.construct((n, e))
+        pub_key = RSA.construct((self._nn, self._ee))
 
         # Create an RSA cipher with PKCS#1 v1.5 padding (same as rsa.encrypt)
         cipher = PKCS1_v1_5.new(pub_key)
@@ -116,7 +114,7 @@ class TPLinkMR200Client(TPLinkMRClient):
 
         return status
 
-    def __get_params(self, retry=False):
+    def __get_params(self, retry=False) -> None:
         self.req.headers = {'referer': f'{self.host}/', 'origin': self.host}
         try:
             r = self.req.get(f"{self.host}/cgi/getParm", timeout=5)
@@ -124,12 +122,13 @@ class TPLinkMR200Client(TPLinkMRClient):
             for line in r.text.splitlines()[0:2]:
                 match = search(r"var (.*)=\"(.*)\"", line)
                 result[match.group(1)] = int(match.group(2), 16)
-            assert {"nn", "ee"} <= result.keys(), "missing RSA keys nn/ee in TPLinkMR200Client"
-            return result
-        except Exception:
+
+            self._nn = int(result["nn"])
+            self._ee = int(result["ee"])
+        except Exception as e:
             if not retry:
-                return self.__get_params(True)
-            raise ClientException()
+                self.__get_params(True)
+            raise ClientException(str(e))
 
     def req_act(self, acts: list):
         '''

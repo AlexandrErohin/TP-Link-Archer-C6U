@@ -9,19 +9,22 @@ class TestTPLinkMR200Client(TestCase):
         self.obj = TPLinkMR200Client('', '')
 
     def test_supports_false(self):
-        fake_response1 = MagicMock()
-        fake_response1.text = (
-            'var param1="0x1A"\n'
-            'var param2="0x2B"\n'
-            'ignored line\n'
-        )
-        fake_response2 = MagicMock()
-        fake_response2.text = '404'
+        responses = [
+            'var param1="0x1A"\nvar param2="0x2B"\nignored line\n',
+            '404',
+            'var nn="dfgdfg"\nvar ee="0x2B"\n'
+        ]
 
-        with patch.object(Session, "get", side_effect=[fake_response1, fake_response2]):
-            result = self.obj.supports()
+        fake_responses = []
+        for text in responses:
+            r = MagicMock()
+            r.text = text
+            fake_responses.append(r)
 
-        self.assertEqual(result, False)
+        with patch.object(Session, "get", side_effect=fake_responses):
+            for _ in range(len(fake_responses)):
+                result = self.obj.supports()
+                self.assertFalse(result)
 
     def test_supports_true(self):
         fake_response = MagicMock()
