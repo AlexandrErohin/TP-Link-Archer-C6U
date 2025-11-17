@@ -256,7 +256,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
                  hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
-                 disabled_all: str = None) -> None:
+                 disabled_all: str = None, portal_password: str = None) -> None:
         values = {
             Connection.HOST_2G: 'wireless_2g',
             Connection.HOST_5G: 'wireless_5g',
@@ -274,7 +274,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
 
         if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
-                                   htmode, channel, txpower, disabled_all]):
+                                   htmode, channel, txpower, disabled_all, portal_password]):
             raise ValueError("At least one wireless setting must be provided")
 
         data = "operation=write"
@@ -303,6 +303,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             data += f"&{value}_txpower={txpower}"
         if disabled_all is not None:
             data += f"&{value}_disabled_all={disabled_all}"
+        if portal_password is not None:
+            data += f"&{value}_portal_password={portal_password}"
 
         path = f"admin/wireless?&form=guest&form={value}"
         self.request(path, data)
@@ -323,22 +325,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         guest_wifi.guest_5g_portal_enable = self._str2bool(data.get('guest_5g_portal_enable'))
         guest_wifi.guest_5g_portal_password = data.get('guest_5g_portal_password')
         return guest_wifi
-
-    def set_guest_wifi_password(self, password: str, band: str = '2g5g') -> None:
-        if band not in ['2g', '5g', '2g5g']:
-            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
-        form_name = f'guest_{band}'
-        path = f'admin/wireless?form=guest&form={form_name}'
-        data = f'operation=write&{form_name}_psk_key={password}'
-        self.request(path, data, ignore_response=True)
-
-    def set_guest_wifi_portal_password(self, password: str, band: str = '2g5g') -> None:
-        if band not in ['2g', '5g', '2g5g']:
-            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
-        form_name = f'guest_{band}'
-        path = f'admin/wireless?form=guest&form={form_name}'
-        data = f'operation=write&{form_name}_portal_password={password}'
-        self.request(path, data, ignore_response=True)
 
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
