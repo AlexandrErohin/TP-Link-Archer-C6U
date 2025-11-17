@@ -124,6 +124,7 @@ class TPLinkMR200Client(TPLinkMRClient):
             for line in r.text.splitlines()[0:2]:
                 match = search(r"var (.*)=\"(.*)\"", line)
                 result[match.group(1)] = int(match.group(2), 16)
+            assert {"nn", "ee"} <= result.keys(), "missing RSA keys nn/ee in TPLinkMR200Client"
             return result
         except Exception:
             if not retry:
