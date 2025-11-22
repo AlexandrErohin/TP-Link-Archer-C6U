@@ -365,6 +365,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for item in wireless_stats:
                 if item['mac'] not in devices:
                     status.wifi_clients_total += 1
+                    # if the wireless device wasn't in wireless_guest or wireless_host, it is counted as iot 
+                    # (since statistics array doesn't identify grouping)
+                    if status.iot_clients_total is None:
+                        status.iot_clients_total = 0
+                    status.iot_clients_total += 1
                     type = self._map_wire_type(item.get('type'))
                     devices[item['mac']] = Device(type, EUI48(item['mac']), IPv4Address('0.0.0.0'),
                                                   '')
