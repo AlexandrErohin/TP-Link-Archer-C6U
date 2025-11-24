@@ -16,7 +16,9 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
  - [pycryptodome](https://pypi.org/project/pycryptodome/)
 
 ## Usage
-Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
+- Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
+- Use Local Password which is for Log In with Local Password. Login with TP-LINK ID doesnt work
+- If you use `https` connection - You need to turn on "Local Management via HTTPS" (advanced->system->administration) in the router web UI
 
 ```python
 from tplinkrouterc6u import (
@@ -271,7 +273,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - [TP-LINK routers](#tplink)
 - [MERCUSYS routers](#mercusys)
 ### <a id="tplink">TP-LINK routers</a>
-- Archer A6 V2.0
+- Archer A6 (2.0, 4.0)
 - Archer A7 V5
 - Archer A8 (1.0, 2.20)
 - Archer A9 V6
