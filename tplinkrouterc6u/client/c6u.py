@@ -240,6 +240,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
+        self._url_smart_network = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
         self._url_openvpn = 'admin/openvpn?form=config&operation=read'
         self._url_pptpd = 'admin/pptpd?form=config&operation=read'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
@@ -341,7 +342,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         smart_network = None
         if self._smart_network:
             try:
-                smart_network = self.request('admin/smart_network?form=game_accelerator', 'operation=loadDevice')
+                smart_network = self.request(self._url_smart_network, 'operation=loadDevice')
             except Exception:
                 self._smart_network = False
 
@@ -483,6 +484,7 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         self._url_firmware = 'admin/firmware?form=upgrade'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
+        self._url_smart_network = 'admin/smart_network?form=game_accelerator'
         self._url_openvpn = 'admin/openvpn?form=config'
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
