@@ -3,7 +3,7 @@ from tplinkrouterc6u.client.mr import TPLinkMRClient
 from Crypto.PublicKey import RSA
 from binascii import hexlify
 from Crypto.Cipher import PKCS1_v1_5
-from re import search
+from re import search, findall
 from tplinkrouterc6u.common.package_enum import VPN
 from tplinkrouterc6u.common.dataclass import (
     LTEStatus,
@@ -79,7 +79,7 @@ class TPLinkMR200Client(TPLinkMRClient):
         ]
 
         response, _ = self.req_act(acts)
-        ret_code = self._parse_ret_val(response)
+        ret_code = self._parse_ret_val(response.text)
 
         if ret_code == self.HTTP_RET_OK:
             del self.req.headers["TokenID"]
@@ -119,9 +119,12 @@ class TPLinkMR200Client(TPLinkMRClient):
         try:
             r = self.req.get(f"{self.host}/cgi/getParm", timeout=5)
             result = {}
-            for line in r.text.splitlines()[0:2]:
-                match = search(r"var (.*)=\"(.*)\"", line)
-                result[match.group(1)] = int(match.group(2), 16)
+            # Use findall to robustly extract variables from the entire response
+            # Handles different formats: var name="val" or var name="val";
+            # Handles optional whitespace.
+            matches = findall(r'var\s+(.*?)\s*=\s*"(.*?)"', r.text)
+            for key, val in matches:
+                result[key] = int(val, 16)
 
             self._nn = int(result["nn"])
             self._ee = int(result["ee"])
