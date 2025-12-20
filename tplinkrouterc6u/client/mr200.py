@@ -3,7 +3,7 @@ from tplinkrouterc6u.client.mr import TPLinkMRClient
 from Crypto.PublicKey import RSA
 from binascii import hexlify
 from Crypto.Cipher import PKCS1_v1_5
-from re import search, findall
+from re import search
 from tplinkrouterc6u.common.package_enum import VPN
 from tplinkrouterc6u.common.dataclass import (
     LTEStatus,
@@ -16,13 +16,13 @@ class TPLinkMR200Client(TPLinkMRClient):
 
     def supports(self) -> bool:
         try:
-            self.__get_params()
+            self._get_params()
             return True
         except ClientException:
             return False
 
     def authorize(self) -> None:
-        self.__get_params()
+        self._get_params()
 
         # Construct the RSA public key manually using modulus (n) and exponent (e)
         pub_key = RSA.construct((self._nn, self._ee))
@@ -114,23 +114,20 @@ class TPLinkMR200Client(TPLinkMRClient):
 
         return status
 
-    def __get_params(self, retry=False) -> None:
+    def _get_params(self, retry=False) -> None:
         self.req.headers = {'referer': f'{self.host}/', 'origin': self.host}
         try:
             r = self.req.get(f"{self.host}/cgi/getParm", timeout=5)
             result = {}
-            # Use findall to robustly extract variables from the entire response
-            # Handles different formats: var name="val" or var name="val";
-            # Handles optional whitespace.
-            matches = findall(r'var\s+(.*?)\s*=\s*"(.*?)"', r.text)
-            for key, val in matches:
-                result[key] = int(val, 16)
+            for line in r.text.splitlines()[0:2]:
+                match = search(r"var (.*)=\"(.*)\"", line)
+                result[match.group(1)] = int(match.group(2), 16)
 
             self._nn = int(result["nn"])
             self._ee = int(result["ee"])
         except Exception as e:
             if not retry:
-                self.__get_params(True)
+                self._get_params(True)
             raise ClientException(str(e))
 
     def req_act(self, acts: list):

@@ -26,8 +26,9 @@ class TestTPLinkVR400v2Client(TestCase):
                 result = self.obj.supports()
                 self.assertFalse(result)
 
-    def test_supports_true_standard(self):
-        # Scenario 1: Standard response (matching MR200 style)
+    def test_supports_false_standard_mr200(self):
+        # Scenario 1: Standard MR200 response (without userSetting)
+        # VR400v2 should return False to let MR200Client handle it
         fake_response = MagicMock()
         fake_response.text = (
             'var nn="0x1A"\n'
@@ -37,7 +38,7 @@ class TestTPLinkVR400v2Client(TestCase):
         with patch.object(Session, "get", return_value=fake_response):
             result = self.obj.supports()
 
-        self.assertEqual(result, True)
+        self.assertEqual(result, False)
 
     def test_supports_true_vr400v2_style(self):
         # Scenario 2: VR400v2 style response with extra lines
