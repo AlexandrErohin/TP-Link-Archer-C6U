@@ -33,24 +33,12 @@ class TPLinkVR400v2Client(TPLinkMR200Client):
         Detect VR400 v2 by checking for 'userSetting' variable in /cgi/getParm response.
         This distinguishes VR400v2 from standard MR200 routers.
         """
-        self.req.headers = {'referer': f'{self.host}/', 'origin': self.host}
         try:
+            self._get_params()
+            # After successful parameter fetch, check for VR400v2-specific signature
             r = self.req.get(f"{self.host}/cgi/getParm", timeout=5)
-
-            matches = findall(r'var\s+(.*?)\s*=\s*"(.*?)"', r.text)
-            result = {}
-            for key, val in matches:
-                result[key] = int(val, 16)
-
-            if "nn" not in result or "ee" not in result:
-                return False
-
-            self._nn = int(result["nn"])
-            self._ee = int(result["ee"])
-
             if 'var userSetting' in r.text:
                 return True
-
         except Exception:
             pass
 
