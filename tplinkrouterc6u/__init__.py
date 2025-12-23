@@ -5,6 +5,7 @@ from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientGCM
 from tplinkrouterc6u.client.mr200 import TPLinkMR200Client
 from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM
 from tplinkrouterc6u.client.vr import TPLinkVRClient
+from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
