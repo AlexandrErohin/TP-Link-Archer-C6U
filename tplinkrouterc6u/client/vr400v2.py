@@ -12,8 +12,7 @@ from re import search, findall
 from logging import Logger
 
 from tplinkrouterc6u.client.mr200 import TPLinkMR200Client
-from tplinkrouterc6u.common.exception import ClientException, ClientError
-from tplinkrouterc6u.common.encryption import EncryptionWrapper
+from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.dataclass import VPNStatus
 
 
@@ -91,7 +90,6 @@ class TPLinkVR400v2Client(TPLinkMR200Client):
         if self._logger:
             self._logger.debug(f"Could not parse return code from: {response_text[:100]}...")
 
-
     def get_vpn_status(self) -> VPNStatus:
         status = VPNStatus()
         acts = [
@@ -114,5 +112,3 @@ class TPLinkVR400v2Client(TPLinkMR200Client):
                 status.pptpvpn_clients_total += 1
 
         return status
-
-

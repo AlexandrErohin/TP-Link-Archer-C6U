@@ -28,7 +28,6 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             regex_result = search('sysauth=(.*);', response.headers['set-cookie'])
             self._sysauth = regex_result.group(1)
             self._logged = True
-            self._smart_network = False
 
         except Exception as e:
             error = "TplinkRouter - C5400X - Cannot authorize! Error - {}; Response - {}".format(e, response.text)
