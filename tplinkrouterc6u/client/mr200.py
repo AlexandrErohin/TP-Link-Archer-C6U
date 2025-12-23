@@ -16,13 +16,13 @@ class TPLinkMR200Client(TPLinkMRClient):
 
     def supports(self) -> bool:
         try:
-            self.__get_params()
+            self._get_params()
             return True
         except ClientException:
             return False
 
     def authorize(self) -> None:
-        self.__get_params()
+        self._get_params()
 
         # Construct the RSA public key manually using modulus (n) and exponent (e)
         pub_key = RSA.construct((self._nn, self._ee))
@@ -79,7 +79,7 @@ class TPLinkMR200Client(TPLinkMRClient):
         ]
 
         response, _ = self.req_act(acts)
-        ret_code = self._parse_ret_val(response)
+        ret_code = self._parse_ret_val(response.text)
 
         if ret_code == self.HTTP_RET_OK:
             del self.req.headers["TokenID"]
@@ -114,7 +114,7 @@ class TPLinkMR200Client(TPLinkMRClient):
 
         return status
 
-    def __get_params(self, retry=False) -> None:
+    def _get_params(self, retry=False) -> None:
         self.req.headers = {'referer': f'{self.host}/', 'origin': self.host}
         try:
             r = self.req.get(f"{self.host}/cgi/getParm", timeout=5)
@@ -127,7 +127,7 @@ class TPLinkMR200Client(TPLinkMRClient):
             self._ee = int(result["ee"])
         except Exception as e:
             if not retry:
-                self.__get_params(True)
+                self._get_params(True)
             raise ClientException(str(e))
 
     def req_act(self, acts: list):

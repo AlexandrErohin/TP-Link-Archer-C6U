@@ -12,6 +12,7 @@ from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
+from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 
@@ -21,7 +22,7 @@ class TplinkRouterProvider:
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
         for client in [TplinkC5400XRouter, TPLinkVRClient, TPLinkEXClientGCM, TPLinkEXClient, TPLinkMRClientGCM,
-                       TPLinkMRClient, TPLinkMR200Client, TPLinkDecoClient, TPLinkXDRClient, TplinkRouter,
+                       TPLinkMRClient, TPLinkMR200Client, TPLinkVR400v2Client, TPLinkDecoClient, TPLinkXDRClient, TplinkRouter,
                        TplinkC80Router, TplinkWDRRouter, TplinkRE330Router]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
