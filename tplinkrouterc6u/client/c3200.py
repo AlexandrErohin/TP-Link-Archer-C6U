@@ -5,6 +5,7 @@ from ipaddress import IPv4Address
 from re import search
 from time import sleep
 from urllib.parse import urlparse
+from typing import List
 
 import requests
 from macaddress import EUI48
@@ -87,7 +88,7 @@ class TplinkC3200Router(AbstractRouter):
         self.SESSION.headers = {"Referer": f"{self.host}/", "Origin": self.host}
 
         login_url = '{}/'.format(self.host)
-        response: Response
+        response = Response()
 
         try:
             response = self.SESSION.post(login_url, timeout=10)
@@ -110,23 +111,23 @@ class TplinkC3200Router(AbstractRouter):
         OP = 7
         CGI = 8
 
-        def __init__(self, type: int, oid: str, stack: str = '0,0,0,0,0,0', pstack: str = '0,0,0,0,0,0',
-                     attrs: list = []):
-            self.type = type
+        def __init__(self, code: int, oid: str, stack: str = '0,0,0,0,0,0', pstack: str = '0,0,0,0,0,0',
+                     attrs=None):
+            if attrs is None:
+                attrs = []
+            self.code = code
             self.oid = oid
             self.stack = stack
             self.pstack = pstack
             self.attrs = attrs
 
     def req_act(self, acts: list):
-        '''
-        Requests ACTs via the cgi proxy
-        '''
+        #  Requests ACTs via the cgi proxy
         act_types = []
         act_data = []
 
         for act in acts:
-            act_types.append(str(act.type))
+            act_types.append(str(act.code))
             act_data.append('[{}#{}#{}]{},{}\r\n{}\r\n'.format(
                 act.oid,
                 act.stack,
@@ -152,6 +153,7 @@ class TplinkC3200Router(AbstractRouter):
         return response, result.get('0') if len(result) == 1 and result.get('0') else result
 
     def _request(self, url, method='POST', data_str=None):
+        r = Response()
 
         retry = 0
         while retry < self.REQUEST_RETRIES:
@@ -159,7 +161,7 @@ class TplinkC3200Router(AbstractRouter):
             if method == 'POST':
                 r = self.SESSION.post(url, data=data_str)
             elif method == 'GET':
-                r = self.session.get(url, data=data_str)
+                r = self.SESSION.get(url, data=data_str)
             else:
                 raise Exception('Unsupported method ' + str(method))
 
@@ -182,7 +184,7 @@ class TplinkC3200Router(AbstractRouter):
         lines = response.split('\n')
         for line in lines:
             if line.startswith('['):
-                regexp = search(r'\[\d+,\d+,\d+,\d+,\d+,\d+\](\d+)', line)
+                regexp = search(r'\[\d+,\d+,\d+,\d+,\d+,\d+](\d+)', line)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)
@@ -305,7 +307,7 @@ class TplinkC3200Router(AbstractRouter):
 
         return status
 
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+    def get_ipv4_reservations(self) -> List[IPv4Reservation]:
         acts = [
             self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr', 'description']),
         ]
@@ -323,7 +325,7 @@ class TplinkC3200Router(AbstractRouter):
 
         return ipv4_reservations
 
-    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+    def get_ipv4_dhcp_leases(self) -> List[IPv4DHCPLease]:
         acts = [
             self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName',
                                                                    'leaseTimeRemaining']),
@@ -375,6 +377,7 @@ class TplinkC3200Router(AbstractRouter):
         return ipv4_status
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        acts = []
 
         match wifi:
             case Connection.HOST_2G:
@@ -423,7 +426,7 @@ class TplinkC3200Router(AbstractRouter):
         self.req_act(acts)
 
     def reboot(self) -> None:
-        ''''CGI 7 et [ACT_REBOOT#0,0,0,0,0,0#0,0,0,0,0,0]0,0 '''
+        # CGI 7 et [ACT_REBOOT#0,0,0,0,0,0#0,0,0,0,0,0]0,0
 
         acts = [
             self.ActItem(self.ActItem.OP, 'ACT_REBOOT'),
