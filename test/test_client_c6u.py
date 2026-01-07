@@ -14,6 +14,12 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkClient(TestCase):
+    router_class = TplinkRouter
+    game_accelerator_path = 'admin/smart_network?form=game_accelerator'
+    openvpn_config_path = 'admin/openvpn?form=config'
+    pptpd_config_path = 'admin/pptpd?form=config'
+    vpn_uses_data_param = True
+
     def test_get_status(self) -> None:
         response_status = '''
 {
@@ -211,7 +217,9 @@ class TestTPLinkClient(TestCase):
   }
                 '''
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
@@ -339,7 +347,9 @@ class TestTPLinkClient(TestCase):
   }
                 '''
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
@@ -484,12 +494,15 @@ class TestTPLinkClient(TestCase):
   }
 '''
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+        game_accelerator_path = self.game_accelerator_path
+
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
                     return loads(response_status)['data']
-                elif path == 'admin/smart_network?form=game_accelerator':
+                elif path == game_accelerator_path:
                     return loads(response_game_accelerator)['data']
                 elif path == 'admin/wireless?form=statistics':
                     return loads(response_stats)['data']
@@ -618,7 +631,9 @@ class TestTPLinkClient(TestCase):
       }
     '''
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
@@ -661,8 +676,9 @@ class TestTPLinkClient(TestCase):
     def test_set_wifi(self) -> None:
         check_url = ''
         check_data = ''
+        router_class = self.router_class
 
-        class TPLinkRouterTest(TplinkRouter):
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 nonlocal check_url, check_data
@@ -705,8 +721,9 @@ class TestTPLinkClient(TestCase):
 
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'
+        router_class = self.router_class
 
-        class TPLinkRouterTest(TplinkRouter):
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/network?form=status_ipv4&operation=read':
@@ -750,8 +767,9 @@ class TestTPLinkClient(TestCase):
           "operator": "load"
       }
     '''
+        router_class = self.router_class
 
-        class TPLinkRouterTest(TplinkRouter):
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
@@ -800,8 +818,9 @@ class TestTPLinkClient(TestCase):
         }
     }
     '''
+        router_class = self.router_class
 
-        class TPLinkRouterTest(TplinkRouter):
+        class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
                 if path == 'admin/status?form=all&operation=read':
@@ -871,7 +890,12 @@ class TestTPLinkClient(TestCase):
              "extra": "7450", "vpntype": "pptp", "key": "7450"}
         ]"""
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+        openvpn_config_path = self.openvpn_config_path
+        pptpd_config_path = self.pptpd_config_path
+        vpn_uses_data_param = self.vpn_uses_data_param
+
+        class TPLinkRouterTest(router_class):
             def request(
                 self,
                 path: str,
@@ -879,14 +903,20 @@ class TestTPLinkClient(TestCase):
                 ignore_response: bool = False,
                 ignore_errors: bool = False,
             ) -> dict | None:
-                if path == "admin/openvpn?form=config":
+                if path == openvpn_config_path:
                     return loads(response_openvpn_read)
-                if path == "admin/pptpd?form=config":
+                if path == pptpd_config_path:
                     return loads(response_pptp_read)
-                if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=openvpn":
-                    return loads(respone_vpnconn_openvpn)
-                if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=pptp":
-                    return loads(respone_vpnconn_pptpvpn)
+                if vpn_uses_data_param:
+                    if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=openvpn":
+                        return loads(respone_vpnconn_openvpn)
+                    if path == "admin/vpnconn?form=config" and data == "operation=list&vpntype=pptp":
+                        return loads(respone_vpnconn_pptpvpn)
+                else:
+                    if path == "admin/vpnconn?form=config&operation=list&vpntype=openvpn":
+                        return loads(respone_vpnconn_openvpn)
+                    if path == "admin/vpnconn?form=config&operation=list&vpntype=pptp":
+                        return loads(respone_vpnconn_pptpvpn)
                 raise ClientException()
 
         client = TPLinkRouterTest("", "")
@@ -910,7 +940,10 @@ class TestTPLinkClient(TestCase):
         }
         """
 
-        class TPLinkRouterTest(TplinkRouter):
+        router_class = self.router_class
+        openvpn_config_path = self.openvpn_config_path
+
+        class TPLinkRouterTest(router_class):
             def request(
                 self,
                 path: str,
@@ -918,7 +951,7 @@ class TestTPLinkClient(TestCase):
                 ignore_response: bool = False,
                 ignore_errors: bool = False,
             ) -> dict | None:
-                if path == "admin/openvpn?form=config" and data == "operation=read":
+                if path == openvpn_config_path and data == "operation=read":
                     return loads(response_openvpn_read)
                 self.captured_path = path
                 self.captured_data = data
@@ -930,7 +963,7 @@ class TestTPLinkClient(TestCase):
             "operation=write&enabled=on"
             "&proto=udp&access=home&cert_exist=True&mask=255.255.255.0&port=1194&serverip=10.8.0.0"
         )
-        self.assertEqual(client.captured_path, 'admin/openvpn?form=config')
+        self.assertEqual(client.captured_path, self.openvpn_config_path)
         self.assertEqual(client.captured_data, expected_data)
 
 
