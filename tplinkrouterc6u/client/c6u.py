@@ -376,7 +376,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             pass
 
         status.devices = list(devices.values())
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
+                                + (status.iot_clients_total or 0))
 
         return status
 

@@ -141,7 +141,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 status.wifi_clients_total += 1
             devices[val['physAddress']] = Device(conn,
                                                  EUI48(val['physAddress']),
-                                                 IPv4Address(val['IPAddress']),
+                                                 get_ip(val['IPAddress']),
                                                  val['hostName'])
 
         total = int(values[4]['total'])

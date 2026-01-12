@@ -508,7 +508,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.wired_total, 2)
         self.assertEqual(status.wifi_clients_total, 2)
         self.assertEqual(status.guest_clients_total, 0)
-        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.clients_total, 7)
         self.assertEqual(status.iot_clients_total, 3)
         self.assertEqual(status.guest_2g_enable, True)
         self.assertEqual(status.guest_5g_enable, None)
