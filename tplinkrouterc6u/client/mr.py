@@ -371,7 +371,7 @@ class TPLinkMRClientBase(AbstractRouter):
         lines = response.split('\n')
         for line in lines:
             if line.startswith('['):
-                regexp = search(r'\[\d,\d,\d,\d,\d,\d\](\d)', line)
+                regexp = search(r'\[\d+,\d+,\d+,\d+,\d+,\d+](\d+)', line)
                 if regexp is not None:
                     obj = {}
                     index = regexp.group(1)

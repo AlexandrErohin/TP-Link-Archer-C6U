@@ -339,6 +339,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco P7
 - Deco X20
 - Deco X50 v1.3
+- Deco X50-5G 1.20
 - Deco X55 1.0
 - Deco X60 V3
 - Deco X90
@@ -370,6 +371,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - AC10 1.20
 - MR47BE v1.0
 - MR50G 1.0
+- ME30 1.0
 - H60XR 1.0
 - H47BE 2.0
 - Halo H80X 1.0
