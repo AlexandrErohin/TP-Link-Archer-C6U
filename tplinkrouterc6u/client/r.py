@@ -17,31 +17,10 @@ from tplinkrouterc6u.common.package_enum import Connection
 
 
 class TPLinkRClient(TPLinkXDRClient):
-    _stok = ''
-
-    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 30) -> None:
-        super().__init__(host, password, username, logger, verify_ssl, timeout)
 
     def supports(self) -> bool:
         response = self._session.get('{}/login.htm'.format(self.host), timeout=self.timeout, verify=self._verify_ssl)
         return 'TL-R' in response.text
-
-    def authorize(self) -> None:
-        response = self._session.post(self.host, json={
-            'method': 'do',
-            'login': {
-                'username': self.username,
-                'password': self.password,
-            }
-        }, timeout=self.timeout, verify=self._verify_ssl)
-        try:
-            data = response.json()
-            self._stok = data['stok']
-        except Exception as e:
-            error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'.
-                     format(self.__class__.__name__, e, response))
-            raise ClientException(error)
 
     def get_status(self) -> Status:
         data = self._request({

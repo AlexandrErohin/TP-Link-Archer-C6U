@@ -33,6 +33,7 @@ class TPLinkXDRClient(AbstractRouter):
         response = self._session.post(self.host, json={
             'method': 'do',
             'login': {
+                'username': self.username,
                 'password': self._encode_password(self.password),
             }
         }, timeout=self.timeout, verify=self._verify_ssl)
