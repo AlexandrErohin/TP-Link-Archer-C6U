@@ -13,6 +13,7 @@ from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
 from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
+from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 
@@ -32,6 +33,7 @@ class TplinkRouterProvider:
                        TPLinkVR400v2Client,
                        TPLinkDecoClient,
                        TPLinkXDRClient,
+                       TPLinkRClient,
                        TplinkRouter,
                        TplinkC80Router,
                        TplinkWDRRouter,
