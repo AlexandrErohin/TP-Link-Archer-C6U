@@ -4,7 +4,6 @@ from unittest import TestCase, main
 
 from macaddress import EUI48
 
-from tplinkrouterc6u import IPv4Status
 from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, Status)
@@ -29,7 +28,7 @@ class TestTPLinkRClient(TestCase):
         self.assertEqual(client.supports(), False)
 
     def test_supports_true(self) -> None:
-        response = '''<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        response = '''
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />

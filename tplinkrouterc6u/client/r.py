@@ -1,18 +1,16 @@
 import math
 from datetime import timedelta
 from ipaddress import IPv4Address
-from logging import Logger
 from urllib.parse import unquote
 
 from macaddress import EUI48
-from requests import Session
 
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
-from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
-                                              IPv4Reservation, IPv4Status,
+from tplinkrouterc6u.common.dataclass import (Device, IPv4DHCPLease,
+                                              IPv4Reservation,
                                               Status)
 from tplinkrouterc6u.common.exception import ClientException
-from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
+from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 
 
@@ -157,9 +155,9 @@ class TPLinkRClient(TPLinkXDRClient):
             result['2g'] = True
         elif math.floor(bind_freq / 2) % 2 == 1:  # 2.4G2
             result['2g'] = True
-        elif math.floor(bind_freq / 256) % 2 == 1: # 5G1
+        elif math.floor(bind_freq / 256) % 2 == 1:  # 5G1
             result['5g'] = True
-        elif math.floor(bind_freq / 512) % 2 == 1: # 5G2
+        elif math.floor(bind_freq / 512) % 2 == 1:  # 5G2
             result['5g'] = True
         elif bind_freq == 771:  # all
             result['2g'] = True
