@@ -309,10 +309,26 @@ $(document).ready(function(e){
           "mac": "C6-FD-4C-A8-D5-BA",
           "ap_name": "yyy-ap"
         }
+      },
+      {
+        "host_info_4": {
+          "mac": "02-42-AC-10-00-01",
+          "type": "wired",
+          "down_speed": "16",
+          "host_save": "off",
+          "ip": "192.168.60.2",
+          "state": "online",
+          "is_cur_host": false,
+          "up_speed": "2",
+          "hostname": "anonymous",
+          "down_limit": "0",
+          "up_limit": "0",
+          "interface": "br-lan"
+        }
       }
     ],
     "count": {
-      "host_info": 3
+      "host_info": 4
     }
   },
   "network": {
@@ -379,9 +395,14 @@ $(document).ready(function(e){
         self.assertIsInstance(status.lan_macaddress, EUI48)
         self.assertEqual(status.wan_ipv4_addr, '172.21.199.238')
         self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
+        self.assertEqual(status.wan_ipv4_gateway, '172.21.192.1')
+        self.assertEqual(status.wan_ipv4_uptime, 403611)
         self.assertTrue(status.wifi_2g_enable)
         self.assertTrue(status.wifi_5g_enable)
-        self.assertEqual(len(status.devices), 3)
+        self.assertEqual(len(status.devices), 4)
+        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(status.wired_total, 1)
+        self.assertEqual(status.wifi_clients_total, 3)
         self.assertIsInstance(status.devices[0], Device)
         self.assertEqual(status.devices[0].type, Connection.HOST_5G)
         self.assertEqual(status.devices[0].macaddr, '46-22-C0-A6-AC-35')
@@ -408,9 +429,11 @@ $(document).ready(function(e){
                 return mock_data
 
         client = TPLinkRClientTest('', '')
-        client._guest_2g_serv_id = '2'
-        client._wifi_2g_serv_id = '3'
-        client._wifi_5g_serv_id = '4'
+        client._serv_id_map = {
+            Connection.GUEST_2G: '2',
+            Connection.HOST_2G: '3',
+            Connection.HOST_5G: '4',
+        }
         client.set_wifi(Connection.GUEST_2G, True)
 
         self.assertEqual(check_payload['method'], 'set')
@@ -429,9 +452,11 @@ $(document).ready(function(e){
                 return mock_data
 
         client = TPLinkRClientTest('', '')
-        client._guest_2g_serv_id = '2'
-        client._wifi_2g_serv_id = '3'
-        client._wifi_5g_serv_id = '4'
+        client._serv_id_map = {
+            Connection.GUEST_2G: '2',
+            Connection.HOST_2G: '3',
+            Connection.HOST_5G: '4',
+        }
         client.set_wifi(Connection.HOST_2G, True)
 
         self.assertEqual(check_payload['method'], 'set')
@@ -450,9 +475,11 @@ $(document).ready(function(e){
                 return mock_data
 
         client = TPLinkRClientTest('', '')
-        client._guest_2g_serv_id = '2'
-        client._wifi_2g_serv_id = '3'
-        client._wifi_5g_serv_id = '4'
+        client._serv_id_map = {
+            Connection.GUEST_2G: '2',
+            Connection.HOST_2G: '3',
+            Connection.HOST_5G: '4',
+        }
         client.set_wifi(Connection.HOST_5G, False)
 
         self.assertEqual(check_payload['method'], 'set')

@@ -6,7 +6,7 @@ from urllib.parse import unquote
 from macaddress import EUI48
 
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
-from tplinkrouterc6u.common.dataclass import (Device, IPv4DHCPLease,
+from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation,
                                               Status)
 from tplinkrouterc6u.common.exception import ClientException
@@ -78,6 +78,7 @@ class TPLinkRClient(TPLinkXDRClient):
         status = Status()
         status._wan_ipv4_addr = get_ip(data['network']['wan_status']['ipaddr'])
         status._wan_ipv4_gateway = get_ip(data['network']['wan_status']['gateway'])
+        status.wan_ipv4_uptime = data['network']['wan_status']['up_time']
         status._lan_ipv4_addr = get_ip(data['network']['lan']['ipaddr'])
         status._lan_macaddr = get_mac(data['network']['lan']['macaddr'])
 
@@ -98,21 +99,27 @@ class TPLinkRClient(TPLinkXDRClient):
                 status.guest_5g_enable = enable
                 self._serv_id_map[Connection.GUEST_5G] = item['serv_id']
 
+        status.clients_total += len(data['host_management']['host_info'])
         for item_map in data['host_management']['host_info']:
             item = item_map[next(iter(item_map))]
             conn_type = Connection.UNKNOWN
             if item['type'] == 'wired':
                 conn_type = Connection.WIRED
+                status.wired_total += 1
             elif item['type'] == 'wireless' and item['freq_name'] == '2.4GHz':
                 conn_type = Connection.HOST_2G
+                status.wifi_clients_total += 1
             elif item['type'] == 'wireless' and item['freq_name'] == '5GHz':
                 conn_type = Connection.HOST_5G
+                status.wifi_clients_total += 1
 
             dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
             if 'up_speed' in item:
                 dev.up_speed = int(item['up_speed'])
             if 'down_speed' in item:
                 dev.down_speed = int(item['down_speed'])
+            if 'signal' in item:
+                dev.signal = int(item['rssi'])
             if 'state' in item:
                 dev.active = item['state'] == 'online'
             status.devices.append(dev)
