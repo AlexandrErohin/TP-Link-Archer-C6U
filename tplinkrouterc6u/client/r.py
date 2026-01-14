@@ -24,7 +24,9 @@ class TPLinkRClient(TPLinkXDRClient):
 
     def supports(self) -> bool:
         try:
-            response = self._session.get('{}/login.htm'.format(self.host), timeout=self.timeout, verify=self._verify_ssl)
+            response = self._session.get('{}/login.htm'.format(self.host),
+                                         timeout=self.timeout,
+                                         verify=self._verify_ssl)
             return 'TL-R' in response.text
         except Exception:
             return False
@@ -44,19 +46,6 @@ class TPLinkRClient(TPLinkXDRClient):
             error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'.
                      format(self.__class__.__name__, e, response))
             raise ClientException(error)
-
-    def get_firmware(self) -> Firmware:
-        data = self._request({
-            'method': 'get',
-            'device_info': {
-                'name': 'info',
-            },
-        })
-        dev_info = data['device_info']['info']
-        hw_version = unquote(dev_info['hw_version'])
-        device_model = unquote(dev_info['device_model'])
-        sw_version = unquote(dev_info['sw_version'])
-        return Firmware(hw_version, device_model, sw_version)
 
     def get_status(self) -> Status:
         data = self._request({
@@ -170,7 +159,7 @@ class TPLinkRClient(TPLinkXDRClient):
             self.get_status()
             if self._serv_id_map[wifi] == '':
                 raise ClientException('TplinkRouter - {} - set wifi failed, unable to get serv_id for {}'.
-                        format(self.__class__), wifi)
+                                      format(self.__class__, wifi.__class__))
 
         payload = {
             'method': 'set',
