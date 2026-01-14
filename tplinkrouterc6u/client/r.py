@@ -17,8 +17,11 @@ from tplinkrouterc6u.common.package_enum import Connection
 class TPLinkRClient(TPLinkXDRClient):
 
     def supports(self) -> bool:
-        response = self._session.get('{}/login.htm'.format(self.host), timeout=self.timeout, verify=self._verify_ssl)
-        return 'TL-R' in response.text
+        try:
+            response = self._session.get('{}/login.htm'.format(self.host), timeout=self.timeout, verify=self._verify_ssl)
+            return 'TL-R' in response.text
+        except Exception:
+            return False
 
     def get_status(self) -> Status:
         data = self._request({
