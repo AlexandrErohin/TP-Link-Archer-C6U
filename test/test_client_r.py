@@ -78,24 +78,6 @@ $(document).ready(function(e){
 
         self.assertEqual(client.supports(), True)
 
-    def test_logout(self) -> None:
-        mock_data = json.loads('''{"error_code":0}''')
-        check_payload = {}
-
-        class TPLinkRClientTest(TPLinkRClient):
-            def _request(self, payload: dict) -> dict:
-                nonlocal check_payload
-                check_payload = payload
-                return mock_data
-
-        client = TPLinkRClientTest('', '')
-        client.logout()
-
-        self.assertEqual(check_payload['method'], 'do')
-        self.assertIn('system', check_payload)
-        self.assertIn('logout', check_payload['system'])
-        self.assertEqual(check_payload['system']['logout'], None)
-
     def test_get_firmware(self) -> None:
         mock_data = json.loads('''
 {

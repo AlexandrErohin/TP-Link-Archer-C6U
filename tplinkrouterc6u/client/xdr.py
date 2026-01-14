@@ -33,7 +33,6 @@ class TPLinkXDRClient(AbstractRouter):
         response = self._session.post(self.host, json={
             'method': 'do',
             'login': {
-                'username': self.username,
                 'password': self._encode_password(self.password),
             }
         }, timeout=self.timeout, verify=self._verify_ssl)
@@ -65,10 +64,7 @@ class TPLinkXDRClient(AbstractRouter):
             },
         })
         dev_info = data['device_info']['info']
-        hw_version = unquote(dev_info['hw_version'])
-        device_model = unquote(dev_info['device_model'])
-        sw_version = unquote(dev_info['sw_version'])
-        return Firmware(hw_version, device_model, sw_version)
+        return Firmware(dev_info['hw_version'], dev_info['device_model'], dev_info['sw_version'])
 
     def get_status(self) -> Status:
         data = self._request({
