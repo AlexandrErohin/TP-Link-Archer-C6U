@@ -15,6 +15,12 @@ from tplinkrouterc6u.common.package_enum import Connection
 
 
 class TPLinkRClient(TPLinkXDRClient):
+    _serv_id_map = {
+        Connection.HOST_2G: '',
+        Connection.HOST_5G: '',
+        Connection.GUEST_2G: '',
+        Connection.GUEST_5G: '',
+    }
 
     def supports(self) -> bool:
         try:
@@ -52,13 +58,16 @@ class TPLinkRClient(TPLinkXDRClient):
             enable = item['enable'] == 'on'
             if item['network_type'] == '1' and bind_freq['2g']:
                 status.wifi_2g_enable = enable
-                status._wifi_2g_serv_id = item['serv_id']
+                self._serv_id_map[Connection.HOST_2G] = item['serv_id']
             elif item['network_type'] == '1' and bind_freq['5g']:
                 status.wifi_5g_enable = enable
-                status._wifi_5g_serv_id = item['serv_id']
+                self._serv_id_map[Connection.HOST_5G] = item['serv_id']
             elif item['network_type'] == '2' and bind_freq['2g']:
                 status.guest_2g_enable = enable
-                status._guest_2g_serv_id = item['serv_id']
+                self._serv_id_map[Connection.GUEST_2G] = item['serv_id']
+            elif item['network_type'] == '2' and bind_freq['5g']:
+                status.guest_5g_enable = enable
+                self._serv_id_map[Connection.GUEST_5G] = item['serv_id']
 
         for item_map in data['host_management']['host_info']:
             item = item_map[next(iter(item_map))]
@@ -119,24 +128,19 @@ class TPLinkRClient(TPLinkXDRClient):
         return dhcp_leases
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        serv_id_map = {
-            Connection.HOST_2G: self._wifi_2g_serv_id,
-            Connection.HOST_5G: self._wifi_5g_serv_id,
-            Connection.GUEST_2G: self._guest_2g_serv_id,
-        }
-
-        if wifi not in serv_id_map:
+        if wifi not in self._serv_id_map:
             raise ClientException('Not supported')
-        if serv_id_map[wifi] is None:
+        if self._serv_id_map[wifi] == '':
             self.get_status()
-            if serv_id_map[wifi] is None:
-                return
+            if self._serv_id_map[wifi] == '':
+                raise ClientException('TplinkRouter - {} - set wifi failed, unable to get serv_id for {}'.
+                        format(self.__class__), wifi)
 
         payload = {
             'method': 'set',
             'apmng_wserv': {
                 'table': 'wlan_serv',
-                'filter': [{'serv_id': serv_id_map[wifi]}],
+                'filter': [{'serv_id': self._serv_id_map[wifi]}],
                 'para': {'enable': 'on' if enable else 'off'},
             },
         }
