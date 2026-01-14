@@ -6,7 +6,7 @@ from urllib.parse import unquote
 from macaddress import EUI48
 
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
-from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
+from tplinkrouterc6u.common.dataclass import (Device, IPv4DHCPLease,
                                               IPv4Reservation,
                                               Status)
 from tplinkrouterc6u.common.exception import ClientException
