@@ -299,7 +299,7 @@ $(document).ready(function(e){
           "interface": "br-lan",
           "up_limit": "0",
           "type": "wireless",
-          "ssid": "syt",
+          "ssid": "xxx",
           "freq_name": "5GHz",
           "state": "online",
           "freq_unit": "2",
@@ -325,10 +325,34 @@ $(document).ready(function(e){
           "up_limit": "0",
           "interface": "br-lan"
         }
+      },
+      {
+        "host_info_5": {
+          ".name": "2EDE61E7EA70",
+          "up_speed": "0",
+          "host_save": "on",
+          "ip": "192.168.60.212",
+          "time_obj": "any",
+          "is_cur_host": "false",
+          "limit": "0",
+          "hostname": "xxx",
+          "interface": "br-lan",
+          "up_limit": "0",
+          "type": "wireless",
+          "ssid": "xxx",
+          "down_speed": "0",
+          "state": "offline",
+          "mac": "2E-DE-61-E7-EA-70",
+          ".anonymous": false,
+          "down_limit": "0",
+          "time_mode": "any",
+          ".type": "host_info",
+          "dev_state": "on"
+        }
       }
     ],
     "count": {
-      "host_info": 4
+      "host_info": 5
     }
   },
   "network": {
@@ -399,8 +423,8 @@ $(document).ready(function(e){
         self.assertEqual(status.wan_ipv4_uptime, 403611)
         self.assertTrue(status.wifi_2g_enable)
         self.assertTrue(status.wifi_5g_enable)
-        self.assertEqual(len(status.devices), 4)
-        self.assertEqual(status.clients_total, 4)
+        self.assertEqual(len(status.devices), 5)
+        self.assertEqual(status.clients_total, 5)
         self.assertEqual(status.wired_total, 1)
         self.assertEqual(status.wifi_clients_total, 3)
         self.assertIsInstance(status.devices[0], Device)
@@ -417,6 +441,9 @@ $(document).ready(function(e){
         self.assertEqual(status.devices[1].ipaddr, '192.168.60.11')
         self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
         self.assertEqual(status.devices[1].hostname, 'chuangmi_camera_ipc013')
+        self.assertIsInstance(status.devices[4], Device)
+        self.assertEqual(status.devices[4].active, False)
+        self.assertEqual(status.devices[4].type, Connection.UNKNOWN)
 
     def test_set_wifi_enable_guest_2g(self) -> None:
         mock_data = json.loads('''{"error_code":0}''')
