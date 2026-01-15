@@ -513,10 +513,8 @@ class TplinkRouterV1_11(TplinkBaseRouter):
 
         try:
             self._request_pwd()
-            # Try to authorize to verify this authentication method works
-            self.authorize()
-            self.logout()
-            return True
+            # V1_11 uses 2048-bit RSA = 512 hex chars, older firmware uses 1024-bit = 256 chars
+            return len(self._pwdNN) >= 512
         except Exception:
             return False
 
