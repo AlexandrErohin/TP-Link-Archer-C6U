@@ -95,10 +95,10 @@ class TPLinkRClient(TPLinkXDRClient):
             if item['type'] == 'wired':
                 conn_type = Connection.WIRED
                 status.wired_total += 1
-            elif item['type'] == 'wireless' and item['freq_name'] == '2.4GHz':
+            elif item['type'] == 'wireless' and item.get('freq_name') == '2.4GHz':
                 conn_type = Connection.HOST_2G
                 status.wifi_clients_total += 1
-            elif item['type'] == 'wireless' and item['freq_name'] == '5GHz':
+            elif item['type'] == 'wireless' and item.get('freq_name') == '5GHz':
                 conn_type = Connection.HOST_5G
                 status.wifi_clients_total += 1
 
