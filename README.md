@@ -23,6 +23,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 ```python
 from tplinkrouterc6u import (
     TplinkRouterProvider,
+    TplinkRouterV1_11,
     TplinkRouter,
     TplinkC1200Router,
     TplinkC5400XRouter,
