@@ -1,4 +1,4 @@
-from tplinkrouterc6u.client.c6u import TplinkRouter
+from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientGCM
