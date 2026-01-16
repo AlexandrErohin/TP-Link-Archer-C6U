@@ -349,6 +349,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco XE75PRO (v3.0)
 - EX511 v2.0
 - HX510 v1.0
+- M8550 v1
+- NE200-Outdoor v1.0
 - NX510v v1.0
 - NX600 v2.0
 - TD-W9960 (v1, V1.20)
@@ -365,6 +367,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
 - TL-WDR3600 V1
+- TL-XDR5410 1.0
 - TL-XDR6088 v1.0.30
 - VX420-G2h v1.1
 - VX800v v1

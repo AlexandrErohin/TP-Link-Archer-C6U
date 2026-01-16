@@ -114,17 +114,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
             status._wan_ipv4_addr = IPv4Address(item['connIPv4Address']) if item.get('connIPv4Address') else None
             status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
 
-        if values[2].__class__ != list:
-            status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
-        else:
-            status.wifi_2g_enable = bool(int(values[2][0]['primaryEnable']))
-            status.wifi_5g_enable = bool(int(values[2][1]['primaryEnable']))
-
-        if values[2].__class__ != list:
-            status.guest_2g_enable = bool(int(values[2]['guestEnable']))
-        else:
-            status.guest_2g_enable = bool(int(values[2][0]['guestEnable']))
-            status.guest_5g_enable = bool(int(values[2][1]['guestEnable']))
+        if values[2]:
+            if values[2].__class__ != list:
+                status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
+                status.guest_2g_enable = bool(int(values[2]['guestEnable']))
+            else:
+                status.wifi_2g_enable = bool(int(values[2][0]['primaryEnable']))
+                status.wifi_5g_enable = bool(int(values[2][1]['primaryEnable']))
+                status.guest_2g_enable = bool(int(values[2][0]['guestEnable']))
+                status.guest_5g_enable = bool(int(values[2][1]['guestEnable']))
 
         devices = {}
         for val in self._to_list(values[3]):
