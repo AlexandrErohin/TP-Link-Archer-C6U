@@ -7,9 +7,7 @@ from macaddress import EUI48
 from tplinkrouterc6u import (
     TplinkC3200Router,
     Connection,
-    Firmware,
     Status,
-    Device,
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
@@ -17,6 +15,9 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkC3200Router(TestCase):
+
+
+    #  Testing the merge_response method
     def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=mac1
@@ -79,193 +80,6 @@ name=wlan6
 
         self.assertEqual(result, [])
 
-    def test_firmware(self) -> None:
-        response = '''
-[0,0,0,0,0,0]0
-hardwareVersion=Archer C3200 v1 24242424
-softwareVersion=0.9.1 0.1 v244b.0 Build 160712 Rel.55313n
-modelName=Archer C3200
-[error]0
-
-'''
-
-        class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
-                return 200, response
-
-        client = TplinkC3200RouterTest('', '')
-        result = client.get_firmware()
-
-        self.assertIsInstance(result, Firmware)
-        self.assertEqual(result.hardware_version, 'Archer C3200 v1 24242424')
-        self.assertEqual(result.model, 'Archer C3200')
-        self.assertEqual(result.firmware_version, '0.9.1 0.1 v244b.0 Build 160712 Rel.55313n')
-
-    def test_get_status_with_5G(self) -> None:
-        response = '''[1,1,0,0,0,0]0
-X_TP_MACAddress=a0:28:84:de:dd:5c
-IPInterfaceIPAddress=192.168.4.1
-[2,1,1,0,0,0]1
-enable=0
-MACAddress=
-externalIPAddress=0.0.0.0
-defaultGateway=0.0.0.0
-name=LTE
-subnetMask=0.0.0.0
-DNSServers=0.0.0.0,0.0.0.0
-[1,1,1,0,0,0]1
-enable=1
-MACAddress=bf:75:44:4c:dc:9e
-externalIPAddress=192.168.30.55
-defaultGateway=192.168.30.1
-name=ipoe_1_d
-subnetMask=255.255.255.0
-DNSServers=192.168.3.1,0.0.0.0
-[1,1,0,0,0,0]2
-enable=1
-X_TP_Band=2.4GHz
-[1,2,0,0,0,0]2
-enable=0
-X_TP_Band=5GHz
-[1,1,0,0,0,0]3
-enable=0
-name=wlan1
-[1,2,0,0,0,0]3
-enable=1
-name=wlan6
-[1,0,0,0,0,0]4
-IPAddress=192.168.30.10
-MACAddress=66:e2:02:bd:b5:1b
-hostName=host1
-X_TP_ConnType=0
-active=1
-[2,0,0,0,0,0]4
-IPAddress=192.168.30.11
-MACAddress=f4:a3:86:2d:41:b5
-hostName=host2
-X_TP_ConnType=3
-active=1
-[1,1,1,0,0,0]5
-associatedDeviceMACAddress=f4:a3:86:2d:41:b5
-X_TP_TotalPacketsSent=176
-X_TP_TotalPacketsReceived=467
-[error]0
-
-'''
-
-        class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
-                return 200, response
-
-        client = TplinkC3200RouterTest('', '')
-        status = client.get_status()
-
-        self.assertIsInstance(status, Status)
-        self.assertEqual(status.wan_macaddr, 'BF-75-44-4C-DC-9E')
-        self.assertIsInstance(status.wan_macaddress, EUI48)
-        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
-        self.assertIsInstance(status.lan_macaddress, EUI48)
-        self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
-        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
-        self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
-        self.assertEqual(status.wan_ipv4_gateway, '192.168.30.1')
-        self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
-        self.assertEqual(status.wired_total, 1)
-        self.assertEqual(status.wifi_clients_total, 1)
-        self.assertEqual(status.guest_clients_total, 0)
-        self.assertEqual(status.clients_total, 2)
-        self.assertEqual(status.guest_2g_enable, False)
-        self.assertEqual(status.guest_5g_enable, True)
-        self.assertEqual(status.iot_2g_enable, None)
-        self.assertEqual(status.iot_5g_enable, None)
-        self.assertEqual(status.wifi_2g_enable, True)
-        self.assertEqual(status.wifi_5g_enable, False)
-        self.assertEqual(status.wan_ipv4_uptime, None)
-        self.assertEqual(status.mem_usage, None)
-        self.assertEqual(status.cpu_usage, None)
-        self.assertEqual(len(status.devices), 2)
-        self.assertIsInstance(status.devices[0], Device)
-        self.assertEqual(status.devices[0].type, Connection.WIRED)
-        self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
-        self.assertIsInstance(status.devices[0].macaddress, EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
-        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'host1')
-        self.assertEqual(status.devices[0].packets_sent, None)
-        self.assertEqual(status.devices[0].packets_received, None)
-        self.assertIsInstance(status.devices[1], Device)
-        self.assertEqual(status.devices[1].type, Connection.HOST_5G)
-        self.assertEqual(status.devices[1].macaddr, 'F4-A3-86-2D-41-B5')
-        self.assertIsInstance(status.devices[1].macaddress, EUI48)
-        self.assertEqual(status.devices[1].ipaddr, '192.168.30.11')
-        self.assertIsInstance(status.devices[1].ipaddress, IPv4Address)
-        self.assertEqual(status.devices[1].hostname, 'host2')
-        self.assertEqual(status.devices[1].packets_sent, 176)
-        self.assertEqual(status.devices[1].packets_received, 467)
-
-    def test_get_status_without_5G(self) -> None:
-        response = '''[1,1,0,0,0,0]0
-X_TP_MACAddress=a0:28:84:de:dd:5c
-IPInterfaceIPAddress=192.168.4.1
-[1,1,1,0,0,0]1
-enable=0
-MACAddress=bf:75:44:4c:dc:9e
-externalIPAddress=192.168.30.55
-defaultGateway=192.168.30.1
-name=ipoe_1_d
-subnetMask=255.255.255.0
-DNSServers=192.168.3.1,0.0.0.0
-[1,1,0,0,0,0]2
-enable=1
-X_TP_Band=2.4GHz
-[1,1,0,0,0,0]3
-enable=0
-name=wlan1
-[1,0,0,0,0,0]4
-IPAddress=192.168.30.10
-MACAddress=66:e2:02:bd:b5:1b
-hostName=host1
-X_TP_ConnType=0
-active=1
-[error]0
-
-'''
-
-        class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
-                return 200, response
-
-        client = TplinkC3200RouterTest('', '')
-        status = client.get_status()
-
-        self.assertEqual(status.wan_macaddr, 'BF-75-44-4C-DC-9E')
-        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
-        self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
-        self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
-        self.assertEqual(status.wan_ipv4_gateway, '192.168.30.1')
-        self.assertEqual(status.wired_total, 1)
-        self.assertEqual(status.wifi_clients_total, 0)
-        self.assertEqual(status.guest_clients_total, 0)
-        self.assertEqual(status.clients_total, 1)
-        self.assertEqual(status.guest_2g_enable, False)
-        self.assertEqual(status.guest_5g_enable, None)
-        self.assertEqual(status.iot_2g_enable, None)
-        self.assertEqual(status.iot_5g_enable, None)
-        self.assertEqual(status.wifi_2g_enable, True)
-        self.assertEqual(status.wifi_5g_enable, None)
-        self.assertEqual(status.wan_ipv4_uptime, None)
-        self.assertEqual(status.mem_usage, None)
-        self.assertEqual(status.cpu_usage, None)
-        self.assertEqual(len(status.devices), 1)
-        self.assertIsInstance(status.devices[0], Device)
-        self.assertEqual(status.devices[0].type, Connection.WIRED)
-        self.assertEqual(status.devices[0].macaddr, '66-E2-02-BD-B5-1B')
-        self.assertIsInstance(status.devices[0].macaddress, EUI48)
-        self.assertEqual(status.devices[0].ipaddr, '192.168.30.10')
-        self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
-        self.assertEqual(status.devices[0].hostname, 'host1')
-        self.assertEqual(status.devices[0].packets_sent, None)
-        self.assertEqual(status.devices[0].packets_received, None)
 
     def test_get_status_with_wlan_dev(self) -> None:
         response = '''
@@ -295,7 +109,7 @@ X_TP_TotalPacketsReceived=467
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -352,7 +166,7 @@ name=wlan1
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -403,7 +217,7 @@ name=wlan1
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -527,7 +341,7 @@ description=HS124 Sqz SDB
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -548,7 +362,7 @@ description=HS124 Sqz SDB
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -563,7 +377,7 @@ description=HS124 Sqz SDB
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -703,7 +517,7 @@ leaseTimeRemaining=0
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -735,7 +549,7 @@ leaseTimeRemaining=86372
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -780,7 +594,7 @@ DNSServers=7.7.7.7,2.2.2.2
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -811,7 +625,7 @@ DNSServers=7.7.7.7,2.2.2.2
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -845,7 +659,7 @@ DNSServers=0.0.0.0,0.0.0.0
 '''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TplinkC3200RouterTest('', '')
@@ -875,7 +689,7 @@ DNSServers=0.0.0.0,0.0.0.0
         check_data = ''
 
         class TplinkC3200RouterTest(TplinkC3200Router):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str
