@@ -23,6 +23,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 ```python
 from tplinkrouterc6u import (
     TplinkRouterProvider,
+    TplinkRouterV1_11,
     TplinkRouter,
     TplinkC1200Router,
     TplinkC5400XRouter,
@@ -33,6 +34,7 @@ from tplinkrouterc6u import (
     TPLinkVR400v2Client,
     TPLinkEXClient, # Class for EX series routers which supports old firmwares with AES cipher CBC mode
     TPLinkEXClientGCM, # Class for EX series routers which supports AES cipher GCM mode
+    TPLinkRClient,
     TPLinkXDRClient,
     TPLinkDecoClient,
     TplinkC80Router,
@@ -50,7 +52,7 @@ router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 # If you have the TP-link C5400X or similar, you can use the TplinkC5400XRouter class instead of the TplinkRouter class.
 # Remember that the password for this router is different, here you need to use the web encrypted password.
 # To get web encrypted password, read Web Encrypted Password section
-# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', Logger('test'))
+# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger: Logger('test'))
 
 try:
     router.authorize()  # authorizing
@@ -339,6 +341,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco P7
 - Deco X20
 - Deco X50 v1.3
+- Deco X50-5G 1.20
 - Deco X55 1.0
 - Deco X60 V3
 - Deco X90
@@ -346,7 +349,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco XE75PRO (v3.0)
 - EX511 v2.0
 - HX510 v1.0
+- M8550 v1
+- NE200-Outdoor v1.0
 - NX510v v1.0
+- NX600 v2.0
 - TD-W9960 (v1, V1.20)
 - TL-MR100 v2.0
 - TL-MR105
@@ -355,10 +361,13 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR150 v2
 - TL-MR6400 (v5, v5.3)
 - TL-MR6500v
+- TL-R470GP-AC 4.0
+- TL-R488GPM-AC 2.0
 - TL-WA1201 3.0
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
 - TL-WDR3600 V1
+- TL-XDR5410 1.0
 - TL-XDR6088 v1.0.30
 - VX420-G2h v1.1
 - VX800v v1
@@ -370,6 +379,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - AC10 1.20
 - MR47BE v1.0
 - MR50G 1.0
+- ME30 1.0
 - H60XR 1.0
 - H47BE 2.0
 - Halo H80X 1.0

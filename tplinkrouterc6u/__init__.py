@@ -1,4 +1,4 @@
-from tplinkrouterc6u.client.c6u import TplinkRouter
+from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientGCM
@@ -12,6 +12,7 @@ from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
+from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 from tplinkrouterc6u.provider import TplinkRouterProvider
 from tplinkrouterc6u.common.package_enum import Connection, VPN

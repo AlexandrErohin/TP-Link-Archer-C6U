@@ -64,7 +64,10 @@ class TPLinkXDRClient(AbstractRouter):
             },
         })
         dev_info = data['device_info']['info']
-        return Firmware(dev_info['hw_version'], dev_info['device_model'], dev_info['sw_version'])
+        return Firmware(
+            unquote(dev_info['hw_version']),
+            unquote(dev_info['device_model']),
+            unquote((dev_info['sw_version'])))
 
     def get_status(self) -> Status:
         data = self._request({
@@ -96,6 +99,8 @@ class TPLinkXDRClient(AbstractRouter):
 
         status = Status()
         status._wan_ipv4_addr = get_ip(data['network']['wan_status']['ipaddr'])
+        status._wan_ipv4_gateway = get_ip(data['network']['wan_status']['gateway'])
+        status.wan_ipv4_uptime = data['network']['wan_status']['up_time']
         status._lan_ipv4_addr = get_ip(data['network']['lan']['ipaddr'])
         status._lan_macaddr = get_mac(data['network']['lan']['macaddr'])
         status.wifi_2g_enable = data['wireless']['wlan_host_2g']['enable'] == '1'
@@ -103,15 +108,19 @@ class TPLinkXDRClient(AbstractRouter):
                                  data['wireless']['wlan_bs']['bs_enable'] == '1')
         status.guest_2g_enable = data['guest_network']['guest_2g']['enable'] == '1'
 
+        status.clients_total += len(data['hosts_info']['host_info'])
         for item_map in data['hosts_info']['host_info']:
             item = item_map[next(iter(item_map))]
             conn_type = Connection.UNKNOWN
             if item['type'] == '0':
                 conn_type = Connection.WIRED
+                status.wired_total += 1
             elif item['type'] == '1' and item['wifi_mode'] == '0':
                 conn_type = Connection.HOST_2G
+                status.wifi_clients_total += 1
             elif item['type'] == '1' and item['wifi_mode'] == '1':
                 conn_type = Connection.HOST_5G
+                status.wifi_clients_total += 1
 
             dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
             dev.up_speed = item['up_speed']

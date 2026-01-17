@@ -376,7 +376,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             pass
 
         status.devices = list(devices.values())
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
+                                + (status.iot_clients_total or 0))
 
         return status
 
@@ -489,3 +490,100 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
+
+
+class TplinkRouterV1_11(TplinkBaseRouter):
+    """
+    Router client for newer TP-Link firmware (1.11.0+) that uses simplified
+    RSA-only authentication without AES encryption wrapper.
+
+    Based on fix from: https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/90
+    """
+
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        self._pwdNN = ''
+        self._pwdEE = ''
+
+    def supports(self) -> bool:
+        """Check if this client can handle the router (new firmware with RSA-only auth)."""
+        if len(self.password) > 125:
+            return False
+
+        try:
+            self._request_pwd()
+            # V1_11 uses 2048-bit RSA = 512 hex chars, older firmware uses 1024-bit = 256 chars
+            return len(self._pwdNN) >= 512
+        except Exception:
+            return False
+
+    def _request_pwd(self) -> None:
+        """Get RSA public key for password encryption."""
+        url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
+
+        response = post(
+            url,
+            params={'operation': 'read'},
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        try:
+            data = response.json()
+            self._pwdNN = data[self._data_block]['password'][0]
+            self._pwdEE = data[self._data_block]['password'][1]
+        except Exception as e:
+            error = ('TplinkRouter - {} - Failed to get encryption keys! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response.text))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+
+    def authorize(self) -> None:
+        """Authorize using simplified RSA-only authentication (no AES encryption)."""
+        if self._pwdNN == '':
+            self._request_pwd()
+
+        # RSA encrypt password using existing utility
+        encrypted_pwd = EncryptionWrapper.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
+
+        # Simple login - just operation=login&password=<HEX>
+        url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
+        response = post(
+            url,
+            data='operation=login&password={}'.format(encrypted_pwd),
+            headers=self._headers_login,
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+
+        try:
+            data = response.json()
+            if not data.get('success'):
+                error_info = data.get(self._data_block, {})
+                raise ClientException(
+                    'TplinkRouter - {} - Login failed: {}'.format(
+                        self.__class__.__name__,
+                        error_info.get('errorcode', 'unknown error')
+                    )
+                )
+
+            self._stok = data[self._data_block]['stok']
+
+            # Get sysauth cookie
+            if 'set-cookie' in response.headers:
+                regex_result = search(r'sysauth=([^;]+)', response.headers['set-cookie'])
+                if regex_result:
+                    self._sysauth = regex_result.group(1)
+
+            self._logged = True
+
+        except ClientException:
+            raise
+        except Exception as e:
+            error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response.text))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
