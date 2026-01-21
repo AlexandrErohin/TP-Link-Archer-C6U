@@ -16,8 +16,7 @@ from tplinkrouterc6u import (
 
 class TestTPLinkC3200Router(TestCase):
 
-
-    #  Testing the merge_response method
+    # Testing the merge_response method
     def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=mac1
@@ -79,7 +78,6 @@ name=wlan6
         result = client._merge_response(response)
 
         self.assertEqual(result, [])
-
 
     def test_get_status_with_wlan_dev(self) -> None:
         response = '''
@@ -347,7 +345,8 @@ description=HS124 Sqz SDB
         client = TplinkC3200RouterTest('', '')
         result = client.get_ipv4_reservations()
 
-        # IPv4Reservation(_macaddr=EUI48('C4-6F-BF-6B-89-B8'), _ipaddr=IPv4Address('192.1.1.131'), hostname='Shelly 2', enabled=True)
+        # IPv4Reservation(_macaddr=EUI48('C4-6F-BF-6B-89-B8'), _ipaddr=IPv4Address('192.1.1.131'),
+        # hostname='Shelly 2', enabled=True)
         self.assertEqual(len(result), 17)
         self.assertIsInstance(result[13], IPv4Reservation)
         self.assertEqual(result[13].macaddr, 'C4-6F-BF-6B-89-B8')
@@ -524,7 +523,8 @@ leaseTimeRemaining=0
         result: List[IPv4DHCPLease]
         result = client.get_ipv4_dhcp_leases()
 
-        # #20 :  IPv4DHCPLease(_macaddr=EUI48('A2-42-58-24-80-D2'), _ipaddr=IPv4Address('192.1.1.16'), hostname='Portable2', lease_time='21:48:04')
+        # #20 :  IPv4DHCPLease(_macaddr=EUI48('A2-42-58-24-80-D2'), _ipaddr=IPv4Address('192.1.1.16'),
+        # hostname='Portable2', lease_time='21:48:04')
         self.assertEqual(len(result), 25)
         self.assertIsInstance(result[20], IPv4DHCPLease)
         self.assertEqual(result[20].macaddr, 'A2-42-58-24-80-D2')

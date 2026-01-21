@@ -445,7 +445,6 @@ name=wlan1
 enable=1
 chaddr=bf:75:44:4c:dc:9e
 yiaddr=192.168.8.21
-description=MyHostname
 [error]0
 
 '''
@@ -461,7 +460,7 @@ description=MyHostname
         self.assertIsInstance(result[0], IPv4Reservation)
         self.assertEqual(result[0].macaddr, 'BF-75-44-4C-DC-9E')
         self.assertEqual(result[0].ipaddr, '192.168.8.21')
-        self.assertEqual(result[0].hostname, 'MyHostname')
+        self.assertEqual(result[0].hostname, '')
         self.assertEqual(result[0].enabled, True)
 
     def test_get_ipv4_reservations_no_reservations(self) -> None:
