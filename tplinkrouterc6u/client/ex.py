@@ -124,7 +124,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 status.guest_2g_enable = bool(int(values[2][0]['guestEnable'])) \
                     if values[2][0].get('guestEnable') else None
                 status.guest_5g_enable = bool(int(values[2][1]['guestEnable'])) \
-                    if values[2][0].get('guestEnable') else None
+                    if values[2][1].get('guestEnable') else None
 
         devices = {}
         for val in self._to_list(values[3]):
