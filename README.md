@@ -40,6 +40,7 @@ from tplinkrouterc6u import (
     TplinkC80Router,
     TplinkWDRRouter,
     TplinkRE330Router,
+    TplinkC3200Router,
     Connection
 )
 from logging import Logger

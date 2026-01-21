@@ -30,13 +30,16 @@ class TplinkC3200Router(TPLinkMR200Client):
 
     # Connection method
     def supports(self) -> bool:
-        # This method checks if we can recognize the router type.
-        welcome_page = requests.get(self.host, timeout=5)
-        if not welcome_page or welcome_page.status_code != 200:
+        if len(self.password) > 125:
             return False
 
-        if re.search("Archer", welcome_page.text):
-            return True
+        try:
+            # This method checks if we can recognize the router type.
+            welcome_page = requests.get(self.host, timeout=5)
+            if welcome_page and welcome_page.status_code == 200 and re.search("Archer", welcome_page.text):
+                return True
+        except ClientException:
+            pass
 
         return False
 
@@ -109,8 +112,7 @@ class TplinkC3200Router(TPLinkMR200Client):
 
         return response, result.get('0') if len(result) == 1 and result.get('0') else result
 
-
-    def _request(self, url, method='POST', data_str=None,  encrypt=False, is_login=False):
+    def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
         r = Response()
 
         retry = 0
@@ -133,7 +135,6 @@ class TplinkC3200Router(TPLinkMR200Client):
             retry += 1
 
         return r.status_code, r.text
-
 
     # Overriding the method since we have two 5G bands in the rooter.
     # We manage both as one.

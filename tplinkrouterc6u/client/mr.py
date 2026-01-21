@@ -228,7 +228,7 @@ class TPLinkMRClientBase(AbstractRouter):
 
     def get_ipv4_reservations(self) -> List[IPv4Reservation]:
         acts = [
-            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr', 'description']),
+            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR'),
         ]
         _, values = self.req_act(acts)
 
@@ -238,7 +238,7 @@ class TPLinkMRClientBase(AbstractRouter):
                 IPv4Reservation(
                     EUI48(item['chaddr']),
                     IPv4Address(item['yiaddr']),
-                    item['description'],
+                    item.get('description', ''),
                     bool(int(item['enable']))
                 ))
 
@@ -336,7 +336,7 @@ class TPLinkMRClientBase(AbstractRouter):
         self.req_act(acts)
 
     @staticmethod
-    def _fill_acts(acts:list) -> tuple[List[str], List[str]]:
+    def _fill_acts(acts: list) -> tuple[List[str], List[str]]:
         # Fill the act lists, to refactor for other subclasses.
         act_types: List[str] = []
         act_data: List[str] = []
@@ -352,7 +352,7 @@ class TPLinkMRClientBase(AbstractRouter):
                 '\r\n'.join(act.attrs)
             ))
 
-        return act_types,act_data
+        return act_types, act_data
 
     def req_act(self, acts: list):
         act_types, act_data = self._fill_acts(acts)
@@ -406,10 +406,10 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return result if result else []
 
-    def _get_url(self, endpoint: str, params: dict=None, include_ts: bool = True) -> str:
+    def _get_url(self, endpoint: str, params: dict = None, include_ts: bool = True) -> str:
         # check if there is any param
         if params is None:
-           params = {}
+            params = {}
 
         # add timestamp param
         if include_ts:
