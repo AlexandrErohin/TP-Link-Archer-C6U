@@ -57,7 +57,10 @@ class TPLinkMR200Client(TPLinkMRClient):
         ]
         _, values = self.req_act(acts)
 
-        status.ipsecvpn_enable = values.get('enable') == '1'
+        if len(values) == 0:
+            status.ipsecvpn_enable = False
+        else:
+            status.ipsecvpn_enable = values.get('enable') == '1'
 
         return status
 

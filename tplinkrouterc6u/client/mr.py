@@ -2,7 +2,7 @@ from hashlib import md5
 from re import search
 from time import time, sleep
 from urllib.parse import quote
-from requests import Session
+from requests import Session, Response
 from datetime import timedelta, datetime
 from macaddress import EUI48
 from ipaddress import IPv4Address
@@ -23,6 +23,7 @@ from tplinkrouterc6u.common.dataclass import (
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
+from typing import List
 
 
 class TPLinkMRClientBase(AbstractRouter):
@@ -54,6 +55,10 @@ class TPLinkMRClientBase(AbstractRouter):
         Connection.GUEST_5G: '1,2,1,0,0,0',
     }
 
+    # Router name to be included in logs for example,
+    # or to be redefined by subclasses.
+    ROUTER_NAME = "TP Link Router MR"
+
     class ActItem:
         GET = 1
         SET = 2
@@ -65,7 +70,9 @@ class TPLinkMRClientBase(AbstractRouter):
         CGI = 8
 
         def __init__(self, type: int, oid: str, stack: str = '0,0,0,0,0,0', pstack: str = '0,0,0,0,0,0',
-                     attrs: list = []):
+                     attrs=None):
+            if attrs is None:
+                attrs = []
             self.type = type
             self.oid = oid
             self.stack = stack
@@ -110,6 +117,10 @@ class TPLinkMRClientBase(AbstractRouter):
         # request TokenID
         self._token = self._req_token()
         self._authorized_at = datetime.now()
+
+    # Fake implementation of all abstract methods
+    def logout(self) -> None:
+        pass
 
     def reboot(self) -> None:
         acts = [
@@ -215,9 +226,9 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return status
 
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+    def get_ipv4_reservations(self) -> List[IPv4Reservation]:
         acts = [
-            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr']),
+            self.ActItem(self.ActItem.GL, 'LAN_DHCP_STATIC_ADDR', attrs=['enable', 'chaddr', 'yiaddr', 'description']),
         ]
         _, values = self.req_act(acts)
 
@@ -227,13 +238,13 @@ class TPLinkMRClientBase(AbstractRouter):
                 IPv4Reservation(
                     EUI48(item['chaddr']),
                     IPv4Address(item['yiaddr']),
-                    '',
+                    item['description'],
                     bool(int(item['enable']))
                 ))
 
         return ipv4_reservations
 
-    def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
+    def get_ipv4_dhcp_leases(self) -> List[IPv4DHCPLease]:
         acts = [
             self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=['IPAddress', 'MACAddress', 'hostName',
                                                                    'leaseTimeRemaining']),
@@ -324,12 +335,11 @@ class TPLinkMRClientBase(AbstractRouter):
 
         self.req_act(acts)
 
-    def req_act(self, acts: list):
-        '''
-        Requests ACTs via the cgi_gdpr proxy
-        '''
-        act_types = []
-        act_data = []
+    @staticmethod
+    def _fill_acts(acts:list) -> tuple[List[str], List[str]]:
+        # Fill the act lists, to refactor for other subclasses.
+        act_types: List[str] = []
+        act_data: List[str] = []
 
         for act in acts:
             act_types.append(str(act.type))
@@ -342,13 +352,18 @@ class TPLinkMRClientBase(AbstractRouter):
                 '\r\n'.join(act.attrs)
             ))
 
+        return act_types,act_data
+
+    def req_act(self, acts: list):
+        act_types, act_data = self._fill_acts(acts)
+
         data = '&'.join(act_types) + '\r\n' + ''.join(act_data)
 
         url = self._get_url('cgi_gdpr')
         (code, response) = self._request(url, data_str=data, encrypt=True)
 
         if code != 200:
-            error = 'TplinkRouter - MR -  Response with error; Request {} - Response {}'.format(data, response)
+            error = self.ROUTER_NAME + ' -  Response with error; Request {} - Response {}'.format(data, response)
             if self._logger:
                 self._logger.debug(error)
             raise ClientError(error)
@@ -391,7 +406,11 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return result if result else []
 
-    def _get_url(self, endpoint: str, params: dict = {}, include_ts: bool = True) -> str:
+    def _get_url(self, endpoint: str, params: dict=None, include_ts: bool = True) -> str:
+        # check if there is any param
+        if params is None:
+           params = {}
+
         # add timestamp param
         if include_ts:
             params['_'] = str(round(time() * 1000))
@@ -410,14 +429,14 @@ class TPLinkMRClientBase(AbstractRouter):
         )
 
     def _req_token(self):
-        '''
+        """
         Requests the TokenID, used for CGI authentication (together with cookies)
             - token is inlined as JS var in the index (/) html page
               e.g.: <script type="text/javascript">var token="086724f57013f16e042e012becf825";</script>
 
         Return value:
             TokenID string
-        '''
+        """
         url = self._get_url('')
         (code, response) = self._request(url, method='GET')
         assert code == 200
@@ -430,12 +449,12 @@ class TPLinkMRClientBase(AbstractRouter):
         return result.group(1)
 
     def _req_rsa_key(self):
-        '''
+        """
         Requests the RSA public key from the host
 
         Return value:
             ((n, e), seq) tuple
-        '''
+        """
         response = ''
         try:
             url = self._get_url(self._url_rsa_key)
@@ -459,7 +478,7 @@ class TPLinkMRClientBase(AbstractRouter):
             assert seq.isnumeric()
 
         except Exception as e:
-            error = ('TplinkRouter - {} - Unknown error rsa_key! Error - {}; Response - {}'
+            error = (self.ROUTER_NAME + '- {} - Unknown error rsa_key! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response))
             if self._logger:
                 self._logger.debug(error)
@@ -468,7 +487,7 @@ class TPLinkMRClientBase(AbstractRouter):
         return nn, ee, int(seq)
 
     def _req_login(self) -> None:
-        '''
+        """
         Authenticates to the host
             - sets the session token after successful login
             - data/signature is passed as a GET parameter, NOT as a raw request data
@@ -476,7 +495,7 @@ class TPLinkMRClientBase(AbstractRouter):
 
         Example session token (set as a cookie):
             {'JSESSIONID': '4d786fede0164d7613411c7b6ec61e'}
-        '''
+        """
         # encrypt username + password
 
         sign, data = self._prepare_data(self.username + '\n' + self.password, True)
@@ -501,12 +520,12 @@ class TPLinkMRClientBase(AbstractRouter):
             info = search('var currAuthTimes=(.*);\nvar currForbidTime=(.*);', response)
             assert info is not None
 
-            error = 'TplinkRouter - MR - Login failed, wrong password. Auth times: {}/5, Forbid time: {}'.format(
+            error = self.ROUTER_NAME + ' - Login failed, wrong password. Auth times: {}/5, Forbid time: {}'.format(
                 info.group(1), info.group(2))
         elif ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
-            error = 'TplinkRouter - MR - Login failed. Generic error code: {}'.format(ret_code)
+            error = self.ROUTER_NAME + ' - Login failed. Generic error code: {}'.format(ret_code)
         elif ret_code != self.HTTP_RET_OK:
-            error = 'TplinkRouter - MR - Login failed. Unknown error code: {}'.format(ret_code)
+            error = self.ROUTER_NAME + ' - Login failed. Unknown error code: {}'.format(ret_code)
 
         if error:
             if self._logger:
@@ -514,14 +533,14 @@ class TPLinkMRClientBase(AbstractRouter):
             raise ClientException(error)
 
     def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
-        '''
+        """
         Prepares and sends an HTTP request to the host
             - sets up the headers, handles token auth
             - encrypts/decrypts the data, if needed
 
         Return value:
             (status_code, response_text) tuple
-        '''
+        """
         headers = self.HEADERS
 
         # add referer to request headers,
@@ -541,6 +560,8 @@ class TPLinkMRClientBase(AbstractRouter):
             data = data_str
 
         retry = 0
+        r = Response()
+
         while retry < self.REQUEST_RETRIES:
             # send the request
             if method == 'POST':
@@ -566,12 +587,12 @@ class TPLinkMRClientBase(AbstractRouter):
             return r.status_code, r.text
 
     def _parse_ret_val(self, response_text):
-        '''
+        """
         Parses $.ret value from the response text
 
         Return value:
             return code (int)
-        '''
+        """
         result = search(r'\$\.ret=(.*);', response_text)
         assert result is not None
         assert result.group(1).isnumeric()
@@ -618,6 +639,8 @@ class TPLinkMRClientBaseGCM(TPLinkMRClientBase):
             data = data_str
 
         retry = 0
+        r = Response()
+
         while retry < self.REQUEST_RETRIES:
             # send the request
             if method == 'POST':
@@ -656,9 +679,9 @@ class TPLinkMRClientBaseGCM(TPLinkMRClientBase):
 class TPLinkMRClient(TPLinkMRClientBase):
 
     def logout(self) -> None:
-        '''
+        """
         Logs out from the host
-        '''
+        """
         if self._token is None:
             return
 
@@ -684,7 +707,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
         ]
         self.req_act(acts)
 
-    def get_sms(self) -> [SMS]:
+    def get_sms(self) -> List[SMS]:
         acts = [
             self.ActItem(
                 self.ActItem.SET, 'LTE_SMS_RECVMSGBOX', attrs=['PageNumber=1']),
