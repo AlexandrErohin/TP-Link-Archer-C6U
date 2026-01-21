@@ -93,7 +93,7 @@ softwareVersion=1.1
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -158,7 +158,7 @@ X_TP_TotalPacketsReceived=467
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -236,7 +236,7 @@ active=1
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -299,7 +299,7 @@ X_TP_TotalPacketsReceived=467
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -356,7 +356,7 @@ name=wlan1
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -407,7 +407,7 @@ name=wlan1
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -445,12 +445,13 @@ name=wlan1
 enable=1
 chaddr=bf:75:44:4c:dc:9e
 yiaddr=192.168.8.21
+description=MyHostname
 [error]0
 
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -460,7 +461,7 @@ yiaddr=192.168.8.21
         self.assertIsInstance(result[0], IPv4Reservation)
         self.assertEqual(result[0].macaddr, 'BF-75-44-4C-DC-9E')
         self.assertEqual(result[0].ipaddr, '192.168.8.21')
-        self.assertEqual(result[0].hostname, '')
+        self.assertEqual(result[0].hostname, 'MyHostname')
         self.assertEqual(result[0].enabled, True)
 
     def test_get_ipv4_reservations_no_reservations(self) -> None:
@@ -470,7 +471,7 @@ yiaddr=192.168.8.21
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -485,7 +486,7 @@ yiaddr=192.168.8.21
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -505,7 +506,7 @@ leaseTimeRemaining=85841
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -535,7 +536,7 @@ leaseTimeRemaining=86372
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -580,7 +581,7 @@ DNSServers=7.7.7.7,2.2.2.2
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -611,7 +612,7 @@ DNSServers=7.7.7.7,2.2.2.2
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -645,7 +646,7 @@ DNSServers=0.0.0.0,0.0.0.0
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -675,7 +676,7 @@ DNSServers=0.0.0.0,0.0.0.0
         check_data = ''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str
@@ -697,7 +698,7 @@ DNSServers=0.0.0.0,0.0.0.0
         check_data = ''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str
@@ -733,7 +734,7 @@ ussdStatus=1
         check_data = []
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 check_url.append(url)
                 check_data.append(data_str)
                 return 200, responses.pop(0)
@@ -774,7 +775,7 @@ ussdStatus=2
         check_data = []
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 check_url.append(url)
                 check_data.append(data_str)
                 return 200, responses.pop(0)
@@ -812,7 +813,7 @@ unread=0
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -838,7 +839,7 @@ unread=0
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -856,7 +857,7 @@ unread=0
         check_data = ''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str
@@ -878,7 +879,7 @@ unread=0
         check_data = ''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str
@@ -922,7 +923,7 @@ ispName=Name
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -975,7 +976,7 @@ ispName=Name
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -1033,7 +1034,7 @@ connAct=0
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 return 200, response
 
         client = TPLinkMRClientTest('', '')
@@ -1055,7 +1056,7 @@ connAct=0
         check_data = ''
 
         class TPLinkMRClientTest(TPLinkMRClient):
-            def _request(self, url, method='POST', data_str=None, encrypt=False):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
                 nonlocal check_url, check_data
                 check_url = url
                 check_data = data_str

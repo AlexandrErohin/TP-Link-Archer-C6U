@@ -9,6 +9,7 @@ from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientGCM
 from tplinkrouterc6u.client.mr200 import TPLinkMR200Client
 from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
+from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
@@ -39,6 +40,7 @@ class TplinkRouterProvider:
                        TplinkC80Router,
                        TplinkWDRRouter,
                        TplinkRE330Router,
+                       TplinkC3200Router,
                        ]:
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
