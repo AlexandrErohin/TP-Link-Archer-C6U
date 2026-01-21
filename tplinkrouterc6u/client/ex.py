@@ -92,7 +92,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN', attrs=['MACAddress', 'IPAddress']),
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
                          attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']),
-            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON', attrs=['primaryEnable', 'guestEnable']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON'),
             self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY',
                          attrs=['active', 'X_TP_LanConnType', 'physAddress', 'IPAddress', 'hostName']),
             self.ActItem(self.ActItem.GO, 'DEV2_MEM_STATUS', attrs=['total', 'free']),
@@ -117,12 +117,14 @@ class TPLinkEXClient(TPLinkMRClientBase):
         if values[2]:
             if values[2].__class__ != list:
                 status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
-                status.guest_2g_enable = bool(int(values[2]['guestEnable']))
+                status.guest_2g_enable = bool(int(values[2]['guestEnable'])) if values[2].get('guestEnable') else None
             else:
                 status.wifi_2g_enable = bool(int(values[2][0]['primaryEnable']))
                 status.wifi_5g_enable = bool(int(values[2][1]['primaryEnable']))
-                status.guest_2g_enable = bool(int(values[2][0]['guestEnable']))
-                status.guest_5g_enable = bool(int(values[2][1]['guestEnable']))
+                status.guest_2g_enable = bool(int(values[2][0]['guestEnable'])) \
+                    if values[2][0].get('guestEnable') else None
+                status.guest_5g_enable = bool(int(values[2][1]['guestEnable'])) \
+                    if values[2][0].get('guestEnable') else None
 
         devices = {}
         for val in self._to_list(values[3]):
