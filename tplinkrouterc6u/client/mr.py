@@ -24,7 +24,7 @@ from tplinkrouterc6u.common.dataclass import (
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from typing import List
-
+from json import loads
 
 class TPLinkMRClientBase(AbstractRouter):
     REQUEST_RETRIES = 3
@@ -464,18 +464,17 @@ class TPLinkMRClientBase(AbstractRouter):
             # assert return code
             assert self._parse_ret_val(response) == self.HTTP_RET_OK
 
+            json_data = loads(response)
             # parse public key
-            ee = search('var ee="(.*)";', response)
-            nn = search('var nn="(.*)";', response)
-            seq = search('var seq="(.*)";', response)
+            ee = json_data['ee']
+            nn = json_data['nn']
+            seq = json_data['seq']
 
             assert ee and nn and seq
-            ee = ee.group(1)
-            nn = nn.group(1)
-            seq = seq.group(1)
+           
             assert len(ee) == 6
             assert len(nn) == 128
-            assert seq.isnumeric()
+            #assert seq.isnumeric()
 
         except Exception as e:
             error = (self.ROUTER_NAME + '- {} - Unknown error rsa_key! Error - {}; Response - {}'
@@ -593,11 +592,26 @@ class TPLinkMRClientBase(AbstractRouter):
         Return value:
             return code (int)
         """
-        result = search(r'\$\.ret=(.*);', response_text)
-        assert result is not None
-        assert result.group(1).isnumeric()
+        """Parse return code from VR400v2 response (supports multiple formats)."""
+        
+        # Try $.ret=...; format
+        result = search(r'\$\.ret=([-]?\d+);', response_text)
+        if result:
+            return int(result.group(1))
 
-        return int(result.group(1))
+        # Try [error]... format
+        result = search(r'\[error\](\d+)', response_text)
+        if result:
+            return int(result.group(1))
+
+        # Try var errorcode=... format
+        result = search(r'var\s+errorcode\s*=\s*(\d+)', response_text)
+        if result:
+            return int(result.group(1))
+
+        result = loads(response_text)
+        result = result['ret']
+        return int(result)
 
     def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
         encrypted_data = self._encryption.aes_encrypt(data)
