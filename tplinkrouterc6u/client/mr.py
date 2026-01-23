@@ -25,6 +25,7 @@ from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from typing import List
 
+
 class TPLinkMRClientBase(AbstractRouter):
     REQUEST_RETRIES = 3
 
@@ -466,7 +467,7 @@ class TPLinkMRClientBase(AbstractRouter):
             # parse public key
             ee = search('var ee="(.*)";', response)
             nn = search('var nn="(.*)";', response)
-            seq = search('var seq="(.*)";', response)            
+            seq = search('var seq="(.*)";', response)
 
             assert ee and nn and seq
             ee = ee.group(1)
@@ -596,7 +597,7 @@ class TPLinkMRClientBase(AbstractRouter):
         assert result is not None
         assert result.group(1).isnumeric()
 
-        result = int(result.group(1))
+        return int(result.group(1))
 
     def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
         encrypted_data = self._encryption.aes_encrypt(data)
