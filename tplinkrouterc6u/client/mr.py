@@ -24,7 +24,6 @@ from tplinkrouterc6u.common.dataclass import (
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from typing import List
-from json import loads
 
 class TPLinkMRClientBase(AbstractRouter):
     REQUEST_RETRIES = 3
@@ -464,29 +463,18 @@ class TPLinkMRClientBase(AbstractRouter):
             # assert return code
             assert self._parse_ret_val(response) == self.HTTP_RET_OK
 
-            json_data = loads(response)
+            # parse public key
+            ee = search('var ee="(.*)";', response)
+            nn = search('var nn="(.*)";', response)
+            seq = search('var seq="(.*)";', response)            
 
-            if(json_data):
-                ee = json_data['ee']
-                nn = json_data['nn']
-                seq = json_data['seq']
-
-                assert ee and nn and seq
-                assert len(ee) == 6
-                assert len(nn) == 128
-            else:
-                # parse public key
-                ee = search('var ee="(.*)";', response)
-                nn = search('var nn="(.*)";', response)
-                seq = search('var seq="(.*)";', response)            
-
-                assert ee and nn and seq
-                ee = ee.group(1)
-                nn = nn.group(1)
-                seq = seq.group(1)
-                assert len(ee) == 6
-                assert len(nn) == 128
-                assert seq.isnumeric()
+            assert ee and nn and seq
+            ee = ee.group(1)
+            nn = nn.group(1)
+            seq = seq.group(1)
+            assert len(ee) == 6
+            assert len(nn) == 128
+            assert seq.isnumeric()
 
         except Exception as e:
             error = (self.ROUTER_NAME + '- {} - Unknown error rsa_key! Error - {}; Response - {}'
@@ -604,29 +592,11 @@ class TPLinkMRClientBase(AbstractRouter):
         Return value:
             return code (int)
         """
-        result = -1
+        result = search(r'\$\.ret=(.*);', response_text)
+        assert result is not None
+        assert result.group(1).isnumeric()
 
-        if '[error]0' in response_text or 'errorcode=0' in response_text:
-            return 0
-
-        try:
-            json_data = loads(response_text)
-
-
-            if(json_data):
-                result = json_data['ret']
-                result = int(result)
-            else:
-                result = search(r'\$\.ret=(.*);', response_text)
-                assert result is not None
-                assert result.group(1).isnumeric()
-
-                result = int(result.group(1))
-        
-        except ValueError:
-                raise ClientError(f"Error trying to convert response to JSON: {response_text}")
-
-        return result
+        result = int(result.group(1))
 
     def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
         encrypted_data = self._encryption.aes_encrypt(data)
