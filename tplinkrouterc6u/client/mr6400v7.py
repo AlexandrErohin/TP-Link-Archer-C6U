@@ -23,7 +23,6 @@ class TPLinkMR6400v7Client(TPLinkMRClient):
                  verify_ssl: bool = True, timeout: int = 30):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-
     def _req_rsa_key(self):
         """
         Requests the RSA public key from the host
@@ -59,7 +58,6 @@ class TPLinkMR6400v7Client(TPLinkMRClient):
 
         return nn, ee, int(seq)
 
-
     def _parse_ret_val(self, response_text):
         """
         Parses $.ret value from the response text
@@ -77,6 +75,6 @@ class TPLinkMR6400v7Client(TPLinkMRClient):
             result = int(result)
 
             return result
-        
+
         except ValueError:
-                raise ClientError(f"Error trying to convert response to JSON: {response_text}")
+            raise ClientError(f"Error trying to convert response to JSON: {response_text}")
