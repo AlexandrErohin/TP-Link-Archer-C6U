@@ -30,6 +30,7 @@ from tplinkrouterc6u import (
     TPLinkMRClient, # Class for MR series routers which supports old firmwares with AES cipher CBC mode
     TPLinkMRClientGCM, # Class for MR series routers which supports AES cipher GCM mode
     TPLinkMR200Client,
+    TPLinkMR6400v7Client,
     TPLinkVRClient,
     TPLinkVR400v2Client,
     TPLinkEXClient, # Class for EX series routers which supports old firmwares with AES cipher CBC mode
@@ -360,7 +361,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR100-Outdoor v1.0
 - TL-MR110-Outdoor v1.0
 - TL-MR150 v2
-- TL-MR6400 (v5, v5.3)
+- TL-MR6400 (v5, v5.3, v7)
 - TL-MR6500v
 - TL-R470GP-AC 4.0
 - TL-R488GPM-AC 2.0
