@@ -514,7 +514,10 @@ class TplinkRouterV1_11(TplinkBaseRouter):
         try:
             self._request_pwd()
             # V1_11 uses 2048-bit RSA = 512 hex chars, older firmware uses 1024-bit = 256 chars
-            return len(self._pwdNN) >= 512
+            if len(self._pwdNN) >= 512:
+                self.authorize()
+                self.logout()
+                return True
         except Exception:
             return False
 
@@ -534,7 +537,7 @@ class TplinkRouterV1_11(TplinkBaseRouter):
             self._pwdNN = data[self._data_block]['password'][0]
             self._pwdEE = data[self._data_block]['password'][1]
         except Exception as e:
-            error = ('TplinkRouter - {} - Failed to get encryption keys! Error - {}; Response - {}'
+            error = ('TplinkRouterV1_11 - {} - Failed to get encryption keys! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response.text))
             if self._logger:
                 self._logger.debug(error)
@@ -563,7 +566,7 @@ class TplinkRouterV1_11(TplinkBaseRouter):
             if not data.get('success'):
                 error_info = data.get(self._data_block, {})
                 raise ClientException(
-                    'TplinkRouter - {} - Login failed: {}'.format(
+                    'TplinkRouterV1_11 - {} - Login failed: {}'.format(
                         self.__class__.__name__,
                         error_info.get('errorcode', 'unknown error')
                     )
@@ -582,7 +585,7 @@ class TplinkRouterV1_11(TplinkBaseRouter):
         except ClientException:
             raise
         except Exception as e:
-            error = ('TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}'
+            error = ('TplinkRouterV1_11 - {} - Cannot authorize! Error - {}; Response - {}'
                      .format(self.__class__.__name__, e, response.text))
             if self._logger:
                 self._logger.debug(error)
