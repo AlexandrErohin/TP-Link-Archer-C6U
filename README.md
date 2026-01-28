@@ -50,11 +50,11 @@ router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 # You may use client directly like
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
-# router = TplinkRouter('http://192.168.0.1','password','admin2', Logger('test'))
+# router = TplinkRouter('http://192.168.0.1','password','admin2', logger=Logger('test'))
 # If you have the TP-link C5400X or similar, you can use the TplinkC5400XRouter class instead of the TplinkRouter class.
 # Remember that the password for this router is different, here you need to use the web encrypted password.
 # To get web encrypted password, read Web Encrypted Password section
-# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger: Logger('test'))
+# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger=Logger('test'))
 
 try:
     router.authorize()  # authorizing
@@ -354,6 +354,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - HX510 v1.0
 - M8550 v1
 - NE200-Outdoor v1.0
+- NE211-Outdoor v1.0
 - NX510v v1.0
 - NX600 v2.0
 - TD-W9960 (v1, V1.20)
