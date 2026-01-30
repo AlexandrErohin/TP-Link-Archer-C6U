@@ -12,7 +12,6 @@ Fixes: https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/220
 """
 
 import hmac
-import hashlib
 import json
 from re import search
 from hashlib import sha256
@@ -176,7 +175,7 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign = ''
         for i in range(0, len(sign_str), SIGNATURE_OFFSET):
             chunk = sign_str[i:i + SIGNATURE_OFFSET]
-            h = hmac.new(aes_key.encode(), chunk.encode(), hashlib.sha256)
+            h = hmac.new(aes_key.encode(), chunk.encode(), sha256)
             sign += h.hexdigest()
         return sign
 
@@ -185,8 +184,8 @@ class TplinkRouterSG(TplinkBaseRouter):
         self._request_pwd_keys()
         self._request_auth_keys()
 
-        # SHA256 hash of "admin" + password (not MD5)
-        self._hash = sha256(('admin' + self.password).encode()).hexdigest()
+        # SHA256 hash of username + password (not MD5)
+        self._hash = sha256((self.username + self.password).encode()).hexdigest()
 
         # Generate AES session key
         self._generate_aes_key()
@@ -286,9 +285,3 @@ class TplinkRouterSG(TplinkBaseRouter):
 
     def _is_valid_response(self, data: dict) -> bool:
         return 'success' in data and data['success'] and self._data_block in data
-
-    def _prepare_data(self, data: str):
-        return data
-
-    def _decrypt_response(self, data: dict) -> dict:
-        return data
