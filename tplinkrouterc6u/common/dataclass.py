@@ -22,6 +22,10 @@ class Device:
     packets_received: int | None = None
     down_speed: int | None = None
     up_speed: int | None = None
+    tx_rate: int | None = None
+    rx_rate: int | None = None
+    online_time: float | None = None
+    traffic_usage: int | None = None
     signal: int | None = None
     active: bool = True
 
