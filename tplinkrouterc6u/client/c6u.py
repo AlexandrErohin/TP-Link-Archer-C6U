@@ -525,6 +525,7 @@ class TplinkRouterSVR(TplinkBaseRouter):
         self._aes_key = ''
         self._aes_iv = ''
         self._hash = ''
+        self._login_username = None
 
     def supports(self) -> bool:
         try:
@@ -757,6 +758,7 @@ class TplinkRouterSVR(TplinkBaseRouter):
             password_key = block['password']
             self._pwdNN = password_key[0]
             self._pwdEE = password_key[1]
+            self._login_username = block.get('username')
         except Exception as e:
             error = (
                 'TplinkRouterSVR - {} - Unknown error for pwd! Error - {}; Response - {}'
@@ -769,7 +771,8 @@ class TplinkRouterSVR(TplinkBaseRouter):
     def _init_crypto(self) -> None:
         self._aes_key = self._random_digits(self.AES_KEY_LEN)
         self._aes_iv = self._random_digits(self.AES_IV_LEN)
-        self._hash = sha256(('admin' + self.password).encode()).hexdigest()
+        login_user = self._login_username if self._login_username is not None else self.username
+        self._hash = sha256((login_user + self.password).encode()).hexdigest()
 
     def _try_login(self, confirm: bool | None = None):
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
