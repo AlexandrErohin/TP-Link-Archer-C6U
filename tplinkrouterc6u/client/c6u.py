@@ -362,12 +362,12 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                         status.iot_clients_total += 1
 
                 device = devices[mac]
-                device.down_speed = item.get('downloadSpeed')
-                device.up_speed = item.get('uploadSpeed')
-                device.tx_rate = item.get('txrate')
-                device.rx_rate = item.get('rxrate')
-                device.online_time = item.get('onlineTime')
-                device.traffic_usage = item.get('trafficUsage')
+                device.down_speed = item.get('downloadSpeed', item.get('downSpeed'))
+                device.up_speed = item.get('uploadSpeed', item.get('upSpeed'))
+                device.tx_rate = item.get('txrate', item.get('txRate'))
+                device.rx_rate = item.get('rxrate', item.get('rxRate'))
+                device.online_time = item.get('onlineTime', item.get('online_time'))
+                device.traffic_usage = item.get('trafficUsage', item.get('trafficUsed'))
                 device.signal = int(item.get('signal')) if item.get('signal') else None
 
         try:
