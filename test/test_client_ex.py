@@ -6,6 +6,7 @@ from tplinkrouterc6u import (
     Connection,
     Firmware,
     Status,
+    LTEStatus,
     Device,
     IPv4Reservation,
     IPv4DHCPLease,
@@ -704,6 +705,76 @@ class TestTPLinkEXClient(TestCase):
         self.assertIn('http:///cgi_gdpr?9?_=', check_url)
         self.assertEqual(check_data, '{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
                                      '"enable":"1"},"operation":"so","oid":"DEV2_OPENVPN"}')
+
+    def test_get_lte_status(self) -> None:
+
+        DEV2_LTE_LINK_CFG = ('{"data":{"enable":"1","wispConnStat":"0","networkType":"3","endcStatus":"-1",'
+                             '"connectedBand":"B3","availableBand":"B3","roamingStatus":"0","connectStatus":"4",'
+                             '"simStatus":"3","simCardNumber":"0","simCardType":"0","simCardState":"1",'
+                             '"simCardImsi":"0","simCardGid1":"010XXXFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",'
+                             '"dataSwitch":"1","roamSwitch":"0","prefNet":"3","timeFactroyFlag":"0",'
+                             '"wlanFactoryFlag":"0","smsScEnable":"0","smsScAddress":"491712121212",'
+                             '"signalStrength":"0","ipv4":"10.171.53.12","dns1v4":"62.109.121.17",'
+                             '"dns2v4":"62.109.121.18","ipv4_mtu":"1500","ipv6":"2a02:3036:282:7376",'
+                             '"ipv6PrefixLen":"64","dns1v6":"2a02:3018:0","dns2v6":"2a02:3018:0:40ff::bbbb",'
+                             '"ipv6_mtu":"1500","ifName":"rmnet_data0","gatewayV4":"10.171.53.2",'
+                             '"gatewayV6":"fe80::4d7c:fa07","netmask":"255.255.255.248","__indexPrimaryServingCell":"",'
+                             '"stack":"1,0,0,0,0,0"},"operation":"go","oid":"DEV2_LTE_LINK_CFG","success":true}')
+        DEV2_XTP_LTE_INTF_CFG = ('{"data":{"enable":"1","freeDurationEnabled":"0","freeDurationWhenRoaming":"0",'
+                                 '"freeDurationStart":"00:00","freeDurationEnd":"00:00","cfgModified":"0",'
+                                 '"dailyFlow":"294896362.0000","currentDate":"1770073200","ledLimitReached":"1",'
+                                 '"allowDialOnce":"0","enableDataLimit":"0","autoDisconnect":"1","dataLimit":"0",'
+                                 '"limitType":"0","limitation":"0","warningPercent":"90","warnSimNumber":"",'
+                                 '"needSmsTip":"0","enablePaymentDay":"1","nextDue":"1772233200","paymentDay":"28",'
+                                 '"adjustStatistics":"-1","curStatistics":"0","curConnTime":"1545647",'
+                                 '"totalStatistics":"38819729967.0000","totalConnTime":"84667","rxFlow":"0",'
+                                 '"txFlow":"0","curRxSpeed":"31921","curTxSpeed":"28242","plmnLock":"0",'
+                                 '"enablePushNotification":"0","stack":"1,0,0,0,0,0"},"operation":"go",'
+                                 '"oid":"DEV2_XTP_LTE_INTF_CFG","success":true}')
+        DEV2_LTE_NET_STATUS = ('{"data":{"ussdSessionStatus":"0","ussdStatus":"0","smsUnreadCount":"0",'
+                               '"smsSendCause":"0","smsSendResult":"3","rfSwitch":"1","sigLevel":"0","connStat":"4",'
+                               '"roamStat":"0","regStat":"1","netType":"3","srvStat":"2","rfInfoChannel":"0",'
+                               '"rfInfoBand":"0","rfInfoIf":"0","rfInfoRat":"0","rfInfoRssi":"0","rfInfoRsrp":"0",'
+                               '"rfInfoRsrq":"0","rfInfoSnr":"0","rfInfoEcio":"0","region":"","callStatus":"0",'
+                               '"stack":"1,0,0,0,0,0"},"operation":"go","oid":"DEV2_LTE_NET_STATUS","success":true}')
+        DEV2_LTE_PROF_STAT = ('{"data":{"activeProfType":"0","activeProfIndex":"0","spn":"","ispWhich":"0",'
+                              '"ispCount":"3","ispMnc":"3","ispMcc":"262","ispName":"O2 2025","usrWhich":"0",'
+                              '"usrCount":"1","usrMnc":"3","usrMcc":"262","stack":"1,0,0,0,0,0"},"operation":"go",'
+                              '"oid":"DEV2_LTE_PROF_STAT","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_LINK_CFG' in data_str:
+                    return 200, DEV2_LTE_LINK_CFG
+                elif 'DEV2_XTP_LTE_INTF_CFG' in data_str:
+                    return 200, DEV2_XTP_LTE_INTF_CFG
+                elif 'DEV2_LTE_NET_STATUS' in data_str:
+                    return 200, DEV2_LTE_NET_STATUS
+                elif 'DEV2_LTE_PROF_STAT' in data_str:
+                    return 200, DEV2_LTE_PROF_STAT
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_lte_status()
+
+        self.assertIsInstance(status, LTEStatus)
+
+        self.assertIsInstance(status, LTEStatus)
+        self.assertEqual(status.enable, 1)
+        self.assertEqual(status.connect_status, 4)
+        self.assertEqual(status.network_type, 3)
+        self.assertEqual(status.sim_status, 3)
+        self.assertEqual(status.sig_level, 0)
+        self.assertEqual(status.total_statistics, 38819729967)
+        self.assertEqual(status.cur_rx_speed, 31921)
+        self.assertEqual(status.cur_tx_speed, 28242)
+        self.assertEqual(status.sms_unread_count, 0)
+        self.assertEqual(status.rsrp, 0)
+        self.assertEqual(status.rsrq, 0)
+        self.assertEqual(status.snr, 0)
+        self.assertEqual(status.isp_name, 'O2 2025')
 
 
 if __name__ == '__main__':

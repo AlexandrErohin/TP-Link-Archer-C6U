@@ -24,6 +24,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 from tplinkrouterc6u import (
     TplinkRouterProvider,
     TplinkRouterV1_11,
+    TplinkRouterSG, # For routers like Archer BE3600, Archer BE230
     TplinkRouter,
     TplinkC1200Router,
     TplinkC5400XRouter,
@@ -35,7 +36,7 @@ from tplinkrouterc6u import (
     TPLinkVR400v2Client,
     TPLinkEXClient, # Class for EX series routers which supports old firmwares with AES cipher CBC mode
     TPLinkEXClientGCM, # Class for EX series routers which supports AES cipher GCM mode
-    TPLinkRClient,
+    TPLinkRClient, # For routers like TL-R470GP-AC
     TPLinkXDRClient,
     TPLinkDecoClient,
     TplinkC80Router,
@@ -286,6 +287,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer A7 V5
 - Archer A8 (1.0, 2.20)
 - Archer A9 V6
+- Archer A10 v1
 - Archer A20 v1.0
 - Archer AX10 v1.0
 - Archer AX12 v1.0
@@ -315,7 +317,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer BE550 v1.0
 - Archer BE800 v1.0
 - Archer BE805 v1.0
-- Archer BE3600 1.6
+- Archer BE3600 (v1.0, v1.6)
 - Archer C1200 (v1.0, v2.0)
 - Archer C2300 (v1.0, v2.0)
 - Archer C3200 v1

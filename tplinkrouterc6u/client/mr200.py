@@ -91,7 +91,8 @@ class TPLinkMR200Client(TPLinkMRClient):
         status = LTEStatus()
         acts = [
             self.ActItem(self.ActItem.GET, 'WAN_LTE_LINK_CFG', '2,1,0,0,0,0',
-                         attrs=['enable', 'connectStatus', 'networkType', 'roamingStatus', 'simStatus']),
+                         attrs=['enable', 'connectStatus', 'networkType', 'roamingStatus', 'simStatus',
+                                'signalStrength']),
             self.ActItem(self.ActItem.GET, 'WAN_LTE_INTF_CFG', '2,0,0,0,0,0',
                          attrs=['dataLimit', 'enablePaymentDay', 'curStatistics', 'totalStatistics', 'enableDataLimit',
                                 'limitation',
