@@ -603,6 +603,143 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[6].packets_sent, 134815)
         self.assertEqual(status.devices[6].packets_received, 2953078)
 
+    def test_get_status_with_game_accelerator_fallback_values(self) -> None:
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "access_devices_wireless_host": [
+                {
+                    "wire_type": "5G",
+                    "macaddr": "f4:aa:bb:cc:dd:ee",
+                    "ipaddr": "192.168.1.110",
+                    "hostname": "CLIENT1"
+                }
+            ]
+        }
+    }
+'''
+        response_game_accelerator = '''
+  {
+      "data": [
+          {"mac": "f4:aa:bb:cc:dd:ee", "deviceTag":"5G", "isGuest":false, "ip":"192.168.1.110",
+          "deviceName":"CLIENT1", "downSpeed":112458738, "upSpeed":704111,
+          "txRate":1441170, "rxRate":1080880, "online_time":34990.64,
+          "trafficUsed":19594852347, "signal": -60},
+          {"deviceName":"no-mac-device"}
+      ],
+      "timeout": false,
+      "success": true
+  }
+'''
+        response_stats = '''
+  {
+      "data": [],
+      "timeout": false,
+      "success": true,
+      "operator": "load"
+  }
+'''
+
+        router_class = self.router_class
+        game_accelerator_path = self.game_accelerator_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == game_accelerator_path:
+                    return loads(response_game_accelerator)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(len(status.devices), 1)
+        device = status.devices[0]
+        self.assertEqual(device.macaddr, 'F4-AA-BB-CC-DD-EE')
+        self.assertEqual(device.ipaddr, '192.168.1.110')
+        self.assertEqual(device.hostname, 'CLIENT1')
+        self.assertEqual(device.down_speed, 112458738)
+        self.assertEqual(device.up_speed, 704111)
+        self.assertEqual(device.tx_rate, 1441170)
+        self.assertEqual(device.rx_rate, 1080880)
+        self.assertEqual(device.online_time, 34990.64)
+        self.assertEqual(device.traffic_usage, 19594852347)
+        self.assertEqual(device.signal, -60)
+
+    def test_get_status_with_game_accelerator_alt_keys(self) -> None:
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "access_devices_wireless_host": [
+                {
+                    "wire_type": "5G",
+                    "macaddr": "aa:bb:cc:dd:ee:ff",
+                    "ipaddr": "192.168.1.120",
+                    "hostname": "CLIENT2"
+                }
+            ]
+        }
+    }
+'''
+        response_game_accelerator = '''
+  {
+      "data": [
+          {"mac": "aa:bb:cc:dd:ee:ff", "deviceTag":"5G", "isGuest":false, "ip":"192.168.1.120",
+          "deviceName":"CLIENT2", "downloadSpeed":12345, "uploadSpeed":2345,
+          "txrate":300, "rxrate":400, "onlineTime":123.45,
+          "trafficUsage":987654321, "signal": -55}
+      ],
+      "timeout": false,
+      "success": true
+  }
+'''
+        response_stats = '''
+  {
+      "data": [],
+      "timeout": false,
+      "success": true,
+      "operator": "load"
+  }
+'''
+
+        router_class = self.router_class
+        game_accelerator_path = self.game_accelerator_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == game_accelerator_path:
+                    return loads(response_game_accelerator)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(len(status.devices), 1)
+        device = status.devices[0]
+        self.assertEqual(device.macaddr, 'AA-BB-CC-DD-EE-FF')
+        self.assertEqual(device.ipaddr, '192.168.1.120')
+        self.assertEqual(device.hostname, 'CLIENT2')
+        self.assertEqual(device.down_speed, 12345)
+        self.assertEqual(device.up_speed, 2345)
+        self.assertEqual(device.tx_rate, 300)
+        self.assertEqual(device.rx_rate, 400)
+        self.assertEqual(device.online_time, 123.45)
+        self.assertEqual(device.traffic_usage, 987654321)
+        self.assertEqual(device.signal, -55)
+
     def test_get_status_with_perf_request(self) -> None:
         response_status = '''
     {

@@ -169,6 +169,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | packets_received | total packets received | int, None |
 | down_speed | download speed | int, None |
 | up_speed | upload speed | int, None |
+| tx_rate | transmit rate (Mbps) | int, None |
+| rx_rate | receive rate (Mbps) | int, None |
+| online_time | client online time (seconds) | float, None |
+| traffic_usage | total traffic usage (bytes) | int, None |
 | signal | Signal strength | int, None |
 | active | Is active device | bool |
 

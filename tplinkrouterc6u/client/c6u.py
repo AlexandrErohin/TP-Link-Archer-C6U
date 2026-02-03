@@ -348,18 +348,27 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         if smart_network:
             for item in smart_network:
-                if item['mac'] not in devices:
+                mac = item.get('mac')
+                if not mac:
+                    continue
+
+                if mac not in devices:
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
-                    devices[item['mac']] = Device(conn, get_mac(item.get('mac', '00:00:00:00:00:00')),
-                                                  get_ip(item['ip']), item['deviceName'])
+                    devices[mac] = Device(conn, get_mac(item.get('mac', '00:00:00:00:00:00')),
+                                          get_ip(item.get('ip', '0.0.0.0')), item.get('deviceName', ''))
                     if conn.is_iot():
                         if status.iot_clients_total is None:
                             status.iot_clients_total = 0
                         status.iot_clients_total += 1
 
-                devices[item['mac']].down_speed = item.get('downloadSpeed')
-                devices[item['mac']].up_speed = item.get('uploadSpeed')
-                devices[item['mac']].signal = int(item.get('signal')) if item.get('signal') else None
+                device = devices[mac]
+                device.down_speed = item.get('downloadSpeed', item.get('downSpeed'))
+                device.up_speed = item.get('uploadSpeed', item.get('upSpeed'))
+                device.tx_rate = item.get('txrate', item.get('txRate'))
+                device.rx_rate = item.get('rxrate', item.get('rxRate'))
+                device.online_time = item.get('onlineTime', item.get('online_time'))
+                device.traffic_usage = item.get('trafficUsage', item.get('trafficUsed'))
+                device.signal = int(item.get('signal')) if item.get('signal') else None
 
         try:
             wireless_stats = self.request('admin/wireless?form=statistics', 'operation=load')
