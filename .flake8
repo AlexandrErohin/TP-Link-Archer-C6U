@@ -1,7 +1,7 @@
 [flake8]
 
 max-line-length = 120
-exclude = .git,__pycache__,build,dist,venv
+exclude = .git,__pycache__,build,dist,venv,.venv
 
 per-file-ignores =
     # __init__.py files are allowed to have unused imports and lines-too-long

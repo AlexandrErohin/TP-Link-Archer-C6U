@@ -12,4 +12,6 @@ For example
  - [Class for routers EX series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/ex.py#L21)
  - [Class for routers WDR series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/wdr.py#L199)
  - [Class for routers RE series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/re330.py#L68)
+ - [Class for routers BE series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/sg.py#L39)
+ - [Class for routers R series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/r.py#L17)
   

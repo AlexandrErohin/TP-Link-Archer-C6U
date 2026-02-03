@@ -13,6 +13,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    LTEStatus,
     VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
@@ -237,6 +238,38 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 attrs=atr),
         ]
         self.req_act(acts)
+
+    def get_lte_status(self) -> LTEStatus:
+        status = LTEStatus()
+        acts = [
+            self.ActItem(self.ActItem.GET, 'DEV2_LTE_LINK_CFG', '1,0,0,0,0,0',
+                         attrs=['enable', 'connectStatus', 'networkType', 'simStatus']),
+            self.ActItem(self.ActItem.GET, 'DEV2_XTP_LTE_INTF_CFG', '1,0,0,0,0,0',
+                         attrs=['totalStatistics', 'curRxSpeed', 'curTxSpeed']),
+            self.ActItem(self.ActItem.GET, 'DEV2_LTE_NET_STATUS', '1,0,0,0,0,0',
+                         attrs=['smsUnreadCount', 'sigLevel', 'rfInfoRsrp', 'rfInfoRsrq', 'rfInfoSnr']),
+            self.ActItem(self.ActItem.GET, 'DEV2_LTE_PROF_STAT', '1,0,0,0,0,0', attrs=['ispName']),
+        ]
+        _, values = self.req_act(acts)
+
+        status.enable = int(values[0]['enable'])
+        status.connect_status = int(values[0]['connectStatus'])
+        status.network_type = int(values[0]['networkType'])
+        status.sim_status = int(values[0]['simStatus'])
+
+        status.total_statistics = int(float(values[1]['totalStatistics']))
+        status.cur_rx_speed = int(values[1]['curRxSpeed'])
+        status.cur_tx_speed = int(values[1]['curTxSpeed'])
+
+        status.sms_unread_count = int(values[2]['smsUnreadCount'])
+        status.sig_level = int(values[2]['sigLevel'])
+        status.rsrp = int(values[2]['rfInfoRsrp'])
+        status.rsrq = int(values[2]['rfInfoRsrq'])
+        status.snr = int(values[2]['rfInfoSnr'])
+
+        status.isp_name = values[3]['ispName']
+
+        return status
 
     def req_act(self, acts: list):
         '''
