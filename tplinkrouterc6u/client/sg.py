@@ -65,7 +65,8 @@ class TplinkRouterSG(TplinkBaseRouter):
         try:
             if not self._check_sg_certification():
                 return False
-            self._request_pwd_keys()
+            self.authorize()
+            self.logout()
             return True
         except Exception:
             return False

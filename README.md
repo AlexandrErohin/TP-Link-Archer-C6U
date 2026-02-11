@@ -317,7 +317,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer BE550 v1.0
 - Archer BE800 v1.0
 - Archer BE805 v1.0
-- Archer BE3600 (v1.0, v1.6)
+- Archer BE3600 (v1.0, v1.2, v1.6)
 - Archer C1200 (v1.0, v2.0)
 - Archer C2300 (v1.0, v2.0)
 - Archer C3200 v1
