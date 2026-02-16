@@ -39,6 +39,9 @@ from tplinkrouterc6u import (
     TPLinkRClient, # For routers like TL-R470GP-AC
     TPLinkXDRClient,
     TPLinkDecoClient,
+    TPLinkEAP115Client,
+    TPLinkCPE210Client,
+    TPLinkSG108EClient,
     TplinkC80Router,
     TplinkWDRRouter,
     TplinkRE330Router,
