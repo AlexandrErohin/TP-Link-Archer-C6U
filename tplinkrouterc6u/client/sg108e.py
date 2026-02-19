@@ -118,7 +118,6 @@ class TPLinkSG108EClient(AbstractRouter):
         state = all_info.get("state") if isinstance(all_info, dict) else None
         link_status = all_info.get("link_status") if isinstance(all_info, dict) else None
 
-        ports_enabled = _count_ports_enabled(state, ports_total)
         ports_link_up = _count_ports_link_up(link_status, state, ports_total)
 
         status = Status()
@@ -308,7 +307,7 @@ def _handle_array(val: str):
     if not inner.startswith("new Array("):
         raise ValueError("Not an array")
 
-    inner = inner[len("new Array(") :]
+    inner = inner[len("new Array("):]
     if inner.endswith(")"):
         inner = inner[:-1]
 

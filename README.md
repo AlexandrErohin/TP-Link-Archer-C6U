@@ -345,6 +345,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer VX231v v1.0
 - Archer VX1800v v1.0
 - BE11000 2.0
+- CPE210
 - Deco M4 2.0
 - Deco M4R 2.0
 - Deco M5 v3
@@ -360,6 +361,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco XE75 (v1.0, v2.0)
 - Deco XE75PRO (v3.0)
 - EX511 v2.0
+- EAP115
 - HX510 v1.0
 - M8550 v1
 - NE200-Outdoor v1.0
@@ -376,6 +378,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-MR6500v
 - TL-R470GP-AC 4.0
 - TL-R488GPM-AC 2.0
+- TL-SG108E
 - TL-WA1201 3.0
 - TL-WA3001 v1.0
 - TL-XDR3010 V2
