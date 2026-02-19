@@ -6,6 +6,8 @@ from requests import post, Response
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from logging import Logger
+from urllib.parse import parse_qsl
+from json import dumps
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.package_enum import Connection, VPN
@@ -219,9 +221,7 @@ class TplinkEncryption(TplinkRequest):
         data_len = len(encrypted_data)
         hash = md5((self.username + self.password).encode()).hexdigest()
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len,
-                                              True if self._logged is False else False,
-                                              hash, self.nn, self.ee)
+        sign = self._encryption.get_signature(int(self._seq) + data_len, True, hash, self.nn, self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
 
@@ -246,7 +246,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config&operation=list&vpntype=pptp'
         referer = '{}/webpages/index.html'.format(self.host)
-        self._headers_request = {'Referer': referer}
+        self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
 
     @abstractmethod
@@ -266,8 +266,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             Connection.IOT_6G: 'iot_6g',
         }
         value = values.get(wifi)
-        path = f"admin/wireless?&form=guest&form={value}"
-        data = f"operation=write&{value}_enable={'on' if enable else 'off'}"
+        path = f"admin/wireless?form={value}"
+        data = f"operation=write&enable={'on' if enable else 'off'}"
         self.request(path, data)
 
     def reboot(self) -> None:
@@ -499,6 +499,32 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
+        self._headers_request['Content-Type'] = 'application/json'
+
+    def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+        # BE805 expects the payload to be a JSON object, even though the base class
+        # typically sends form-urlencoded style strings (e.g. 'operation=read').
+        # We intercept the request, parse the string to a dict, and convert to JSON.
+
+        # Also, BE805 requires the 'operation' parameter to be in the URL query string
+        # for many endpoints (e.g. firmware, dhcp, vpn).
+
+        if isinstance(data, str) and '=' in data:
+            try:
+                # content is like "operation=read&form=..."
+                # Parse to dict
+                parsed = dict(parse_qsl(data))
+
+                for key, value in parsed.items():
+                    if key not in path:
+                        path += f"&{key}={value}"
+
+                # Convert to JSON string
+                data = dumps(parsed)
+            except Exception:
+                # If parsing fails, fall back to sending original data
+                pass
+        return super().request(path, data, ignore_response, ignore_errors)
 
 
 class TplinkRouterV1_11(TplinkBaseRouter):
