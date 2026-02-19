@@ -1,6 +1,6 @@
 from logging import Logger
 
-from tplinkrouterc6u import TPLinkXDRClient
+from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
 from tplinkrouterc6u.client.sg import TplinkRouterSG
@@ -19,6 +19,9 @@ from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
+from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
+from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
+from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
 
 
 class TplinkRouterProvider:
@@ -45,10 +48,23 @@ class TplinkRouterProvider:
                        TplinkWDRRouter,
                        TplinkRE330Router,
                        TplinkC3200Router,
+                       TPLinkEAP115Client,
+                       TPLinkCPE210Client,
+                       TPLinkSG108EClient,
                        ]:
             router = client(host, password, username, logger, verify_ssl, timeout)
-            if router.supports():
-                return router
+            try:
+                if router.supports():
+                    return router
+            except Exception as e:
+                if logger is not None:
+                    logger.debug(
+                        'TplinkRouterProvider: supports() failed for %s (%s): %s',
+                        host,
+                        client.__name__,
+                        e,
+                    )
+                continue
 
         message = ('Login failed! Please check if your router local password is correct,'
                    'check if the default router username is correct or '
