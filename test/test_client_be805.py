@@ -1,13 +1,11 @@
-
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from json import loads
 from tplinkrouterc6u.client.be805 import TplinkBE805Client
 from tplinkrouterc6u import (
     Status,
     IPv4Status,
     Connection,
-    ClientException,
     Firmware,
     IPv4Reservation,
     IPv4DHCPLease
@@ -37,7 +35,7 @@ class TestTPLinkBE805Client(TestCase):
 
         self.assertIsInstance(firmware, Firmware)
         self.assertEqual(firmware.hardware_version, "Archer BE805 v1.20")
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
         self.assertEqual(args[0], 'admin/firmware?form=upgrade&operation=read')
@@ -69,7 +67,7 @@ class TestTPLinkBE805Client(TestCase):
 
         self.assertIsInstance(status, IPv4Status)
         self.assertEqual(str(status.wan_ipv4_ipaddr), "175.156.194.150")
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
         self.assertEqual(args[0], 'admin/network?form=status_ipv4&operation=read')
@@ -79,13 +77,13 @@ class TestTPLinkBE805Client(TestCase):
     def test_set_wifi(self, mock_request) -> None:
         client = TplinkBE805Client('192.168.1.1', 'p')
         client.set_wifi(Connection.GUEST_2G, True)
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
-        
+
         path = args[0]
         data = args[1]
-        
+
         self.assertTrue('operation=write' in path)
         self.assertTrue('admin/wireless' in path)
         data_json = loads(data)
@@ -96,12 +94,12 @@ class TestTPLinkBE805Client(TestCase):
     def test_reboot(self, mock_request) -> None:
         client = TplinkBE805Client('192.168.1.1', 'p')
         client.reboot()
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
         path = args[0]
         data = args[1]
-        
+
         self.assertEqual(path, 'admin/system?form=reboot&operation=write')
         data_json = loads(data)
         self.assertEqual(data_json.get('operation'), 'write')
@@ -141,7 +139,7 @@ class TestTPLinkBE805Client(TestCase):
 
         self.assertIsInstance(status, Status)
         self.assertEqual(str(status.wan_ipv4_addr), "175.156.194.150")
-        
+
         # Verify the main call was made
         # We can't simple check call_args because multiple calls happened
         # We check if *any* call matches our expectation
@@ -175,7 +173,7 @@ class TestTPLinkBE805Client(TestCase):
         self.assertEqual(str(reservations[0].macaddr), "AA-BB-CC-DD-EE-FF")
         self.assertEqual(str(reservations[0].ipaddr), "192.168.1.100")
         self.assertTrue(reservations[0].enabled)
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
         # checking default URL from base class
@@ -203,7 +201,7 @@ class TestTPLinkBE805Client(TestCase):
         self.assertEqual(str(leases[0].macaddr), "AA-BB-CC-DD-EE-AA")
         self.assertEqual(str(leases[0].ipaddr), "192.168.1.101")
         self.assertEqual(leases[0].hostname, "Leased Device")
-        
+
         mock_request.assert_called()
         args, _ = mock_request.call_args
         # checking default URL from base class

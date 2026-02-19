@@ -20,16 +20,16 @@ class TplinkBE805Client(TplinkRouter):
     def _prepare_data(self, data: str) -> dict:
         encrypted_data = self._encryption.aes_encrypt(data)
         data_len = len(encrypted_data)
-        
+
         # BE805 requires the full signature (Key + IV + Hash + Seq) for ALL requests,
         # not just login. This matches the behavior of 'is_login=True' in the base implementation.
-        
+
         # Calculate hash (Standard MD5 of user+pass)
         hash_val = md5((self.username + self.password).encode()).hexdigest()
-        
+
         # Force is_login=True to include Key/IV in the signature
-        sign = self._encryption.get_signature(int(self._seq) + data_len, 
-                                              True, 
+        sign = self._encryption.get_signature(int(self._seq) + data_len,
+                                              True,
                                               hash_val, self.nn, self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
@@ -53,30 +53,30 @@ class TplinkBE805Client(TplinkRouter):
         path = f"admin/wireless?form={value}&{data}"
         self.request(path, data, ignore_response=True)
 
-    def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+    def request(self, path: str, data: str, ignore_response: bool=False, ignore_errors: bool=False) -> dict | None:
         # BE805 expects the payload to be a JSON object, even though the base class
         # typically sends form-urlencoded style strings (e.g. 'operation=read').
         # We intercept the request, parse the string to a dict, and convert to JSON.
-        
+
         # Also, BE805 requires the 'operation' parameter to be in the URL query string
         # for many endpoints (e.g. firmware, dhcp, vpn).
-        
+
         if isinstance(data, str) and '=' in data:
             try:
                 # content is like "operation=read&form=..."
                 # Parse to dict
                 parsed = dict(parse_qsl(data))
-                
+
                 # logic to append operation to path if missing
                 op_val = parsed.get('operation')
                 if op_val and 'operation=' not in path:
                     separator = '&' if '?' in path else '?'
                     path = f"{path}{separator}operation={op_val}"
-                
+
                 # Convert to JSON string
                 data = dumps(parsed)
             except Exception:
                 # If parsing fails, fall back to sending original data
                 pass
-        
+
         return super().request(path, data, ignore_response, ignore_errors)
