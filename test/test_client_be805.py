@@ -8,7 +8,9 @@ from tplinkrouterc6u import (
     IPv4Status,
     Connection,
     ClientException,
-    Firmware
+    Firmware,
+    IPv4Reservation,
+    IPv4DHCPLease
 )
 
 
@@ -31,22 +33,10 @@ class TestTPLinkBE805Client(TestCase):
         mock_request.return_value = response['data']
 
         client = TplinkBE805Client('192.168.1.1', 'password')
-        # We need to bypass __init__ logic that might call request or setup things? 
-        # Actually __init__ is fine, it just sets variables. 
-        # But we need to mock other things potentially? No, just request.
-        
         firmware = client.get_firmware()
 
         self.assertIsInstance(firmware, Firmware)
         self.assertEqual(firmware.hardware_version, "Archer BE805 v1.20")
-        
-        # Verify URL modification: generic handler should handle it.
-        # But wait, get_firmware in base class calls: request(self._url_firmware, 'operation=read')
-        # And in BE805 __init__, we removed the override, so it uses default: 'admin/firmware?form=upgrade'
-        # So request is called with: path='admin/firmware?form=upgrade', data='operation=read'
-        # BE805.request should change path to: 'admin/firmware?form=upgrade&operation=read'
-        
-
         
         mock_request.assert_called()
         args, _ = mock_request.call_args
@@ -87,7 +77,7 @@ class TestTPLinkBE805Client(TestCase):
 
     @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
     def test_set_wifi(self, mock_request) -> None:
-        client = TplinkBE805Client('1.1.1.1', 'p')
+        client = TplinkBE805Client('192.168.1.1', 'p')
         client.set_wifi(Connection.GUEST_2G, True)
         
         mock_request.assert_called()
@@ -100,11 +90,11 @@ class TestTPLinkBE805Client(TestCase):
         self.assertTrue('admin/wireless' in path)
         data_json = loads(data)
         self.assertEqual(data_json.get('operation'), 'write')
-        self.assertEqual(data_json.get('guest_2g_enable'), 'on')
+        self.assertEqual(data_json.get('enable'), 'on')
 
     @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
     def test_reboot(self, mock_request) -> None:
-        client = TplinkBE805Client('1.1', 'p')
+        client = TplinkBE805Client('192.168.1.1', 'p')
         client.reboot()
         
         mock_request.assert_called()
@@ -115,3 +105,108 @@ class TestTPLinkBE805Client(TestCase):
         self.assertEqual(path, 'admin/system?form=reboot&operation=write')
         data_json = loads(data)
         self.assertEqual(data_json.get('operation'), 'write')
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
+    def test_get_status(self, mock_request) -> None:
+        status_data = {
+            "wan_macaddr": "0C-EF-15-51-AD-83",
+            "lan_macaddr": "0C-EF-15-51-AD-82",
+            "wan_ipv4_ipaddr": "175.156.194.150",
+            "lan_ipv4_ipaddr": "192.168.1.1",
+            "wan_ipv4_gateway": "175.156.192.1",
+            "wan_ipv4_uptime": 73,
+            "mem_usage": "0.45",
+            "cpu_usage": "0.12",
+            "conn_type": "dhcp",
+            "access_devices_wired": [],
+            "access_devices_wireless_host": [],
+            "access_devices_wireless_guest": [],
+        }
+
+        def side_effect(path, data, *args, **kwargs):
+            if 'admin/status?form=all' in path:
+                return status_data
+            if 'admin/smart_network' in path:
+                return []
+            if 'admin/wireless?form=statistics' in path:
+                return []
+            if 'admin/status?form=perf' in path:
+                return {}
+            return {}
+
+        mock_request.side_effect = side_effect
+
+        client = TplinkBE805Client('192.168.1.1', 'p')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(str(status.wan_ipv4_addr), "175.156.194.150")
+        
+        # Verify the main call was made
+        # We can't simple check call_args because multiple calls happened
+        # We check if *any* call matches our expectation
+        found_status_call = False
+        for call_args in mock_request.call_args_list:
+            args, _ = call_args
+            if 'admin/status?form=all&operation=read' in args[0]:
+                found_status_call = True
+                data_json = loads(args[1])
+                self.assertEqual(data_json.get('operation'), 'read')
+                break
+        self.assertTrue(found_status_call)
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
+    def test_get_ipv4_reservations(self, mock_request) -> None:
+        response = [
+            {
+                "mac": "AA-BB-CC-DD-EE-FF",
+                "ip": "192.168.1.100",
+                "comment": "Test Device",
+                "enable": "on"
+            }
+        ]
+        mock_request.return_value = response
+
+        client = TplinkBE805Client('192.168.1.1', 'p')
+        reservations = client.get_ipv4_reservations()
+
+        self.assertEqual(len(reservations), 1)
+        self.assertIsInstance(reservations[0], IPv4Reservation)
+        self.assertEqual(str(reservations[0].macaddr), "AA-BB-CC-DD-EE-FF")
+        self.assertEqual(str(reservations[0].ipaddr), "192.168.1.100")
+        self.assertTrue(reservations[0].enabled)
+        
+        mock_request.assert_called()
+        args, _ = mock_request.call_args
+        # checking default URL from base class
+        self.assertEqual(args[0], 'admin/dhcps?form=reservation&operation=load')
+        data_json = loads(args[1])
+        self.assertEqual(data_json.get('operation'), 'load')
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
+    def test_get_ipv4_dhcp_leases(self, mock_request) -> None:
+        response = [
+            {
+                "macaddr": "AA-BB-CC-DD-EE-AA",
+                "ipaddr": "192.168.1.101",
+                "name": "Leased Device",
+                "leasetime": "120"
+            }
+        ]
+        mock_request.return_value = response
+
+        client = TplinkBE805Client('192.168.1.1', 'p')
+        leases = client.get_ipv4_dhcp_leases()
+
+        self.assertEqual(len(leases), 1)
+        self.assertIsInstance(leases[0], IPv4DHCPLease)
+        self.assertEqual(str(leases[0].macaddr), "AA-BB-CC-DD-EE-AA")
+        self.assertEqual(str(leases[0].ipaddr), "192.168.1.101")
+        self.assertEqual(leases[0].hostname, "Leased Device")
+        
+        mock_request.assert_called()
+        args, _ = mock_request.call_args
+        # checking default URL from base class
+        self.assertEqual(args[0], 'admin/dhcps?form=client&operation=load')
+        data_json = loads(args[1])
+        self.assertEqual(data_json.get('operation'), 'load')

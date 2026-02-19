@@ -36,6 +36,23 @@ class TplinkBE805Client(TplinkRouter):
 
 
 
+    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+        values = {
+            Connection.HOST_2G: 'wireless_2g',
+            Connection.HOST_5G: 'wireless_5g',
+            Connection.HOST_6G: 'wireless_6g',
+            Connection.GUEST_2G: 'guest_2g',
+            Connection.GUEST_5G: 'guest_5g',
+            Connection.GUEST_6G: 'guest_6g',
+            Connection.IOT_2G: 'iot_2g',
+            Connection.IOT_5G: 'iot_5g',
+            Connection.IOT_6G: 'iot_6g',
+        }
+        value = values.get(wifi)
+        data = f"operation=write&enable={'on' if enable else 'off'}"
+        path = f"admin/wireless?form={value}&{data}"
+        self.request(path, data, ignore_response=True)
+
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
         # BE805 expects the payload to be a JSON object, even though the base class
         # typically sends form-urlencoded style strings (e.g. 'operation=read').
