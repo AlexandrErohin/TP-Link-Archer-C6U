@@ -98,8 +98,9 @@ class TestTPLinkBE805Client(TestCase):
         
         self.assertTrue('operation=write' in path)
         self.assertTrue('admin/wireless' in path)
-        self.assertTrue('"operation": "write"' in data)
-        self.assertTrue('"guest_2g_enable": "on"' in data)
+        data_json = loads(data)
+        self.assertEqual(data_json.get('operation'), 'write')
+        self.assertEqual(data_json.get('guest_2g_enable'), 'on')
 
     @patch('tplinkrouterc6u.client.c6u.TplinkRouter.request')
     def test_reboot(self, mock_request) -> None:
@@ -112,4 +113,5 @@ class TestTPLinkBE805Client(TestCase):
         data = args[1]
         
         self.assertEqual(path, 'admin/system?form=reboot&operation=write')
-        self.assertIn('"operation": "write"', data)
+        data_json = loads(data)
+        self.assertEqual(data_json.get('operation'), 'write')
