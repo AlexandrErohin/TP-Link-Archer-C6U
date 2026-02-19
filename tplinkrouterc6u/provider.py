@@ -53,18 +53,10 @@ class TplinkRouterProvider:
                        TPLinkSG108EClient,
                        ]:
             router = client(host, password, username, logger, verify_ssl, timeout)
-            try:
-                if router.supports():
-                    return router
-            except Exception as e:
-                if logger is not None:
-                    logger.debug(
-                        'TplinkRouterProvider: supports() failed for %s (%s): %s',
-                        host,
-                        client.__name__,
-                        e,
-                    )
-                continue
+            if router.supports():
+                return router
+            elif logger is not None:
+                logger.debug('TplinkRouterProvider: supports() failed for %s (%s)', host, client.__name__)
 
         message = ('Login failed! Please check if your router local password is correct,'
                    'check if the default router username is correct or '

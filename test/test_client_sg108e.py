@@ -37,7 +37,8 @@ class TestSG108EParser(TestCase):
         # Matches what the switch serves: many assignments in one var statement,
         # sometimes without a trailing ';' at end-of-script.
         html = """<html><head><script type=text/javascript>
-        var trunk_info=new Array(\"\",\" (LAG1)\"),state_info=new Array(\"Disabled\",\"Enabled\"),speed_info=new Array(\"Link Down\",\"Auto\"),flow_info=new Array(\"Off\",\"On\"),selState=new Array(0,1,0)
+        var trunk_info=new Array(\"\",\" (LAG1)\"),state_info=new Array(\"Disabled\",\"Enabled\"),
+        speed_info=new Array(\"Link Down\",\"Auto\"),flow_info=new Array(\"Off\",\"On\"),selState=new Array(0,1,0)
         </script></head></html>"""
 
         vars = parse_script_variables(html)
@@ -73,7 +74,8 @@ class TestTPLinkSG108EClient(TestCase):
         client._session = Mock()
 
         ip_html = """<html><script>
-        var ip_ds = { ipStr: ['192.168.1.1'], netmaskStr: ['255.255.255.0'], gatewayStr: ['192.168.1.254'], macStr: ['AA:BB:CC:DD:EE:FF'] };
+        var ip_ds = { ipStr: ['192.168.1.1'], netmaskStr: ['255.255.255.0'],
+        gatewayStr: ['192.168.1.254'], macStr: ['AA:BB:CC:DD:EE:FF'] };
         var tip = '';
         </script></html>"""
         resp = Mock()
@@ -92,10 +94,13 @@ class TestTPLinkSG108EClient(TestCase):
         client._session = Mock()
 
         ip_html = """<html><script>
-        var ip_ds = { state:1, vlan:1, maxVlan:4094, ipStr: [\"192.0.2.23\"], netmaskStr: [\"255.255.255.0\"], gatewayStr: [\"192.0.2.1\"] };
+        var ip_ds = { state:1, vlan:1, maxVlan:4094, ipStr: [\"192.0.2.23\"], netmaskStr: [\"255.255.255.0\"],
+        gatewayStr: [\"192.0.2.1\"] };
         </script></html>"""
         sys_html = """<html><script>
-        var info_ds = { descriStr:[\"TL-SG108E\"], macStr:[\"02:00:00:00:00:01\"], ipStr:[\"192.0.2.23\"], netmaskStr:[\"255.255.255.0\"], gatewayStr:[\"192.0.2.1\"], firmwareStr:[\"1.0.0\"], hardwareStr:[\"TL-SG108E 6.0\"] };
+        var info_ds = { descriStr:[\"TL-SG108E\"], macStr:[\"02:00:00:00:00:01\"], ipStr:[\"192.0.2.23\"],
+        netmaskStr:[\"255.255.255.0\"], gatewayStr:[\"192.0.2.1\"], firmwareStr:[\"1.0.0\"],
+        hardwareStr:[\"TL-SG108E 6.0\"] };
         </script></html>"""
 
         ip_resp = Mock()
