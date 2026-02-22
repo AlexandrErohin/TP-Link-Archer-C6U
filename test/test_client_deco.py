@@ -9,6 +9,7 @@ from tplinkrouterc6u import (
     Status,
     Device,
     IPv4Status,
+    LTEStatus,
 )
 
 
@@ -575,6 +576,230 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(check_url, 'admin/device?form=system')
         self.assertEqual(check_data, '{"operation": "reboot", "params": {"mac_list": [{"mac": "84:a0:d0:37:c7:44"}]}}')
         self.assertEqual(response_firmware['result']['device_list'], client.devices)
+
+
+    def test_get_lte_status(self) -> None:
+        response_internet = '''
+{"result": {
+    "mobile_cpe": {
+        "sim_number": "",
+        "signal_strength": 60,
+        "rsrp": -91,
+        "snr": 7.2,
+        "rssi": -83,
+        "sim_status": "ready",
+        "dial_status": "connected",
+        "profile_name": "T3JhbmdlIEludGVybmV0",
+        "data_usage": 75714784,
+        "rsrq": -9,
+        "inet_status": "online",
+        "downlink_rate": 5680,
+        "limit_mode": "data_flow",
+        "uplink_rate": 1080,
+        "network_type": "lte_plus"
+    }
+}, "error_code": 0}
+'''
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=internet':
+                    return loads(response_internet)['result']
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_lte_status()
+
+        self.assertIsInstance(result, LTEStatus)
+        self.assertEqual(result.enable, 1)
+        self.assertEqual(result.connect_status, 1)
+        self.assertEqual(result.network_type, 7)
+        self.assertEqual(result.network_type_info, '4G+ LTE')
+        self.assertEqual(result.sim_status, 3)
+        self.assertEqual(result.sim_status_info, 'SIM card prepared.')
+        self.assertEqual(result.total_statistics, 75714784)
+        self.assertEqual(result.cur_rx_speed, 5680)
+        self.assertEqual(result.cur_tx_speed, 1080)
+        self.assertEqual(result.sig_level, 2)
+        self.assertEqual(result.rsrp, -91)
+        self.assertEqual(result.rsrq, -9)
+        self.assertEqual(result.snr, 72)
+        self.assertEqual(result.isp_name, 'Orange Internet')
+        self.assertIsNone(result.sms_unread_count)
+
+    def test_get_lte_status_disconnected(self) -> None:
+        response_internet = '''
+{"result": {
+    "mobile_cpe": {
+        "sim_number": "",
+        "signal_strength": 0,
+        "rsrp": 0,
+        "snr": 0,
+        "rssi": 0,
+        "sim_status": "absent",
+        "dial_status": "disconnected",
+        "profile_name": "",
+        "data_usage": 0,
+        "rsrq": 0,
+        "inet_status": "offline",
+        "downlink_rate": 0,
+        "limit_mode": "data_flow",
+        "uplink_rate": 0,
+        "network_type": ""
+    }
+}, "error_code": 0}
+'''
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=internet':
+                    return loads(response_internet)['result']
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_lte_status()
+
+        self.assertIsInstance(result, LTEStatus)
+        self.assertEqual(result.enable, 0)
+        self.assertEqual(result.connect_status, 0)
+        self.assertEqual(result.network_type, 0)
+        self.assertEqual(result.network_type_info, 'No Service')
+        self.assertEqual(result.sim_status, 1)
+        self.assertEqual(result.sim_status_info, 'No SIM card detected.')
+        self.assertEqual(result.sig_level, 0)
+        self.assertIsNone(result.isp_name)
+
+    def test_get_lte_status_5g_nr(self) -> None:
+        response_internet = '''
+{"result": {
+    "mobile_cpe": {
+        "signal_strength": 80,
+        "rsrp": -75,
+        "snr": 15.5,
+        "sim_status": "ready",
+        "dial_status": "connected",
+        "profile_name": "VGVzdA==",
+        "data_usage": 1000000,
+        "rsrq": -5,
+        "downlink_rate": 50000,
+        "uplink_rate": 10000,
+        "network_type": "5g_nr"
+    }
+}, "error_code": 0}
+'''
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=internet':
+                    return loads(response_internet)['result']
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_lte_status()
+
+        self.assertIsInstance(result, LTEStatus)
+        self.assertEqual(result.network_type, 8)
+        self.assertEqual(result.network_type_info, '5G NR')
+        self.assertEqual(result.sig_level, 3)
+        self.assertEqual(result.snr, 155)
+        self.assertEqual(result.isp_name, 'Test')
+
+    def test_get_status_cellular(self) -> None:
+        response_network = '''
+{"result": {
+    "wan": {
+        "mobile_cpe": {
+            "mac": "44:e1:52:8c:40:36",
+            "dns2": "8.8.4.4",
+            "dns1": "8.8.8.8",
+            "mask": "255.255.255.0",
+            "gateway": "10.0.0.1",
+            "ip": "10.184.250.250"
+        },
+        "dial_type": "lte", "info": {}, "enable_auto_dns": true},
+    "lan": {
+        "ip_info": {
+            "mac": "44:e1:52:8c:40:37",
+            "mask": "255.255.255.0",
+            "ip": "192.168.68.1"
+    }}}, "error_code": 0}
+'''
+        response_performance = '{"result": {"mem_usage": 0.43, "cpu_usage": 0.1}, "error_code": 0}'
+        response_wireless = '''
+{"result": {
+    "band5_1": {"backhaul": {"channel": 44},
+        "guest": {"enable": false},
+        "host": {"enable": true}}, "is_eg": false,
+    "band2_4": {"backhaul": {"channel": 10},
+        "guest": {"enable": true},
+        "host": {"enable": true}}}, "error_code": 0}
+'''
+        response_clients = '{"result": {"client_list": []}, "error_code": 0}'
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=wan_ipv4':
+                    return loads(response_network)['result']
+                elif path == 'admin/network?form=performance':
+                    return loads(response_performance)['result']
+                elif path == 'admin/wireless?form=wlan':
+                    return loads(response_wireless)['result']
+                elif path == 'admin/client?form=client_list':
+                    return loads(response_clients)['result']
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, '44-E1-52-8C-40-36')
+        self.assertEqual(status.wan_ipv4_addr, '10.184.250.250')
+        self.assertEqual(status.wan_ipv4_gateway, '10.0.0.1')
+        self.assertEqual(status.conn_type, 'lte')
+        self.assertEqual(status.lan_macaddr, '44-E1-52-8C-40-37')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.68.1')
+
+    def test_get_ipv4_status_cellular(self) -> None:
+        response_network = '''
+{"result": {
+    "wan": {
+        "mobile_cpe": {
+            "mac": "44:e1:52:8c:40:36",
+            "dns2": "8.8.4.4",
+            "dns1": "8.8.8.8",
+            "mask": "255.255.255.0",
+            "gateway": "10.0.0.1",
+            "ip": "10.184.250.250"
+        },
+        "dial_type": "lte", "info": {}, "enable_auto_dns": true},
+    "lan": {
+        "ip_info": {
+            "mac": "44:e1:52:8c:40:37",
+            "mask": "255.255.255.0",
+            "ip": "192.168.68.1"
+    }}}, "error_code": 0}
+'''
+
+        class TPLinkRouterTest(TPLinkDecoClient):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=wan_ipv4':
+                    return loads(response_network)['result']
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertIsInstance(result, IPv4Status)
+        self.assertEqual(result.wan_macaddr, '44-E1-52-8C-40-36')
+        self.assertEqual(result.wan_ipv4_ipaddr, '10.184.250.250')
+        self.assertEqual(result.wan_ipv4_gateway, '10.0.0.1')
+        self.assertEqual(result.wan_ipv4_conntype, 'lte')
+        self.assertEqual(result.wan_ipv4_netmask, '255.255.255.0')
+        self.assertEqual(result.wan_ipv4_pridns, '8.8.8.8')
+        self.assertEqual(result.wan_ipv4_snddns, '8.8.4.4')
+        self.assertEqual(result.lan_macaddr, '44-E1-52-8C-40-37')
+        self.assertEqual(result.lan_ipv4_ipaddr, '192.168.68.1')
+        self.assertEqual(result.lan_ipv4_netmask, '255.255.255.0')
 
 
 if __name__ == '__main__':
