@@ -1,6 +1,6 @@
 from base64 import b64encode, b64decode
 from Crypto.PublicKey.RSA import construct
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_v1_5, PKCS1_OAEP
 from binascii import b2a_hex, hexlify
 from Crypto.Cipher import AES
 from Crypto import Random
@@ -302,3 +302,47 @@ class EncryptionWrapperMRGCM:
         n = int('0x' + nn, 16)
         e = int('0x' + ee, 16)
         return RSA.construct((n, e))
+
+
+class EncryptionWrapperMRGCMOAEP(EncryptionWrapperMRGCM):
+    def aes_decrypt(self, data: str):
+        raw = b64decode(data)
+        tag = raw[-16:]
+        encrypted_response_data = raw[:-16]
+        aes_decryptor = self._make_aes_cipher()
+        response = aes_decryptor.decrypt_and_verify(encrypted_response_data, tag)
+        try:
+            return response.decode('utf8')
+        except UnicodeDecodeError:
+            return response.decode('latin-1')
+
+    def get_signature(self, seq: int, is_login: bool, hash: str, nn: str, ee: str) -> str:
+        if is_login:
+            key = b64encode(self._key.encode('utf-8')).decode()
+            iv = b64encode(self._iv.encode('utf-8')).decode()
+            sign_data = 'key={}&iv={}&h={}&s={}'.format(key, iv, hash, seq)
+        else:
+            sign_data = 'h={}&s={}'.format(hash, seq)
+
+        rsa_byte_len = len(nn) // 2
+        # OAEP with SHA-1: overhead = 2*20+2 = 42 bytes
+        step = rsa_byte_len - 42
+
+        rsa_key = self._make_rsa_pub_key(nn, ee)
+        cipher = PKCS1_OAEP.new(rsa_key)
+
+        signature = ''
+        pos = 0
+
+        while pos < len(sign_data):
+            chunk = sign_data[pos: pos + step].encode('utf8')
+            enc = cipher.encrypt(chunk)
+            enc_str = hexlify(enc).decode('utf8')
+
+            while len(enc_str) < rsa_byte_len * 2:
+                enc_str = '0' + enc_str
+
+            signature += enc_str
+            pos = pos + step
+
+        return signature
