@@ -577,7 +577,6 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(check_data, '{"operation": "reboot", "params": {"mac_list": [{"mac": "84:a0:d0:37:c7:44"}]}}')
         self.assertEqual(response_firmware['result']['device_list'], client.devices)
 
-
     def test_get_lte_status(self) -> None:
         response_internet = '''
 {"result": {

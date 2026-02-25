@@ -261,7 +261,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | rsrq | RSRQ  | int |
 | snr | SNR  | int |
 | isp_name | ISP name  | str |
-| network_types | All possible network types - {0: "No Service", 1: "GSM", 2: "WCDMA", 3: "4G LTE", 4: "TD-SCDMA", 5: "CDMA 1x", 6: "CDMA 1x Ev-Do", 7: "4G+ LTE"} | dict |
+| network_types | All possible network types - {0: "No Service", 1: "GSM", 2: "WCDMA", 3: "4G LTE", 4: "TD-SCDMA", 5: "CDMA 1x", 6: "CDMA 1x Ev-Do", 7: "4G+ LTE", 8: "5G NR"} | dict |
 | sim_statuses | All possible sim statuses - {0: "No SIM card detected or SIM card error.", 1: "No SIM card detected.", 2: "SIM card error.", 3: "SIM card prepared.", 4: "SIM locked.", 5: "SIM unlocked. Authentication succeeded.", 6: "PIN locked.", 7: "SIM card is locked permanently.", 8: "suspension of transmission", 9: "Unopened"} | dict |
 
 ## Enum
@@ -354,7 +354,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco P7
 - Deco X20
 - Deco X50 v1.3
-- Deco X50-5G 1.20
+- Deco X50-5G (1.20, 2.0)
 - Deco X55 1.0
 - Deco X60 V3
 - Deco X90
