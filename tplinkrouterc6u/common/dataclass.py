@@ -286,7 +286,8 @@ class LTEStatus:
         4: "TD-SCDMA",
         5: "CDMA 1x",
         6: "CDMA 1x Ev-Do",
-        7: "4G+ LTE"
+        7: "4G+ LTE",
+        8: "5G NR"
     }
     sim_statuses = {
         0: "No SIM card detected or SIM card error.",

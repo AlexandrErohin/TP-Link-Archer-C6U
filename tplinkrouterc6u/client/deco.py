@@ -7,7 +7,7 @@ from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 
@@ -69,15 +69,17 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
 
         status = Status()
-        element = get_value(data, ['wan', 'ip_info', 'mac'])
+        wan_info = get_value(data, ['wan', 'ip_info']) or get_value(data, ['wan', 'mobile_cpe']) or {}
+        element = wan_info.get('mac')
         status._wan_macaddr = EUI48(element) if element else None
         status._lan_macaddr = EUI48(get_value(data, ['lan', 'ip_info', 'mac']))
-        element = get_value(data, ['wan', 'ip_info', 'ip'])
+        element = wan_info.get('ip')
         status._wan_ipv4_addr = IPv4Address(element) if element else None
         element = get_value(data, ['lan', 'ip_info', 'ip'])
         status._lan_ipv4_addr = IPv4Address(element) if element else None
-        element = get_value(data, ['wan', 'ip_info', 'gateway'])
+        element = wan_info.get('gateway')
         status._wan_ipv4_gateway = IPv4Address(element) if element else None
+        status.conn_type = get_value(data, ['wan', 'dial_type'])
 
         data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
         status.mem_usage = data.get('mem_usage')
@@ -127,19 +129,20 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
-        element = get_value(data, ['wan', 'ip_info', 'mac'])
+        wan_info = get_value(data, ['wan', 'ip_info']) or get_value(data, ['wan', 'mobile_cpe']) or {}
+        element = wan_info.get('mac')
         ipv4_status._wan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
-        element = get_value(data, ['wan', 'ip_info', 'ip'])
+        element = wan_info.get('ip')
         ipv4_status._wan_ipv4_ipaddr = IPv4Address(element) if element else None
-        element = get_value(data, ['wan', 'ip_info', 'gateway'])
+        element = wan_info.get('gateway')
         ipv4_status._wan_ipv4_gateway = IPv4Address(element) if element else None
         element = get_value(data, ['wan', 'dial_type'])
         ipv4_status._wan_ipv4_conntype = element if element else ''
-        element = get_value(data, ['wan', 'ip_info', 'mask'])
+        element = wan_info.get('mask')
         ipv4_status._wan_ipv4_netmask = IPv4Address(element) if element else None
-        element = get_value(data, ['wan', 'ip_info', 'dns1'])
+        element = wan_info.get('dns1')
         ipv4_status._wan_ipv4_pridns = get_ip(element if element else '0.0.0.0')
-        element = get_value(data, ['wan', 'ip_info', 'dns2'])
+        element = wan_info.get('dns2')
         ipv4_status._wan_ipv4_snddns = get_ip(element if element else '0.0.0.0')
         element = get_value(data, ['lan', 'ip_info', 'mac'])
         ipv4_status._lan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
@@ -150,6 +153,55 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         ipv4_status._lan_ipv4_netmask = get_ip(element if element else '0.0.0.0')
 
         return ipv4_status
+
+    def get_lte_status(self) -> LTEStatus:
+        data = self.request('admin/network?form=internet', dumps({"operation": "read"}))
+        status = LTEStatus()
+        cpe = data.get('mobile_cpe', {})
+
+        status.enable = 1 if cpe.get('dial_status') == 'connected' else 0
+        status.connect_status = 1 if cpe.get('dial_status') == 'connected' else 0
+
+        network_type_map = {
+            'lte': 3,
+            'lte_plus': 7,
+            '5g_nr': 8,
+            '5g_nsa': 8,
+            '5g_sa': 8,
+            'wcdma': 2,
+            'gsm': 1,
+        }
+        status.network_type = network_type_map.get(cpe.get('network_type', ''), 0)
+
+        sim_status_map = {
+            'ready': 3,
+            'locked': 4,
+            'absent': 1,
+            'error': 2,
+        }
+        status.sim_status = sim_status_map.get(cpe.get('sim_status', ''), 0)
+
+        status.total_statistics = cpe.get('data_usage')
+        status.cur_rx_speed = cpe.get('downlink_rate')
+        status.cur_tx_speed = cpe.get('uplink_rate')
+
+        sig = cpe.get('signal_strength')
+        status.sig_level = round(sig / 25) if sig is not None else None
+
+        status.rsrp = cpe.get('rsrp')
+        status.rsrq = cpe.get('rsrq')
+
+        snr = cpe.get('snr')
+        status.snr = round(snr * 10) if snr is not None else None
+
+        profile = cpe.get('profile_name')
+        if profile:
+            try:
+                status.isp_name = b64decode(profile).decode()
+            except Exception:
+                status.isp_name = profile
+
+        return status
 
     def authorize(self) -> None:
         self._retry_request(super().authorize)
