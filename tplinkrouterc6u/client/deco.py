@@ -115,7 +115,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             device = Device(conn,
                             get_mac(item.get('mac', '00:00:00:00:00:00')),
                             get_ip(item.get('ip', '0.0.0.0')),
-                            b64decode(item['name']).decode())
+                            self._decode_name(item['name']))
             device.down_speed = item.get('down_speed')
             device.up_speed = item.get('up_speed')
             devices.append(device)
@@ -196,10 +196,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
         profile = cpe.get('profile_name')
         if profile:
-            try:
-                status.isp_name = b64decode(profile).decode()
-            except Exception:
-                status.isp_name = profile
+            status.isp_name = self._decode_name(profile)
 
         return status
 
@@ -241,3 +238,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
     def _is_valid_response(self, data: dict) -> bool:
         return 'error_code' in data and data['error_code'] == 0
+
+    def _decode_name(self, data: str) -> str:
+        try:
+            return b64decode(data).decode()
+        except Exception:
+            return data
