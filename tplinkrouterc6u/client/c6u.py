@@ -10,7 +10,7 @@ from urllib.parse import parse_qsl
 from json import dumps
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
-from tplinkrouterc6u.common.package_enum import Connection, VPN
+from tplinkrouterc6u.common.package_enum import Connection, VPN, VpnClientServerProtocol
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
@@ -19,6 +19,8 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     VPNStatus,
+    VpnClientStatus,
+    VpnClientServer,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -245,6 +247,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_pptpd = 'admin/pptpd?form=config&operation=read'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config&operation=list&vpntype=pptp'
+        self._url_vpn_client_enable = 'admin/vpn?form=enable'
+        self._url_vpn_client_server = 'admin/vpn?form=server'
+        self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -460,6 +465,88 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = "operation=write&{}".format(data)
         self.request(path, data)
 
+    def get_vpn_client_status(self) -> VpnClientStatus:
+        data = self.request(self._url_vpn_client_enable, 'operation=read')
+        return VpnClientStatus(enabled=data.get('enable') == 'on')
+
+    def set_vpn_client(self, enable: bool) -> None:
+        self.request(
+            self._url_vpn_client_enable,
+            urlencode({'operation': 'write', 'enable': 'on' if enable else 'off'}),
+        )
+
+    def get_vpn_client_servers(self) -> list[VpnClientServer]:
+        data = self.request(self._url_vpn_client_server, 'operation=load')
+        servers = []
+        for item in data:
+            try:
+                protocol = VpnClientServerProtocol(item.get('type', ''))
+            except ValueError:
+                raise ClientException('Unknown VPN server protocol: {}'.format(item.get('type')))
+            servers.append(VpnClientServer(
+                id=item['key'],
+                name=item.get('des', ''),
+                protocol=protocol,
+                active=item.get('enable') == 'on',
+                status=item.get('status'),
+            ))
+        return servers
+
+    def set_vpn_client_server(self, server_id: str | None) -> None:
+        data = self.request(self._url_vpn_client_server, 'operation=load')
+        if server_id is None:
+            target = next((item for item in data if item.get('enable') == 'on'), None)
+            if target is None:
+                raise ClientException('No active VPN server to deactivate')
+            old = dict(target)
+            new = dict(target)
+            new['enable'] = 'off'
+        else:
+            target = next((item for item in data if item.get('key') == server_id), None)
+            if target is None:
+                raise ClientException('VPN server not found: {}'.format(server_id))
+            old = dict(target)
+            new = dict(target)
+            new['enable'] = 'on'
+        payload = urlencode({
+            'operation': 'update',
+            'key': target['key'],
+            'new': dumps(new),
+            'old': dumps(old),
+        })
+        self.request(self._url_vpn_client_server, payload)
+
+    def get_vpn_client_devices(self) -> list[Device]:
+        data = self.request(self._url_vpn_client_user_list, 'operation=load')
+        devices = []
+        for item in data:
+            device = Device(
+                type=Connection.UNKNOWN,
+                _macaddr=get_mac(item.get('mac', '00:00:00:00:00:00')),
+                _ipaddr=get_ip('0.0.0.0'),
+                hostname=item.get('name', ''),
+                vpn_client_enable=item.get('access') == 'on',
+            )
+            devices.append(device)
+        return devices
+
+    def set_vpn_client_device(self, mac: str, enable: bool) -> None:
+        data = self.request(self._url_vpn_client_user_list, 'operation=load')
+        normalized = get_mac(mac)
+        target = next((item for item in data if get_mac(item.get('mac', '')) == normalized), None)
+        if target is None:
+            raise ClientException('Device not found in VPN whitelist: {}'.format(mac))
+        old = dict(target)
+        new = dict(target)
+        new['access'] = 'on' if enable else 'off'
+        payload = urlencode({
+            'operation': 'update',
+            'key': target['mac'],
+            'new': dumps(new),
+            'old': dumps(old),
+        })
+        self.request(self._url_vpn_client_user_list, payload)
+
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
@@ -516,7 +603,7 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
                 parsed = dict(parse_qsl(data))
 
                 for key, value in parsed.items():
-                    if key not in path:
+                    if f'{key}=' not in path:
                         path += f"&{key}={value}"
 
                 # Convert to JSON string
