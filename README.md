@@ -112,6 +112,12 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
 | set_vpn | vpn: [VPNStatus](#vpn_status), enable: bool | Allow to turn on/of VPN |   |
+| get_vpn_client_status |   | Gets VPN client enabled state | [VpnClientStatus](#vpn_client_status) |
+| set_vpn_client | enable: bool | Turn VPN client on or off |   |
+| get_vpn_client_servers |   | Gets list of configured VPN client servers | [[VpnClientServer]](#vpn_client_server) |
+| set_vpn_client_server | server_id: str, enable: bool | Toggle a VPN server on or off; the router handles deactivating all others when one is enabled |   |
+| get_vpn_client_devices |   | Gets list of devices in the VPN client whitelist | [[Device]](#device) |
+| set_vpn_client_device | mac: str, enable: bool | Enable or disable VPN client access for a device by MAC address |   |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
 | send_ussd | command: str | Send USSD command for LTE routers | str |
 | get_sms | | Get sms messages from the first page for LTE routers | [[SMS]](#sms) |
@@ -179,6 +185,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | traffic_usage | total traffic usage (bytes) | int, None |
 | signal | Signal strength | int, None |
 | active | Is active device | bool |
+| vpn_client_enabled | Is device routed through VPN client | bool, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -234,6 +241,20 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | openvpn_clients_total | OpenVPN clients connected | int |
 | pptpvpn_clients_total | PPTPVPN clients connected | int |
 
+### <a id="vpn_client_status">VpnClientStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| enabled | VPN client is enabled | bool |
+
+### <a id="vpn_client_server">VpnClientServer</a>
+| Field | Description | Type |
+| --- |---|---|
+| id | Server identifier | str |
+| name | Server display name | str |
+| protocol | VPN protocol | [VpnClientServerProtocol](#vpn_client_server_protocol) |
+| active | Is this server currently active | bool |
+| status | Connection status string from router (e.g. "connected") | str, None |
+
 ### <a id="sms">SMS</a>
 | Field | Description | Type |
 | --- |---|---|
@@ -281,6 +302,11 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - VPN.OPEN_VPN
 - VPN.PPTP_VPN
 - VPN.IPSEC
+
+### <a id="vpn_client_server_protocol">VpnClientServerProtocol</a>
+- VpnClientServerProtocol.OPEN_VPN
+- VpnClientServerProtocol.PPTP
+- VpnClientServerProtocol.L2TP_IPSEC
 
 ## <a id="supports">Supported routers</a>
 - [TP-LINK routers](#tplink)

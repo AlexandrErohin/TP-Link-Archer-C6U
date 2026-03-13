@@ -28,7 +28,7 @@ class Device:
     traffic_usage: int | None = None
     signal: int | None = None
     active: bool = True
-    vpn_client_enable: bool | None = None
+    vpn_client_enabled: bool | None = None
 
     @property
     def macaddr(self):

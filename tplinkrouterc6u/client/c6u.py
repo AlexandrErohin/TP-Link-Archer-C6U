@@ -484,7 +484,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             except ValueError:
                 raise ClientException('Unknown VPN server protocol: {}'.format(item.get('type')))
             servers.append(VpnClientServer(
-                id=item['key'],
+                id=item.get('key', ''),
                 name=item.get('des', ''),
                 protocol=protocol,
                 active=item.get('enable') == 'on',
@@ -492,22 +492,23 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             ))
         return servers
 
-    def set_vpn_client_server(self, server_id: str | None) -> None:
+    def set_vpn_client_server(self, server_id: str, enable: bool) -> None:
+        """Toggle a VPN server on or off by ID.
+
+        When enable=True, the router automatically deactivates all other active servers;
+        only one server can be active at a time.
+        When enable=False and the server is already inactive, this is a no-op.
+        """
         data = self.request(self._url_vpn_client_server, 'operation=load')
-        if server_id is None:
-            target = next((item for item in data if item.get('enable') == 'on'), None)
-            if target is None:
-                raise ClientException('No active VPN server to deactivate')
-            old = dict(target)
-            new = dict(target)
-            new['enable'] = 'off'
-        else:
-            target = next((item for item in data if item.get('key') == server_id), None)
-            if target is None:
-                raise ClientException('VPN server not found: {}'.format(server_id))
-            old = dict(target)
-            new = dict(target)
-            new['enable'] = 'on'
+        target = next((item for item in data if item.get('key') == server_id), None)
+        if target is None:
+            raise ClientException('VPN server not found: {}'.format(server_id))
+        desired = 'on' if enable else 'off'
+        if target.get('enable') == desired:
+            return
+        old = dict(target)
+        new = dict(target)
+        new['enable'] = desired
         payload = urlencode({
             'operation': 'update',
             'key': target['key'],
@@ -525,7 +526,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 _macaddr=get_mac(item.get('mac', '00:00:00:00:00:00')),
                 _ipaddr=get_ip('0.0.0.0'),
                 hostname=item.get('name', ''),
-                vpn_client_enable=item.get('access') == 'on',
+                vpn_client_enabled=item.get('access') == 'on',
             )
             devices.append(device)
         return devices

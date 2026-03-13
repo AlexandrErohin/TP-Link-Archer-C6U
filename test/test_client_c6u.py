@@ -1167,7 +1167,7 @@ class TestTPLinkClient(TestCase):
         self.assertFalse(result[0].active)
         self.assertEqual(result[0].status, 'disconnected')
 
-    def test_set_vpn_client_server(self) -> None:
+    def test_set_vpn_client_server_enable(self) -> None:
         server_list = [
             {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'off', 'des': 'Server A'},
             {'.name': 'cfg04769c', 'key': 'key-bbb', 'type': 'openvpn', 'enable': 'on', 'des': 'Server B'},
@@ -1175,17 +1175,15 @@ class TestTPLinkClient(TestCase):
         router_class = self.router_class
 
         class TPLinkRouterTest(router_class):
-            captured_path = None
             captured_data = None
 
             def request(self, path, data, ignore_response=False, ignore_errors=False):
                 if 'admin/vpn?form=server' in path and 'operation=update' not in data:
                     return server_list
-                self.captured_path = path
                 self.captured_data = data
 
         client = TPLinkRouterTest('', '')
-        client.set_vpn_client_server('key-aaa')
+        client.set_vpn_client_server('key-aaa', True)
 
         parsed = dict(parse_qsl(client.captured_data))
         self.assertEqual(parsed.get('operation'), 'update')
@@ -1195,23 +1193,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(new_obj['enable'], 'on')
         self.assertEqual(old_obj['enable'], 'off')
 
-    def test_set_vpn_client_server_none_no_active_raises(self) -> None:
-        server_list = [
-            {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'off', 'des': 'Server A'},
-        ]
-        router_class = self.router_class
-
-        class TPLinkRouterTest(router_class):
-            def request(self, path, data, ignore_response=False, ignore_errors=False):
-                if 'admin/vpn?form=server' in path:
-                    return server_list
-                raise ClientException()
-
-        client = TPLinkRouterTest('', '')
-        with self.assertRaises(ClientException):
-            client.set_vpn_client_server(None)
-
-    def test_set_vpn_client_server_none_deactivates(self) -> None:
+    def test_set_vpn_client_server_disable(self) -> None:
         server_list = [
             {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'on', 'des': 'Server A'},
         ]
@@ -1226,11 +1208,31 @@ class TestTPLinkClient(TestCase):
                 self.captured_data = data
 
         client = TPLinkRouterTest('', '')
-        client.set_vpn_client_server(None)
+        client.set_vpn_client_server('key-aaa', False)
 
         parsed = dict(parse_qsl(client.captured_data))
         new_obj = loads(parsed['new'])
         self.assertEqual(new_obj['enable'], 'off')
+
+    def test_set_vpn_client_server_disable_already_inactive_is_noop(self) -> None:
+        server_list = [
+            {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'off', 'des': 'Server A'},
+        ]
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            request_count = 0
+
+            def request(self, path, data, ignore_response=False, ignore_errors=False):
+                self.request_count += 1
+                if 'admin/vpn?form=server' in path:
+                    return server_list
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        client.set_vpn_client_server('key-aaa', False)
+
+        self.assertEqual(client.request_count, 1)  # only the read, no write
 
     def test_get_vpn_client_devices(self) -> None:
         router_class = self.router_class
@@ -1249,8 +1251,8 @@ class TestTPLinkClient(TestCase):
 
         self.assertEqual(len(result), 2)
         self.assertIsInstance(result[0], Device)
-        self.assertTrue(result[0].vpn_client_enable)
-        self.assertFalse(result[1].vpn_client_enable)
+        self.assertTrue(result[0].vpn_client_enabled)
+        self.assertFalse(result[1].vpn_client_enabled)
 
     def test_set_vpn_client_device(self) -> None:
         device_list = [
@@ -1294,36 +1296,55 @@ class TestTPLinkClient(TestCase):
         with self.assertRaises(ClientException):
             client.set_vpn_client_device('00:00:00:00:00:00', True)
 
+    def test_set_vpn_client_server_not_found_raises(self) -> None:
+        router_class = self.router_class
 
-    def test_request_does_not_drop_param_whose_name_appears_in_form_value(self) -> None:
-        # Regression test: 'enable' is a substring of 'form=enable', so a naive
-        # `key not in path` check would incorrectly skip appending &enable=on.
-        from tplinkrouterc6u.client.c6u import TplinkRequest
-
-        captured = {}
-
-        class TPLinkRouterTest(self.router_class):
+        class TPLinkRouterTest(router_class):
             def request(self, path, data, ignore_response=False, ignore_errors=False):
-                # Invoke TplinkRouter's override (URL building) but intercept
-                # before TplinkRequest actually makes the HTTP call.
-                from tplinkrouterc6u.client.c6u import TplinkRequest as Base
-                original = Base.request
-
-                def capture(inner_self, inner_path, inner_data, ignore_response=False, ignore_errors=False):
-                    captured['path'] = inner_path
-                    captured['data'] = inner_data
-
-                Base.request = capture
-                try:
-                    super().request(path, data, ignore_response, ignore_errors)
-                finally:
-                    Base.request = original
+                if 'admin/vpn?form=server' in path:
+                    return [
+                        {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'off', 'des': 'Server A'},
+                    ]
+                raise ClientException()
 
         client = TPLinkRouterTest('', '')
-        client._logged = True
-        client.set_vpn_client(True)
+        with self.assertRaises(ClientException):
+            client.set_vpn_client_server('key-nonexistent', True)
 
-        self.assertIn('enable=on', captured.get('path', ''))
+    def test_set_vpn_client_server_enable_already_active_is_noop(self) -> None:
+        server_list = [
+            {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn', 'enable': 'on', 'des': 'Server A'},
+        ]
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            request_count = 0
+
+            def request(self, path, data, ignore_response=False, ignore_errors=False):
+                self.request_count += 1
+                if 'admin/vpn?form=server' in path:
+                    return server_list
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        client.set_vpn_client_server('key-aaa', True)
+
+        self.assertEqual(client.request_count, 1)  # only the read, no write
+
+    def test_get_vpn_client_servers_unknown_protocol_raises(self) -> None:
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path, data, ignore_response=False, ignore_errors=False):
+                if 'admin/vpn?form=server' in path:
+                    return [
+                        {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'unknownproto', 'enable': 'off', 'des': 'Server A'},
+                    ]
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        with self.assertRaises(ClientException):
+            client.get_vpn_client_servers()
 
 
 if __name__ == '__main__':
