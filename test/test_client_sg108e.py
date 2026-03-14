@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 from unittest.mock import Mock
 
-from tplinkrouterc6u import TPLinkSG108EClient
+from tplinkrouterc6u import TPLinkSG108EClient, ClientError
 from tplinkrouterc6u.client.sg108e import parse_script_variables
 
 
@@ -141,6 +141,11 @@ class TestTPLinkSG108EClient(TestCase):
         self.assertEqual(status.wired_total, 8)
         # 7 ports link-up (one is down), disabled port ignored.
         self.assertEqual(status.clients_total, 6)
+
+    def test_get_traffic_statistics_raises_client_error(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        with self.assertRaises(ClientError):
+            client.get_traffic_statistics()
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, IPv4Status,
                                               Status)
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 
@@ -248,6 +248,9 @@ class TPLinkXDRClient(AbstractRouter):
         if data['error_code'] != 0:
             raise ClientException('TplinkRouter - {} - set wifi failed, code - {}'.
                                   format(self.__class__, data['error_code']))
+
+    def get_traffic_statistics(self) -> list:
+        raise ClientError("Traffic statistics is not supported for this device")
 
     def _request(self, payload: dict) -> dict:
         url = '{}/stok={}/ds'.format(self.host, self._stok)

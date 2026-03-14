@@ -4,7 +4,7 @@ from unittest import TestCase, main
 
 from macaddress import EUI48
 
-from tplinkrouterc6u import IPv4Status
+from tplinkrouterc6u import IPv4Status, ClientError
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, Status)
@@ -629,6 +629,11 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertEqual(ipv4_status.lan_ipv4_netmask, '0.0.0.0')
         self.assertIsInstance(ipv4_status.lan_ipv4_netmask_address, IPv4Address)
         self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('0.0.0.0'))
+
+    def test_get_traffic_statistics_raises_client_error(self) -> None:
+        client = TPLinkXDRClient('', '')
+        with self.assertRaises(ClientError):
+            client.get_traffic_statistics()
 
 
 if __name__ == '__main__':

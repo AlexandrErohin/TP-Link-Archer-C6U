@@ -1,7 +1,7 @@
 from unittest import main, TestCase
 from unittest.mock import Mock
 
-from tplinkrouterc6u import TPLinkEAP115Client
+from tplinkrouterc6u import TPLinkEAP115Client, ClientError
 
 
 class TestTPLinkEAP115Client(TestCase):
@@ -89,6 +89,11 @@ class TestTPLinkEAP115Client(TestCase):
         fw = client.get_firmware()
         self.assertEqual(fw.hardware_version, '1.0/2.0')
         self.assertEqual(fw.model, 'TP-Link EAP115')
+
+    def test_get_traffic_statistics_raises_client_error(self) -> None:
+        client = TPLinkEAP115Client('http://192.168.0.10', 'password')
+        with self.assertRaises(ClientError):
+            client.get_traffic_statistics()
 
 
 if __name__ == '__main__':

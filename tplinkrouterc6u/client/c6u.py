@@ -270,6 +270,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = f"operation=write&enable={'on' if enable else 'off'}"
         self.request(path, data)
 
+    def get_traffic_statistics(self) -> list:
+        raise ClientError("Traffic statistics is not supported for this device")
+
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
 

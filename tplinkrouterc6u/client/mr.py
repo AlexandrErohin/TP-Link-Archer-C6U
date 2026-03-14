@@ -55,6 +55,12 @@ class TPLinkMRClientBase(AbstractRouter):
         Connection.GUEST_5G: '1,2,1,0,0,0',
     }
 
+    HOST_TYPE_MAP = {
+        '2.4g': Connection.HOST_2G,
+        '5g': Connection.HOST_5G,
+        'wired': Connection.WIRED,
+    }
+
     # Router name to be included in logs for example,
     # or to be redefined by subclasses.
     ROUTER_NAME = "TP Link Router MR"
@@ -304,6 +310,27 @@ class TPLinkMRClientBase(AbstractRouter):
                 attrs=['enable={}'.format(int(enable))]),
         ]
         self.req_act(acts)
+
+    def get_traffic_statistics(self) -> List[Device]:
+        acts = [
+            self.ActItem(self.ActItem.GL, 'STAT_ENTRY'),
+        ]
+        _, values = self.req_act(acts)
+
+        devices = []
+        for item in self._to_list(values):
+            conn = self.HOST_TYPE_MAP.get(item.get('hostType', ''), Connection.WIRED)
+            devices.append(Device(
+                type=conn,
+                _macaddr=EUI48(item['macAddress']),
+                _ipaddr=IPv4Address(int(item['ipAddress'])),
+                hostname=item.get('hostName', ''),
+                down_speed=int(item.get('currBytesRx', 0)),
+                up_speed=int(item.get('currBytesTx', 0)),
+                traffic_usage=int(item.get('totalBytesRx', 0)) + int(item.get('totalBytesTx', 0)),
+            ))
+
+        return devices
 
     def get_vpn_status(self) -> VPNStatus:
         status = VPNStatus()

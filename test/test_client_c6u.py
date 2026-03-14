@@ -9,6 +9,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     Device,
     ClientException,
+    ClientError,
     VPN,
 )
 
@@ -1102,6 +1103,11 @@ class TestTPLinkClient(TestCase):
         )
         self.assertEqual(client.captured_path, self.openvpn_config_path)
         self.assertEqual(client.captured_data, expected_data)
+
+    def test_get_traffic_statistics_raises_client_error(self) -> None:
+        client = self.router_class('', '')
+        with self.assertRaises(ClientError):
+            client.get_traffic_statistics()
 
 
 if __name__ == '__main__':

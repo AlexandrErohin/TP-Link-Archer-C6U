@@ -8,6 +8,7 @@ from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus
+from tplinkrouterc6u.common.exception import ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 
@@ -44,6 +45,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             params = {'band2_4': {'guest': en}}
 
         self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
+
+    def get_traffic_statistics(self) -> list:
+        raise ClientError("Traffic statistics is not supported for this device")
 
     def reboot(self) -> None:
         if not self.devices:

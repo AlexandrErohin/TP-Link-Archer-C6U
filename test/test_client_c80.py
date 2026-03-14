@@ -3,7 +3,7 @@ from ipaddress import IPv4Address
 from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
-from tplinkrouterc6u import Connection, ClientException
+from tplinkrouterc6u import Connection, ClientException, ClientError
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 
 
@@ -588,6 +588,11 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(ipv4status._lan_ipv4_ipaddr, IPv4Address('192.168.0.1'))
         self.assertEqual(ipv4status.lan_ipv4_dhcp_enable, True)
         self.assertEqual(ipv4status._lan_ipv4_netmask, IPv4Address('255.255.255.0'))
+
+    def test_get_traffic_statistics_raises_client_error(self) -> None:
+        client = TplinkC80RouterTest('', '')
+        with self.assertRaises(ClientError):
+            client.get_traffic_statistics()
 
 
 if __name__ == '__main__':

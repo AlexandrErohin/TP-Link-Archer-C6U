@@ -8,7 +8,7 @@ from macaddress import EUI48
 import requests
 from requests import Session
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus
@@ -202,6 +202,9 @@ class TplinkC80Router(AbstractRouter):
         text = f'id {RouterConstants.CONNECTION_REQUESTS_MAP[wifi]}\r\n{enable_string}'
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
+
+    def get_traffic_statistics(self) -> list:
+        raise ClientError("Traffic statistics is not supported for this device")
 
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"

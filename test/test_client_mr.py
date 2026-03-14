@@ -1067,6 +1067,88 @@ connAct=0
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, '2\r\n[OPENVPN#0,0,0,0,0,0#0,0,0,0,0,0]0,1\r\nenable=1\r\n')
 
+    def test_get_traffic_statistics(self) -> None:
+        response = '''[1,0,0,0,0,0]0
+hostType=2.4g
+hostName=Phone
+ipAddress=3232235777
+macAddress=AA:BB:CC:DD:EE:01
+totalBytesRx=1000
+totalBytesTx=2000
+currBytesRx=100
+currBytesTx=200
+currIcmp=0
+currUdp=0
+currSyn=0
+currIcmpMax=0
+currUdpMax=0
+currSynMax=0
+[2,0,0,0,0,0]0
+hostType=5g
+hostName=Laptop
+ipAddress=3232235778
+macAddress=AA:BB:CC:DD:EE:02
+totalBytesRx=5000
+totalBytesTx=3000
+currBytesRx=500
+currBytesTx=300
+currIcmp=0
+currUdp=0
+currSyn=0
+currIcmpMax=0
+currUdpMax=0
+currSynMax=0
+[3,0,0,0,0,0]0
+hostType=wired
+hostName=Server
+ipAddress=3232235779
+macAddress=AA:BB:CC:DD:EE:03
+totalBytesRx=100000
+totalBytesTx=50000
+currBytesRx=1000
+currBytesTx=500
+currIcmp=0
+currUdp=0
+currSyn=0
+currIcmpMax=0
+currUdpMax=0
+currSynMax=0
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        devices = client.get_traffic_statistics()
+
+        self.assertEqual(len(devices), 3)
+
+        self.assertIsInstance(devices[0], Device)
+        self.assertEqual(devices[0].type, Connection.HOST_2G)
+        self.assertEqual(devices[0].hostname, 'Phone')
+        self.assertEqual(devices[0].macaddr, 'AA-BB-CC-DD-EE-01')
+        self.assertEqual(devices[0].ipaddr, '192.168.1.1')
+        self.assertEqual(devices[0].down_speed, 100)
+        self.assertEqual(devices[0].up_speed, 200)
+        self.assertEqual(devices[0].traffic_usage, 3000)
+
+        self.assertEqual(devices[1].type, Connection.HOST_5G)
+        self.assertEqual(devices[1].hostname, 'Laptop')
+        self.assertEqual(devices[1].ipaddr, '192.168.1.2')
+        self.assertEqual(devices[1].down_speed, 500)
+        self.assertEqual(devices[1].up_speed, 300)
+        self.assertEqual(devices[1].traffic_usage, 8000)
+
+        self.assertEqual(devices[2].type, Connection.WIRED)
+        self.assertEqual(devices[2].hostname, 'Server')
+        self.assertEqual(devices[2].ipaddr, '192.168.1.3')
+        self.assertEqual(devices[2].down_speed, 1000)
+        self.assertEqual(devices[2].up_speed, 500)
+        self.assertEqual(devices[2].traffic_usage, 150000)
+
 
 if __name__ == '__main__':
     main()
