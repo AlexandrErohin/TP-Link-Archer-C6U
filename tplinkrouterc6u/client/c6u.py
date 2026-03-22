@@ -506,22 +506,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             urlencode({'operation': 'write', 'enable': 'on' if enable else 'off'}),
         )
 
-    def get_vpn_client_servers(self) -> list[VpnClientServer]:
-        data = self.request(self._url_vpn_client_server, 'operation=load')
-        servers = []
-        for item in data:
-            try:
-                protocol = VpnClientServerProtocol(item.get('type', ''))
-            except ValueError:
-                raise ClientException('Unknown VPN server protocol: {}'.format(item.get('type')))
-            servers.append(VpnClientServer(
-                id=item.get('key', ''),
-                name=item.get('des', ''),
-                protocol=protocol,
-                active=item.get('enable') == 'on',
-                status=item.get('status'),
-            ))
-        return servers
 
     def set_vpn_client_server(self, server_id: str, enable: bool) -> None:
         """Toggle a VPN server on or off by ID.
@@ -548,19 +532,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         })
         self.request(self._url_vpn_client_server, payload)
 
-    def get_vpn_client_devices(self) -> list[Device]:
-        data = self.request(self._url_vpn_client_user_list, 'operation=load')
-        devices = []
-        for item in data:
-            device = Device(
-                type=Connection.UNKNOWN,
-                _macaddr=get_mac(item.get('mac', '00:00:00:00:00:00')),
-                _ipaddr=get_ip('0.0.0.0'),
-                hostname=item.get('name', ''),
-                vpn_client_enabled=item.get('access') == 'on',
-            )
-            devices.append(device)
-        return devices
 
     def set_vpn_client_device(self, mac: str, enable: bool) -> None:
         data = self.request(self._url_vpn_client_user_list, 'operation=load')
