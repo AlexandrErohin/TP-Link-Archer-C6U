@@ -112,11 +112,9 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
 | set_vpn | vpn: [VPNStatus](#vpn_status), enable: bool | Allow to turn on/of VPN |   |
-| get_vpn_client_status |   | Gets VPN client enabled state | [VpnClientStatus](#vpn_client_status) |
+| get_vpn_client_status |   | Gets VPN client status including enabled state, configured servers, and whitelisted devices | [VpnClientStatus](#vpn_client_status) |
 | set_vpn_client | enable: bool | Turn VPN client on or off |   |
-| get_vpn_client_servers |   | Gets list of configured VPN client servers | [[VpnClientServer]](#vpn_client_server) |
 | set_vpn_client_server | server_id: str, enable: bool | Toggle a VPN server on or off; the router handles deactivating all others when one is enabled |   |
-| get_vpn_client_devices |   | Gets list of devices in the VPN client whitelist | [[Device]](#device) |
 | set_vpn_client_device | mac: str, enable: bool | Enable or disable VPN client access for a device by MAC address |   |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
 | send_ussd | command: str | Send USSD command for LTE routers | str |
@@ -245,6 +243,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | Field | Description | Type |
 | --- |---|---|
 | enabled | VPN client is enabled | bool |
+| servers | Configured VPN client servers | [[VpnClientServer]](#vpn_client_server) |
+| devices | Devices in the VPN client whitelist | [[Device]](#device) |
 
 ### <a id="vpn_client_server">VpnClientServer</a>
 | Field | Description | Type |
