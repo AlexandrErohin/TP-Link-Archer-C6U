@@ -1303,20 +1303,23 @@ class TestTPLinkClient(TestCase):
 
         self.assertEqual(client.request_count, 1)  # only the read, no write
 
-    def test_get_vpn_client_servers_unknown_protocol_raises(self) -> None:
+    def test_get_vpn_client_status_unknown_protocol_raises(self) -> None:
         router_class = self.router_class
 
         class TPLinkRouterTest(router_class):
             def request(self, path, data, ignore_response=False, ignore_errors=False):
+                if 'admin/vpn?form=enable' in path:
+                    return {'enable': 'on', 'type': '0', 'ipsec': '1'}
                 if 'admin/vpn?form=server' in path:
                     return [
-                        {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'unknownproto', 'enable': 'off', 'des': 'Server A'},
+                        {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'unknownproto',
+                         'enable': 'off', 'des': 'Server A'},
                     ]
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
         with self.assertRaises(ClientException):
-            client.get_vpn_client_servers()
+            client.get_vpn_client_status()
 
 
 if __name__ == '__main__':
