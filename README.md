@@ -183,7 +183,6 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | traffic_usage | total traffic usage (bytes) | int, None |
 | signal | Signal strength | int, None |
 | active | Is active device | bool |
-| vpn_client_enabled | Is device routed through VPN client | bool, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -244,7 +243,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | --- |---|---|
 | enabled | VPN client is enabled | bool |
 | servers | Configured VPN client servers | [[VpnClientServer]](#vpn_client_server) |
-| devices | Devices in the VPN client whitelist | [[Device]](#device) |
+| devices | Devices in the VPN client whitelist | [[VpnClientDevice]](#vpn_client_device) |
 
 ### <a id="vpn_client_server">VpnClientServer</a>
 | Field | Description | Type |
@@ -254,6 +253,14 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | protocol | VPN protocol | [VpnClientServerProtocol](#vpn_client_server_protocol) |
 | active | Is this server currently active | bool |
 | status | Connection status string from router (e.g. "connected") | str, None |
+
+### <a id="vpn_client_device">VpnClientDevice</a>
+| Field | Description | Type |
+| --- |---|---|
+| macaddr | device mac address | str |
+| macaddress | device mac address | EUI48 |
+| name | device hostname | str |
+| enabled | Is device routed through VPN client | bool |
 
 ### <a id="sms">SMS</a>
 | Field | Description | Type |

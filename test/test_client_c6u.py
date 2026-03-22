@@ -13,6 +13,8 @@ from tplinkrouterc6u import (
     VPN,
     VpnClientStatus,
     VpnClientServer,
+    VpnClientServerProtocol,
+    VpnClientDevice,
 )
 
 
@@ -1135,8 +1137,11 @@ class TestTPLinkClient(TestCase):
         self.assertIsInstance(result.servers[0], VpnClientServer)
         self.assertEqual(result.servers[0].id, 'key-aaa')
         self.assertEqual(len(result.devices), 1)
-        self.assertIsInstance(result.devices[0], Device)
-        self.assertTrue(result.devices[0].vpn_client_enabled)
+        self.assertIsInstance(result.devices[0], VpnClientDevice)
+        self.assertEqual(result.devices[0].macaddr, 'AA-BB-CC-DD-EE-FF')
+        self.assertIsInstance(result.devices[0].macaddress, EUI48)
+        self.assertEqual(result.devices[0].name, 'DeviceA')
+        self.assertTrue(result.devices[0].enabled)
 
     def test_set_vpn_client(self) -> None:
         router_class = self.router_class

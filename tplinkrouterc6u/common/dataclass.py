@@ -29,7 +29,6 @@ class Device:
     traffic_usage: int | None = None
     signal: int | None = None
     active: bool = True
-    vpn_client_enabled: bool | None = None
 
     @property
     def macaddr(self):
@@ -323,10 +322,25 @@ class VPNStatus:
 
 
 @dataclass
+class VpnClientDevice:
+    _macaddr: EUI48
+    name: str
+    enabled: bool
+
+    @property
+    def macaddr(self) -> str:
+        return str(self._macaddr)
+
+    @property
+    def macaddress(self) -> EUI48:
+        return self._macaddr
+
+
+@dataclass
 class VpnClientStatus:
     enabled: bool
     servers: list[VpnClientServer] = field(default_factory=list)
-    devices: list[Device] = field(default_factory=list)
+    devices: list[VpnClientDevice] = field(default_factory=list)
 
 
 @dataclass

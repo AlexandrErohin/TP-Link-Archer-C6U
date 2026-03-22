@@ -21,6 +21,7 @@ from tplinkrouterc6u.common.dataclass import (
     VPNStatus,
     VpnClientStatus,
     VpnClientServer,
+    VpnClientDevice,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -485,13 +486,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             ))
 
         devices = []
-        for item in device_data:
-            devices.append(Device(
-                type=Connection.UNKNOWN,
+        for item in (device_data or []):
+            devices.append(VpnClientDevice(
                 _macaddr=get_mac(item.get('mac', '00:00:00:00:00:00')),
-                _ipaddr=get_ip('0.0.0.0'),
-                hostname=item.get('name', ''),
-                vpn_client_enabled=item.get('access') == 'on',
+                name=item.get('name', ''),
+                enabled=item.get('access') == 'on',
             ))
 
         return VpnClientStatus(
