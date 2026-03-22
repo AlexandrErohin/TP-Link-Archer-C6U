@@ -13,7 +13,6 @@ from tplinkrouterc6u import (
     VPN,
     VpnClientStatus,
     VpnClientServer,
-    VpnClientServerProtocol,
 )
 
 
