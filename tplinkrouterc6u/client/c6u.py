@@ -466,8 +466,39 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self.request(path, data)
 
     def get_vpn_client_status(self) -> VpnClientStatus:
-        data = self.request(self._url_vpn_client_enable, 'operation=read')
-        return VpnClientStatus(enabled=data.get('enable') == 'on')
+        enable_data = self.request(self._url_vpn_client_enable, 'operation=read')
+        server_data = self.request(self._url_vpn_client_server, 'operation=load')
+        device_data = self.request(self._url_vpn_client_user_list, 'operation=load')
+
+        servers = []
+        for item in server_data:
+            try:
+                protocol = VpnClientServerProtocol(item.get('type', ''))
+            except ValueError:
+                raise ClientException('Unknown VPN server protocol: {}'.format(item.get('type')))
+            servers.append(VpnClientServer(
+                id=item.get('key', ''),
+                name=item.get('des', ''),
+                protocol=protocol,
+                active=item.get('enable') == 'on',
+                status=item.get('status'),
+            ))
+
+        devices = []
+        for item in device_data:
+            devices.append(Device(
+                type=Connection.UNKNOWN,
+                _macaddr=get_mac(item.get('mac', '00:00:00:00:00:00')),
+                _ipaddr=get_ip('0.0.0.0'),
+                hostname=item.get('name', ''),
+                vpn_client_enabled=item.get('access') == 'on',
+            ))
+
+        return VpnClientStatus(
+            enabled=enable_data.get('enable') == 'on',
+            servers=servers,
+            devices=devices,
+        )
 
     def set_vpn_client(self, enable: bool) -> None:
         self.request(

@@ -1115,6 +1115,16 @@ class TestTPLinkClient(TestCase):
             def request(self, path, data, ignore_response=False, ignore_errors=False):
                 if 'admin/vpn?form=enable' in path:
                     return {'enable': 'on', 'type': '0', 'ipsec': '1'}
+                if 'admin/vpn?form=server' in path:
+                    return [
+                        {'.name': 'cfg02769c', 'key': 'key-aaa', 'type': 'openvpn',
+                         'enable': 'on', 'des': 'Server A', 'status': 'connected'},
+                    ]
+                if 'admin/vpn?form=vpn_user_list' in path:
+                    return [
+                        {'mac': 'AA:BB:CC:DD:EE:FF', 'name': 'DeviceA',
+                         'client_type': 'other', 'access': 'on'},
+                    ]
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -1122,6 +1132,12 @@ class TestTPLinkClient(TestCase):
 
         self.assertIsInstance(result, VpnClientStatus)
         self.assertTrue(result.enabled)
+        self.assertEqual(len(result.servers), 1)
+        self.assertIsInstance(result.servers[0], VpnClientServer)
+        self.assertEqual(result.servers[0].id, 'key-aaa')
+        self.assertEqual(len(result.devices), 1)
+        self.assertIsInstance(result.devices[0], Device)
+        self.assertTrue(result.devices[0].vpn_client_enabled)
 
     def test_set_vpn_client(self) -> None:
         router_class = self.router_class

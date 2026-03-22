@@ -1,3 +1,4 @@
+from __future__ import annotations
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from dataclasses import dataclass, field
@@ -324,6 +325,8 @@ class VPNStatus:
 @dataclass
 class VpnClientStatus:
     enabled: bool
+    servers: list[VpnClientServer] = field(default_factory=list)
+    devices: list[Device] = field(default_factory=list)
 
 
 @dataclass
