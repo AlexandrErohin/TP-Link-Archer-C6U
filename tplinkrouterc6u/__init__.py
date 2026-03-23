@@ -20,7 +20,7 @@ from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
 from tplinkrouterc6u.provider import TplinkRouterProvider
-from tplinkrouterc6u.common.package_enum import Connection, VPN
+from tplinkrouterc6u.common.package_enum import Connection, VPN, VpnClientServerProtocol
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
@@ -31,5 +31,8 @@ from tplinkrouterc6u.common.dataclass import (
     SMS,
     LTEStatus,
     VPNStatus,
+    VpnClientStatus,
+    VpnClientServer,
+    VpnClientDevice,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

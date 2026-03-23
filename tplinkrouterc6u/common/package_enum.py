@@ -55,3 +55,9 @@ class VPN(Enum):
     def lowercase(self) -> str:
         """Returns the lowercase version of the enum value. Needed for the c1200 router."""
         return self.value.lower()
+
+
+class VpnClientServerProtocol(Enum):
+    OPEN_VPN = 'openvpn'
+    PPTP = 'pptp'
+    L2TP_IPSEC = 'l2tp'
