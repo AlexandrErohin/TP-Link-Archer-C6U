@@ -505,7 +505,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             urlencode({'operation': 'write', 'enable': 'on' if enable else 'off'}),
         )
 
-
     def set_vpn_client_server(self, server_id: str, enable: bool) -> None:
         """Toggle a VPN server on or off by ID.
 
@@ -530,7 +529,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             'old': dumps(old),
         })
         self.request(self._url_vpn_client_server, payload)
-
 
     def set_vpn_client_device(self, mac: str, enable: bool) -> None:
         data = self.request(self._url_vpn_client_user_list, 'operation=load')
