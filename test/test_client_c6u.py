@@ -13,7 +13,6 @@ from tplinkrouterc6u import (
     VPN,
     VpnClientStatus,
     VpnClientServer,
-    VpnClientServerProtocol,
     VpnClientDevice,
 )
 
@@ -1108,7 +1107,6 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(client.captured_path, self.openvpn_config_path)
         self.assertEqual(client.captured_data, expected_data)
 
-
     def test_get_vpn_client_status(self) -> None:
         router_class = self.router_class
 
@@ -1160,7 +1158,6 @@ class TestTPLinkClient(TestCase):
         self.assertIn('form=enable', client.captured_path)
         self.assertIn('enable=off', client.captured_data)
         self.assertIn('operation=write', client.captured_data)
-
 
     def test_set_vpn_client_server_enable(self) -> None:
         server_list = [
@@ -1228,7 +1225,6 @@ class TestTPLinkClient(TestCase):
         client.set_vpn_client_server('key-aaa', False)
 
         self.assertEqual(client.request_count, 1)  # only the read, no write
-
 
     def test_set_vpn_client_device(self) -> None:
         device_list = [
