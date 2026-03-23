@@ -1,8 +1,9 @@
+from __future__ import annotations
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from dataclasses import dataclass, field
 from datetime import datetime
-from tplinkrouterc6u.common.package_enum import Connection
+from tplinkrouterc6u.common.package_enum import Connection, VpnClientServerProtocol
 
 
 @dataclass
@@ -318,3 +319,34 @@ class VPNStatus:
     ipsecvpn_enable: bool | None = None
     openvpn_clients_total: int = 0
     pptpvpn_clients_total: int = 0
+
+
+@dataclass
+class VpnClientDevice:
+    _macaddr: EUI48
+    name: str
+    enabled: bool
+
+    @property
+    def macaddr(self) -> str:
+        return str(self._macaddr)
+
+    @property
+    def macaddress(self) -> EUI48:
+        return self._macaddr
+
+
+@dataclass
+class VpnClientStatus:
+    enabled: bool
+    servers: list[VpnClientServer] = field(default_factory=list)
+    devices: list[VpnClientDevice] = field(default_factory=list)
+
+
+@dataclass
+class VpnClientServer:
+    id: str
+    name: str
+    protocol: VpnClientServerProtocol
+    active: bool
+    status: str | None = None
