@@ -573,19 +573,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return result
 
 
-class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
+class TplinkRouterJson(TplinkBaseRouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
-
-        self._url_firmware = 'admin/firmware?form=upgrade'
-        self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
-        self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
-        self._url_smart_network = 'admin/smart_network?form=game_accelerator'
-        self._url_openvpn = 'admin/openvpn?form=config'
-        self._url_pptpd = 'admin/pptpd?form=config'
-        self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
-        self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
         self._headers_request['Content-Type'] = 'application/json'
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
@@ -614,7 +605,22 @@ class TplinkRouter(TplinkEncryption, TplinkBaseRouter):
         return super().request(path, data, ignore_response, ignore_errors)
 
 
-class TplinkRouterV1_11(TplinkBaseRouter):
+class TplinkRouter(TplinkEncryption, TplinkRouterJson):
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+
+        self._url_firmware = 'admin/firmware?form=upgrade'
+        self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
+        self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
+        self._url_smart_network = 'admin/smart_network?form=game_accelerator'
+        self._url_openvpn = 'admin/openvpn?form=config'
+        self._url_pptpd = 'admin/pptpd?form=config'
+        self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
+        self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
+
+
+class TplinkRouterV1_11(TplinkRouterJson):
     """
     Router client for newer TP-Link firmware (1.11.0+) that uses simplified
     RSA-only authentication without AES encryption wrapper.
