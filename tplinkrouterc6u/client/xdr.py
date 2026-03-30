@@ -18,6 +18,8 @@ from tplinkrouterc6u.common.package_enum import Connection
 class TPLinkXDRClient(AbstractRouter):
     _stok = ''
 
+    SUPPORT_SERIES = ['TL-XDR','TL-7DR']
+
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
@@ -27,7 +29,11 @@ class TPLinkXDRClient(AbstractRouter):
 
     def supports(self) -> bool:
         response = self._session.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
-        return 'TL-XDR' in response.text
+        for s in self.SUPPORT_SERIES:
+            if s in response.text:
+                return True
+        return False
+
 
     def authorize(self) -> None:
         response = self._session.post(self.host, json={
