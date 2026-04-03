@@ -287,11 +287,6 @@ class TestTPLinkWDRClient(TestCase):
         self.assertTrue(status.wifi_5g_enable)
         self.assertEqual(status.wan_ipv4_uptime, 6732336)
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TplinkWDRRouterTest('', '')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == "__main__":
     main()

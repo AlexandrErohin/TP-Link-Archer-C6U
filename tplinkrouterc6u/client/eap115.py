@@ -153,9 +153,6 @@ class TPLinkEAP115Client(AbstractRouter):
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         raise ClientError("WiFi configuration is not supported for EAP115")
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def _get_data(self, path: str, **params):
         params = {**params, "_": int(time() * 1000)}
         response = self._session.get(

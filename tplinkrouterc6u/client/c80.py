@@ -203,9 +203,6 @@ class TplinkC80Router(AbstractRouter):
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"
         lan_ip_request = "4|1,0,0"

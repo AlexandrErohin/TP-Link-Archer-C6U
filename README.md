@@ -112,6 +112,10 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
 | set_vpn | vpn: [VPNStatus](#vpn_status), enable: bool | Allow to turn on/of VPN |   |
+| get_vpn_client_status |   | Gets VPN client status including enabled state, configured servers, and whitelisted devices | [VpnClientStatus](#vpn_client_status) |
+| set_vpn_client | enable: bool | Turn VPN client on or off |   |
+| set_vpn_client_server | server_id: str, enable: bool | Toggle a VPN server on or off; the router handles deactivating all others when one is enabled |   |
+| set_vpn_client_device | mac: str, enable: bool | Enable or disable VPN client access for a device by MAC address |   |
 | send_sms | phone_number: str, message: str | Send sms for LTE routers |   |
 | send_ussd | command: str | Send USSD command for LTE routers | str |
 | get_sms | | Get sms messages from the first page for LTE routers | [[SMS]](#sms) |
@@ -234,6 +238,30 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | openvpn_clients_total | OpenVPN clients connected | int |
 | pptpvpn_clients_total | PPTPVPN clients connected | int |
 
+### <a id="vpn_client_status">VpnClientStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| enabled | VPN client is enabled | bool |
+| servers | Configured VPN client servers | [[VpnClientServer]](#vpn_client_server) |
+| devices | Devices in the VPN client whitelist | [[VpnClientDevice]](#vpn_client_device) |
+
+### <a id="vpn_client_server">VpnClientServer</a>
+| Field | Description | Type |
+| --- |---|---|
+| id | Server identifier | str |
+| name | Server display name | str |
+| protocol | VPN protocol | [VpnClientServerProtocol](#vpn_client_server_protocol) |
+| active | Is this server currently active | bool |
+| status | Connection status string from router (e.g. "connected") | str, None |
+
+### <a id="vpn_client_device">VpnClientDevice</a>
+| Field | Description | Type |
+| --- |---|---|
+| macaddr | device mac address | str |
+| macaddress | device mac address | EUI48 |
+| name | device hostname | str |
+| enabled | Is device routed through VPN client | bool |
+
 ### <a id="sms">SMS</a>
 | Field | Description | Type |
 | --- |---|---|
@@ -282,6 +310,11 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - VPN.PPTP_VPN
 - VPN.IPSEC
 
+### <a id="vpn_client_server_protocol">VpnClientServerProtocol</a>
+- VpnClientServerProtocol.OPEN_VPN
+- VpnClientServerProtocol.PPTP
+- VpnClientServerProtocol.L2TP_IPSEC
+
 ## <a id="supports">Supported routers</a>
 - [TP-LINK routers](#tplink)
 - [MERCUSYS routers](#mercusys)
@@ -315,7 +348,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer AXE5400 v1.0
 - Archer AXE75 V1
 - Archer BE220 v1.0
-- Archer BE230 v1.0
+- Archer BE230 (v1.0, v2.0)
 - Archer BE3600 (v1.0, v1.2, v1.6)
 - Archer BE400 v1.0
 - Archer BE550 v1.0
@@ -339,6 +372,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer NX200 (v1.0, v2.0)
 - Archer VR1200v v1
 - Archer VR2100v v1
+- Archer VR2800 v1
 - Archer VR400 (v2, v3)
 - Archer VR600 v3
 - Archer VR900v
@@ -346,6 +380,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer VX231v v1.0
 - BE11000 2.0
 - CPE210 v2.0
+- Deco BE25 1.0
 - Deco M4 2.0
 - Deco M4R 2.0
 - Deco M5 v3
@@ -393,6 +428,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - XC220-G3v v2.30
 ### <a id="mercusys">MERCUSYS routers</a>
 - AC10 1.20
+- Halo H25BE 1.0
 - Halo H3000x 1.0
 - Halo H47BE 2.0
 - Halo H60XR 1.0

@@ -262,9 +262,6 @@ class TPLinkCPE210Client(AbstractRouter):
         data["wirelessEnable"] = int(bool(enable))
         self._post_data(_PATH_WIRELESS_AP, data=data)
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def _post_data(self, path: str, data: dict, **params):
         params = {**params, "_": int(time() * 1000)}
         response = self._session.post(

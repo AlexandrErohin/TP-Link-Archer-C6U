@@ -1,8 +1,7 @@
 from requests.packages import urllib3
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, Device
-from typing import List
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
 from abc import ABC, abstractmethod
 
 
@@ -50,8 +49,4 @@ class AbstractRouter(ABC):
 
     @abstractmethod
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        pass
-
-    @abstractmethod
-    def get_traffic_statistics(self) -> List[Device]:
         pass

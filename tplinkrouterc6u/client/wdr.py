@@ -279,9 +279,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
 
         self.request(section, query, True)
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def update(self, what: str = "") -> None:
         if what == "":
             return None

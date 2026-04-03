@@ -1067,87 +1067,73 @@ connAct=0
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, '2\r\n[OPENVPN#0,0,0,0,0,0#0,0,0,0,0,0]0,1\r\nenable=1\r\n')
 
-    def test_get_traffic_statistics(self) -> None:
-        response = '''[1,0,0,0,0,0]0
-hostType=2.4g
+    def test_get_status_enriches_devices_with_traffic_stats(self) -> None:
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.1.1
+defaultGateway=192.168.1.254
+name=pppoe
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[1,0,0,0,0,0]4
+IPAddress=192.168.4.10
+MACAddress=AA:BB:CC:DD:EE:01
 hostName=Phone
-ipAddress=3232235777
+X_TP_ConnType=1
+active=1
+[2,0,0,0,0,0]4
+IPAddress=192.168.4.11
+MACAddress=AA:BB:CC:DD:EE:02
+hostName=Server
+X_TP_ConnType=0
+active=1
+[error]0
+
+'''
+        stat_response = '''[1,0,0,0,0,0]0
 macAddress=AA:BB:CC:DD:EE:01
-totalBytesRx=1000
-totalBytesTx=2000
 currBytesRx=100
 currBytesTx=200
-currIcmp=0
-currUdp=0
-currSyn=0
-currIcmpMax=0
-currUdpMax=0
-currSynMax=0
+totalBytesRx=1000
+totalBytesTx=2000
 [2,0,0,0,0,0]0
-hostType=5g
-hostName=Laptop
-ipAddress=3232235778
 macAddress=AA:BB:CC:DD:EE:02
-totalBytesRx=5000
-totalBytesTx=3000
-currBytesRx=500
-currBytesTx=300
-currIcmp=0
-currUdp=0
-currSyn=0
-currIcmpMax=0
-currUdpMax=0
-currSynMax=0
-[3,0,0,0,0,0]0
-hostType=wired
-hostName=Server
-ipAddress=3232235779
-macAddress=AA:BB:CC:DD:EE:03
-totalBytesRx=100000
-totalBytesTx=50000
 currBytesRx=1000
 currBytesTx=500
-currIcmp=0
-currUdp=0
-currSyn=0
-currIcmpMax=0
-currUdpMax=0
-currSynMax=0
+totalBytesRx=100000
+totalBytesTx=50000
 [error]0
 
 '''
 
         class TPLinkMRClientTest(TPLinkMRClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
-                return 200, response
+                if data_str and 'STAT_ENTRY' in data_str:
+                    return 200, stat_response
+                return 200, status_response
 
         client = TPLinkMRClientTest('', '')
-        devices = client.get_traffic_statistics()
+        status = client.get_status()
 
-        self.assertEqual(len(devices), 3)
+        self.assertEqual(len(status.devices), 2)
 
-        self.assertIsInstance(devices[0], Device)
-        self.assertEqual(devices[0].type, Connection.HOST_2G)
-        self.assertEqual(devices[0].hostname, 'Phone')
-        self.assertEqual(devices[0].macaddr, 'AA-BB-CC-DD-EE-01')
-        self.assertEqual(devices[0].ipaddr, '192.168.1.1')
-        self.assertEqual(devices[0].down_speed, 100)
-        self.assertEqual(devices[0].up_speed, 200)
-        self.assertEqual(devices[0].traffic_usage, 3000)
+        phone = next(d for d in status.devices if d.macaddr == 'AA-BB-CC-DD-EE-01')
+        self.assertEqual(phone.down_speed, 100)
+        self.assertEqual(phone.up_speed, 200)
+        self.assertEqual(phone.traffic_usage, 3000)
 
-        self.assertEqual(devices[1].type, Connection.HOST_5G)
-        self.assertEqual(devices[1].hostname, 'Laptop')
-        self.assertEqual(devices[1].ipaddr, '192.168.1.2')
-        self.assertEqual(devices[1].down_speed, 500)
-        self.assertEqual(devices[1].up_speed, 300)
-        self.assertEqual(devices[1].traffic_usage, 8000)
-
-        self.assertEqual(devices[2].type, Connection.WIRED)
-        self.assertEqual(devices[2].hostname, 'Server')
-        self.assertEqual(devices[2].ipaddr, '192.168.1.3')
-        self.assertEqual(devices[2].down_speed, 1000)
-        self.assertEqual(devices[2].up_speed, 500)
-        self.assertEqual(devices[2].traffic_usage, 150000)
+        server = next(d for d in status.devices if d.macaddr == 'AA-BB-CC-DD-EE-02')
+        self.assertEqual(server.down_speed, 1000)
+        self.assertEqual(server.up_speed, 500)
+        self.assertEqual(server.traffic_usage, 150000)
 
 
 if __name__ == '__main__':

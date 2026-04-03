@@ -46,9 +46,6 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
         self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def reboot(self) -> None:
         if not self.devices:
             self.get_firmware()

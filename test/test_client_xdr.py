@@ -630,11 +630,6 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertIsInstance(ipv4_status.lan_ipv4_netmask_address, IPv4Address)
         self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('0.0.0.0'))
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TPLinkXDRClient('', '')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()

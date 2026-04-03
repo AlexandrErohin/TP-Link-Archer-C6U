@@ -801,11 +801,6 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(result.lan_ipv4_ipaddr, '192.168.68.1')
         self.assertEqual(result.lan_ipv4_netmask, '255.255.255.0')
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TPLinkDecoClient('', '')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()

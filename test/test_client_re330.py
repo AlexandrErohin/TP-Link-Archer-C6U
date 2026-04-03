@@ -291,11 +291,6 @@ class TestTPLinkClient(TestCase):
         led_status = client.get_led_status()
         self.assertEqual(led_status, False)
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TplinkRE330RouterTest('', '')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()

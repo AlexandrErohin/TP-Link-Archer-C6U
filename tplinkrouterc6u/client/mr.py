@@ -227,6 +227,19 @@ class TPLinkMRClientBase(AbstractRouter):
             devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
             devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
 
+        try:
+            stat_acts = [self.ActItem(self.ActItem.GL, 'STAT_ENTRY')]
+            _, stat_values = self.req_act(stat_acts)
+            for item in self._to_list(stat_values):
+                mac = item.get('macAddress')
+                if mac and mac in devices:
+                    devices[mac].down_speed = int(item.get('currBytesRx', 0))
+                    devices[mac].up_speed = int(item.get('currBytesTx', 0))
+                    devices[mac].traffic_usage = (int(item.get('totalBytesRx', 0)) +
+                                                  int(item.get('totalBytesTx', 0)))
+        except Exception:
+            pass
+
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
@@ -310,27 +323,6 @@ class TPLinkMRClientBase(AbstractRouter):
                 attrs=['enable={}'.format(int(enable))]),
         ]
         self.req_act(acts)
-
-    def get_traffic_statistics(self) -> List[Device]:
-        acts = [
-            self.ActItem(self.ActItem.GL, 'STAT_ENTRY'),
-        ]
-        _, values = self.req_act(acts)
-
-        devices = []
-        for item in self._to_list(values):
-            conn = self.HOST_TYPE_MAP.get(item.get('hostType', ''), Connection.WIRED)
-            devices.append(Device(
-                type=conn,
-                _macaddr=EUI48(item['macAddress']),
-                _ipaddr=IPv4Address(int(item['ipAddress'])),
-                hostname=item.get('hostName', ''),
-                down_speed=int(item.get('currBytesRx', 0)),
-                up_speed=int(item.get('currBytesTx', 0)),
-                traffic_usage=int(item.get('totalBytesRx', 0)) + int(item.get('totalBytesTx', 0)),
-            ))
-
-        return devices
 
     def get_vpn_status(self) -> VPNStatus:
         status = VPNStatus()

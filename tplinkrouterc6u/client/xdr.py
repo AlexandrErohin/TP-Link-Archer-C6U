@@ -249,9 +249,6 @@ class TPLinkXDRClient(AbstractRouter):
             raise ClientException('TplinkRouter - {} - set wifi failed, code - {}'.
                                   format(self.__class__, data['error_code']))
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def _request(self, payload: dict) -> dict:
         url = '{}/stok={}/ds'.format(self.host, self._stok)
         response = self._session.post(url, json=payload, timeout=self.timeout, verify=self._verify_ssl)

@@ -156,9 +156,6 @@ class TPLinkSG108EClient(AbstractRouter):
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         raise ClientError("WiFi configuration is not supported for TL-SG108E")
 
-    def get_traffic_statistics(self) -> list:
-        raise ClientError("Traffic statistics is not supported for this device")
-
     def port_stats(self) -> dict:
         return self._get_vars(_PATH_PORT_STATS)
 

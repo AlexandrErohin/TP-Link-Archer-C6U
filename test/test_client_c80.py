@@ -589,11 +589,6 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(ipv4status.lan_ipv4_dhcp_enable, True)
         self.assertEqual(ipv4status._lan_ipv4_netmask, IPv4Address('255.255.255.0'))
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TplinkC80RouterTest('', '')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()

@@ -142,11 +142,6 @@ class TestTPLinkSG108EClient(TestCase):
         # 7 ports link-up (one is down), disabled port ignored.
         self.assertEqual(status.clients_total, 6)
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()

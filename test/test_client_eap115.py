@@ -90,11 +90,6 @@ class TestTPLinkEAP115Client(TestCase):
         self.assertEqual(fw.hardware_version, '1.0/2.0')
         self.assertEqual(fw.model, 'TP-Link EAP115')
 
-    def test_get_traffic_statistics_raises_client_error(self) -> None:
-        client = TPLinkEAP115Client('http://192.168.0.10', 'password')
-        with self.assertRaises(ClientError):
-            client.get_traffic_statistics()
-
 
 if __name__ == '__main__':
     main()
