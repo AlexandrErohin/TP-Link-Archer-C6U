@@ -3,7 +3,7 @@ from ipaddress import IPv4Address
 from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
-from tplinkrouterc6u import Connection, ClientException, ClientError
+from tplinkrouterc6u import Connection, ClientException
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 
 

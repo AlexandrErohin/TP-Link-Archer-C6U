@@ -4,7 +4,7 @@ from unittest import TestCase, main
 
 from macaddress import EUI48
 
-from tplinkrouterc6u import IPv4Status, ClientError
+from tplinkrouterc6u import IPv4Status
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, Status)

@@ -8,7 +8,7 @@ from macaddress import EUI48
 import requests
 from requests import Session
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.exception import ClientException, ClientError
+from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus

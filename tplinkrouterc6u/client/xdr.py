@@ -10,7 +10,7 @@ from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, IPv4Status,
                                               Status)
-from tplinkrouterc6u.common.exception import ClientException, ClientError
+from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 

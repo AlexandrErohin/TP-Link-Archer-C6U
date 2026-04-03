@@ -10,7 +10,6 @@ from tplinkrouterc6u import (
     IPv4Status,
     Device,
     ClientException,
-    ClientError,
     VPN,
     VpnClientStatus,
     VpnClientServer,

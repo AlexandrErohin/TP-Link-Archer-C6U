@@ -10,7 +10,6 @@ from tplinkrouterc6u import (
     Device,
     IPv4Status,
     LTEStatus,
-    ClientError,
 )
 
 

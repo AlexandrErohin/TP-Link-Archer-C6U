@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 from unittest.mock import Mock
 
-from tplinkrouterc6u import TPLinkSG108EClient, ClientError
+from tplinkrouterc6u import TPLinkSG108EClient
 from tplinkrouterc6u.client.sg108e import parse_script_variables
 
 
