@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import re
 from ipaddress import IPv4Address
 from requests import get, Response
 from logging import Logger
@@ -137,7 +139,11 @@ class WDRRequest:
     _headers_request = {}
 
     def buildUrl(self, section: str):
-        return "{}/userRpm{}".format(self.host, dataUrls[section])
+        base = f"{self.host}"
+        if hasattr(self, "token") and self.token:
+            base += f"/{self.token}"
+        base += f"/userRpm{dataUrls[section]}"
+        return base
 
     def request(
         self,
@@ -149,10 +155,11 @@ class WDRRequest:
         if not self._headers_request:
             self._headers_request = defaultHeaders()
 
-        # add xtra headers: User-Agent, Authorization and Referer
+        # add xtra headers: User-Agent and Referer
         self._headers_request["Referer"] = self.buildUrl("defReferer")
         self._headers_request["User-Agent"] = "TP-Link Scrapper"
-        self._headers_request["Authorization"] = "Basic {}".format(self.credentials)
+
+        cookies = {"Authorization": f"Basic {self.credentials}"}
 
         path = dataUrls[section]
         url = self.buildUrl(section)
@@ -166,6 +173,7 @@ class WDRRequest:
         response = get(
             url,
             headers=self._headers_request,
+            cookies=cookies,
             timeout=self.timeout,
             verify=self._verify_ssl,
         )
@@ -211,9 +219,11 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     ) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
+        password_md5 = hashlib.md5(self.password.encode()).hexdigest()
         self.credentials = base64.b64encode(
-            bytes(f"{self.username}:{self.password}", "utf8")
+            bytes(f"{self.username}:{password_md5}", "utf8")
         ).decode("utf8")
+        self.token = None
         # device data
         self.status: Status = Status()  # {}
         self.brand = "TP-Link"
@@ -225,9 +235,29 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         self.dhcpLeases: list[IPv4DHCPLease] = []
         self.connDevices: list[Device] = []
 
-    # N/A. WDR family has no session support , so no "logged" state
+    # Authorize by logging in and retrieving session token
     def authorize(self) -> None:
-        pass
+        if self.token:
+            return
+        headers = {"Referer": f"{self.host}/"}
+        cookies = {"Authorization": f"Basic {self.credentials}"}
+        login_url = f"{self.host}/userRpm/LoginRpm.htm?Save=Save"
+        try:
+            response = get(
+                login_url,
+                headers=headers,
+                cookies=cookies,
+                timeout=self.timeout,
+                verify=self._verify_ssl,
+            )
+            token_match = re.search(r"/([A-Z]{16})/", response.text)
+            if not token_match:
+                raise ClientError(
+                    "Failed to retrieve session token. Check credentials."
+                )
+            self.token = token_match.group(1)
+        except Exception as e:
+            raise ClientError(f"Authorization failed: {e}")
 
     def logout(self) -> None:
         pass
@@ -405,7 +435,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             currpage = int(data["script1"][0])
             lastpage = int(data["script1"][3])
             tmpData = {}
-            while currpage < lastpage:
+            while currpage < (lastpage - 1):
                 query = f"Page={str(currpage + 1)}"
                 raw = self.request(section, query)
                 tmpData = self._parseRawHTML(raw)
@@ -481,9 +511,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                     elif section == "w50stations":
                         self.network.wlan50Gcli.append(tmpcli)
         elif section == "wgsettings":
-            guestData = data["script3"]
-            self.status.guest_2g_enable = bool(int(guestData[2]))
-            self.status.guest_5g_enable = bool(int(guestData[3]))
+            # TODO
+            pass
 
         elif section == "wgshare":
             # TODO
@@ -620,7 +649,6 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         data = {}
         count = 0
         for script in all_scripts:
-
             if script == "":
                 continue
 

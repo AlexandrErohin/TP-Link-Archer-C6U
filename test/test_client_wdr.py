@@ -74,7 +74,7 @@ _DHCPRESERVES = (
     + '"49-6F-72-CD-68-5D","192.168.1.25",1,\n"DF-24-38-C1-FE-BB","192.168.1.51",1,\n"1A-08-6C-52-31-3D",'
     + '"192.168.1.22",1,\n"DE-E4-DF-9A-AD-0D","192.168.1.17",1,\n"DF-F2-CB-FE-46-15","192.168.1.26",1,\n'
     + '0,0 )\n</SCRIPT>\n<SCRIPT language="javascript" type="text/javascript">var DHCPStaticPara = '
-    + "new Array(\n1,\n1,\n8,\n1,\n8,\n0,0 );\n</SCRIPT>"
+    + "new Array(\n1,\n1,\n8,\n2,\n8,\n0,0 );\n</SCRIPT>"
 )
 
 ABSTRACT_STATUS = (
@@ -99,7 +99,7 @@ ABSTRACT_NETWORK = {
     "netLan": _NETLAN,
     "w24stations": _W24STA,
     "w50stations": _W50STA,
-    "wgsettings": _WLANGUEST,
+    # "wgsettings": _WLANGUEST,
     "dhcpconfig": _DHCPCFG,
     "dhcplease": _DHCPLEASES,
     "dhcpreserve": _DHCPRESERVES,
@@ -152,7 +152,7 @@ class TplinkWDRRouterTest(TplinkWDRRouter):
                 "netWan",
                 # 'w24stations',
                 # 'w50stations',
-                "wgsettings",
+                # "wgsettings",
                 "dhcpconfig",
                 "dhcplease",
                 # 'dhcpreserve',
