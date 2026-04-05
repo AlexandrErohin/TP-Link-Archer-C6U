@@ -433,9 +433,9 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             raw = self.request(section, "")
             data = self._parseRawHTML(raw)
             currpage = int(data["script1"][0])
-            lastpage = int(data["script1"][3])
+            lastpage = int(data["script1"][3]) - 1
             tmpData = {}
-            while currpage < (lastpage - 1):
+            while currpage < lastpage:
                 query = f"Page={str(currpage + 1)}"
                 raw = self.request(section, query)
                 tmpData = self._parseRawHTML(raw)
