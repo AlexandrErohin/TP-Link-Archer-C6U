@@ -55,6 +55,12 @@ class TPLinkMRClientBase(AbstractRouter):
         Connection.GUEST_5G: '1,2,1,0,0,0',
     }
 
+    HOST_TYPE_MAP = {
+        '2.4g': Connection.HOST_2G,
+        '5g': Connection.HOST_5G,
+        'wired': Connection.WIRED,
+    }
+
     # Router name to be included in logs for example,
     # or to be redefined by subclasses.
     ROUTER_NAME = "TP Link Router MR"
@@ -220,6 +226,19 @@ class TPLinkMRClientBase(AbstractRouter):
                     '')
             devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
             devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
+
+        try:
+            stat_acts = [self.ActItem(self.ActItem.GL, 'STAT_ENTRY')]
+            _, stat_values = self.req_act(stat_acts)
+            for item in self._to_list(stat_values):
+                mac = item.get('macAddress')
+                if mac and mac in devices:
+                    devices[mac].down_speed = int(item.get('currBytesRx', 0))
+                    devices[mac].up_speed = int(item.get('currBytesTx', 0))
+                    devices[mac].traffic_usage = (int(item.get('totalBytesRx', 0)) +
+                                                  int(item.get('totalBytesTx', 0)))
+        except Exception:
+            pass
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
