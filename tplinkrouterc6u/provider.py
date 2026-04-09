@@ -15,6 +15,7 @@ from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
+from tplinkrouterc6u.client.vx220 import TPLinkVX220Client
 from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
@@ -31,6 +32,7 @@ class TplinkRouterProvider:
         for client in [
                        TplinkC5400XRouter,
                        TPLinkVRClient,
+                       TPLinkVX220Client,
                        TPLinkEXClientGCM,
                        TPLinkEXClient,
                        TPLinkMRClientGCM,
