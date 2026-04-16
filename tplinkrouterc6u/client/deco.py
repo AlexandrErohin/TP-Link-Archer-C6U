@@ -2,8 +2,6 @@ from base64 import b64decode
 from json import dumps
 from requests.exceptions import ConnectTimeout
 from collections.abc import Callable
-from macaddress import EUI48
-from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
@@ -71,14 +69,14 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         status = Status()
         wan_info = get_value(data, ['wan', 'ip_info']) or get_value(data, ['wan', 'mobile_cpe']) or {}
         element = wan_info.get('mac')
-        status._wan_macaddr = EUI48(element) if element else None
-        status._lan_macaddr = EUI48(get_value(data, ['lan', 'ip_info', 'mac']))
+        status._wan_macaddr = get_mac(element) if element else None
+        status._lan_macaddr = get_mac(get_value(data, ['lan', 'ip_info', 'mac']))
         element = wan_info.get('ip')
-        status._wan_ipv4_addr = IPv4Address(element) if element else None
+        status._wan_ipv4_addr = get_ip(element) if element else None
         element = get_value(data, ['lan', 'ip_info', 'ip'])
-        status._lan_ipv4_addr = IPv4Address(element) if element else None
+        status._lan_ipv4_addr = get_ip(element) if element else None
         element = wan_info.get('gateway')
-        status._wan_ipv4_gateway = IPv4Address(element) if element else None
+        status._wan_ipv4_gateway = get_ip(element) if element else None
         status.conn_type = get_value(data, ['wan', 'dial_type'])
 
         data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
@@ -133,13 +131,13 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         element = wan_info.get('mac')
         ipv4_status._wan_macaddr = get_mac(element if element else '00:00:00:00:00:00')
         element = wan_info.get('ip')
-        ipv4_status._wan_ipv4_ipaddr = IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_ipaddr = get_ip(element) if element else None
         element = wan_info.get('gateway')
-        ipv4_status._wan_ipv4_gateway = IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_gateway = get_ip(element) if element else None
         element = get_value(data, ['wan', 'dial_type'])
         ipv4_status._wan_ipv4_conntype = element if element else ''
         element = wan_info.get('mask')
-        ipv4_status._wan_ipv4_netmask = IPv4Address(element) if element else None
+        ipv4_status._wan_ipv4_netmask = get_ip(element) if element else None
         element = wan_info.get('dns1')
         ipv4_status._wan_ipv4_pridns = get_ip(element if element else '0.0.0.0')
         element = wan_info.get('dns2')

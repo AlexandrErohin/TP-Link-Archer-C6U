@@ -4,8 +4,6 @@ from time import time, sleep
 from urllib.parse import quote
 from requests import Session, Response
 from datetime import timedelta, datetime
-from macaddress import EUI48
-from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM
@@ -175,15 +173,15 @@ class TPLinkMRClientBase(AbstractRouter):
         if values['0'].__class__ == list:
             values['0'] = values['0'][0]
 
-        status._lan_macaddr = EUI48(values['0']['X_TP_MACAddress'])
-        status._lan_ipv4_addr = IPv4Address(values['0']['IPInterfaceIPAddress'])
+        status._lan_macaddr = get_mac(values['0']['X_TP_MACAddress'])
+        status._lan_ipv4_addr = get_ip(values['0']['IPInterfaceIPAddress'])
 
         for item in self._to_list(values.get('1')):
             if int(item['enable']) == 0 and values.get('1').__class__ == list:
                 continue
-            status._wan_macaddr = EUI48(item['MACAddress']) if item.get('MACAddress') else None
-            status._wan_ipv4_addr = IPv4Address(item['externalIPAddress'])
-            status._wan_ipv4_gateway = IPv4Address(item['defaultGateway'])
+            status._wan_macaddr = get_mac(item['MACAddress']) if item.get('MACAddress') else None
+            status._wan_ipv4_addr = get_ip(item['externalIPAddress'])
+            status._wan_ipv4_gateway = get_ip(item['defaultGateway'])
             status.conn_type = item.get('name', '')
 
         if values['2'].__class__ != list:
@@ -212,8 +210,8 @@ class TPLinkMRClientBase(AbstractRouter):
             elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
             devices[val['MACAddress']] = Device(conn,
-                                                EUI48(val['MACAddress']),
-                                                IPv4Address(val['IPAddress']),
+                                                get_mac(val['MACAddress']),
+                                                get_ip(val['IPAddress']),
                                                 val['hostName'])
 
         for val in self._to_list(values.get('5')):
@@ -221,8 +219,8 @@ class TPLinkMRClientBase(AbstractRouter):
                 status.wifi_clients_total += 1
                 devices[val['associatedDeviceMACAddress']] = Device(
                     Connection.HOST_2G,
-                    EUI48(val['associatedDeviceMACAddress']),
-                    IPv4Address('0.0.0.0'),
+                    get_mac(val['associatedDeviceMACAddress']),
+                    get_ip('0.0.0.0'),
                     '')
             devices[val['associatedDeviceMACAddress']].packets_sent = int(val['X_TP_TotalPacketsSent'])
             devices[val['associatedDeviceMACAddress']].packets_received = int(val['X_TP_TotalPacketsReceived'])
@@ -255,8 +253,8 @@ class TPLinkMRClientBase(AbstractRouter):
         for item in self._to_list(values):
             ipv4_reservations.append(
                 IPv4Reservation(
-                    EUI48(item['chaddr']),
-                    IPv4Address(item['yiaddr']),
+                    get_mac(item['chaddr']),
+                    get_ip(item['yiaddr']),
                     item.get('description', ''),
                     bool(int(item['enable']))
                 ))
@@ -275,8 +273,8 @@ class TPLinkMRClientBase(AbstractRouter):
             lease_time = item['leaseTimeRemaining']
             dhcp_leases.append(
                 IPv4DHCPLease(
-                    EUI48(item['MACAddress']),
-                    IPv4Address(item['IPAddress']),
+                    get_mac(item['MACAddress']),
+                    get_ip(item['IPAddress']),
                     item['hostName'],
                     str(timedelta(seconds=int(lease_time))) if lease_time.isdigit() else 'Permanent',
                 ))

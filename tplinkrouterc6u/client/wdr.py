@@ -1,9 +1,7 @@
 import base64
-from ipaddress import IPv4Address
 from requests import get, Response
 from logging import Logger
-from macaddress import EUI48
-from tplinkrouterc6u.common.helper import get_ip
+from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientError
 from tplinkrouterc6u.common.dataclass import (
@@ -429,7 +427,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
 
         if section == "netLan":
             lanData = data["script0"]
-            self.ipv4status._lan_ipv4_netmask = IPv4Address(lanData[3])
+            self.ipv4status._lan_ipv4_netmask = get_ip(lanData[3])
             self.network.ipv4["igmpProxy"] = lanData[4]
             self.ipv4status.lan_ipv4_dhcp_enable = False
 
@@ -441,7 +439,7 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             self.ipv4status._wan_ipv4_conntype = connType
             self.status.conn_type = connType
 
-            self.ipv4status._wan_ipv4_netmask = IPv4Address(wanData[14] or "0.0.0.0")
+            self.ipv4status._wan_ipv4_netmask = get_ip(wanData[14] or "0.0.0.0")
             dns = ["0.0.0.0", "0.0.0.0"]
             # self.ipv4status._wan_ipv4_pridns = '0.0.0.0'
             # self.ipv4status._wan_ipv4_snddns = '0.0.0.0'
@@ -449,8 +447,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
                 dns[0] = wanData[20]
                 dns[1] = wanData[22]
 
-            self.ipv4status._wan_ipv4_pridns = IPv4Address(dns[0])
-            self.ipv4status._wan_ipv4_snddns = IPv4Address(dns[1])
+            self.ipv4status._wan_ipv4_pridns = get_ip(dns[0])
+            self.ipv4status._wan_ipv4_snddns = get_ip(dns[1])
 
             self.hostname = wanData[26]
 
@@ -527,8 +525,8 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
             self.dhcpLeases = []
             for i in range(0, len(data["script0"]), 4):
                 item = IPv4DHCPLease(
-                    EUI48(data["script0"][i + 1]),
-                    IPv4Address(data["script0"][i + 2]),
+                    get_mac(data["script0"][i + 1]),
+                    get_ip(data["script0"][i + 2]),
                     data["script0"][i],
                     data["script0"][i + 3],
                 )
@@ -547,16 +545,16 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
         self.status = Status()
         self.status.wan_ipv4_uptime = int(data["script0"][8])
         self.status._lan_ipv4_addr = get_ip(data["script1"][1])
-        self.status._lan_macaddr = EUI48(data["script1"][0])
+        self.status._lan_macaddr = get_mac(data["script1"][0])
 
         self.ipv4status._lan_ipv4_ipaddr = get_ip(data["script1"][1])
-        self.ipv4status._lan_macaddr = EUI48(data["script1"][0])
+        self.ipv4status._lan_macaddr = get_mac(data["script1"][0])
 
-        self.status._wan_macaddr = EUI48(data["script5"][1])
+        self.status._wan_macaddr = get_mac(data["script5"][1])
         self.status._wan_ipv4_addr = get_ip(data["script5"][2])
         self.status._wan_ipv4_gateway = get_ip(data["script5"][7])
 
-        self.ipv4status._wan_macaddr = EUI48(data["script5"][1])
+        self.ipv4status._wan_macaddr = get_mac(data["script5"][1])
         self.ipv4status._wan_ipv4_ipaddr = get_ip(data["script5"][2])
         self.ipv4status._wan_ipv4_netmask = ""
         self.ipv4status._wan_ipv4_gateway = get_ip(data["script5"][7])
