@@ -2,11 +2,10 @@ from dataclasses import dataclass
 from logging import Logger
 from urllib import parse
 from collections import defaultdict
-from ipaddress import IPv4Address
 import re
-from macaddress import EUI48
 import requests
 from requests import Session
+from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
@@ -167,11 +166,11 @@ class TplinkRE330Router(AbstractRouter):
         mapped_devices = self._parse_devices(device_data_response)
 
         status = Status()
-        status._wan_macaddr = EUI48(network_info['wan_mac'])
-        status._lan_macaddr = EUI48(network_info['lan_mac'])
-        status._lan_ipv4_addr = IPv4Address(network_info['lan_ip'])
-        status._wan_ipv4_addr = IPv4Address(network_info['wan_ip'])
-        status._wan_ipv4_gateway = IPv4Address(network_info['gateway_ip'])
+        status._wan_macaddr = get_mac(network_info['wan_mac'])
+        status._lan_macaddr = get_mac(network_info['lan_mac'])
+        status._lan_ipv4_addr = get_ip(network_info['lan_ip'])
+        status._wan_ipv4_addr = get_ip(network_info['wan_ip'])
+        status._wan_ipv4_gateway = get_ip(network_info['gateway_ip'])
         status.wan_ipv4_uptime = int(network_info['uptime']) // 100
 
         status.wifi_2g_enable = wifi_status[Connection.HOST_2G]
@@ -251,17 +250,17 @@ class TplinkRE330Router(AbstractRouter):
         }
 
         ipv4status = IPv4Status()
-        ipv4status._wan_macaddr = EUI48(network_info['wan_mac'])
-        ipv4status._wan_ipv4_ipaddr = IPv4Address(network_info['wan_ip'])
-        ipv4status._wan_ipv4_gateway = IPv4Address(network_info['gateway_ip'])
+        ipv4status._wan_macaddr = get_mac(network_info['wan_mac'])
+        ipv4status._wan_ipv4_ipaddr = get_ip(network_info['wan_ip'])
+        ipv4status._wan_ipv4_gateway = get_ip(network_info['gateway_ip'])
         ipv4status._wan_ipv4_conntype = RouterConstants.CONNECTION_TYPE_MAP[network_info['link_type']]
-        ipv4status._wan_ipv4_netmask = IPv4Address(network_info['wan_mask'])
-        ipv4status._wan_ipv4_pridns = IPv4Address(network_info['dns_1'])
-        ipv4status._wan_ipv4_snddns = IPv4Address(network_info['dns_2'])
-        ipv4status._lan_macaddr = EUI48(network_info['lan_mac'])
-        ipv4status._lan_ipv4_ipaddr = IPv4Address(network_info['lan_ip'])
+        ipv4status._wan_ipv4_netmask = get_ip(network_info['wan_mask'])
+        ipv4status._wan_ipv4_pridns = get_ip(network_info['dns_1'])
+        ipv4status._wan_ipv4_snddns = get_ip(network_info['dns_2'])
+        ipv4status._lan_macaddr = get_mac(network_info['lan_mac'])
+        ipv4status._lan_ipv4_ipaddr = get_ip(network_info['lan_ip'])
         ipv4status.lan_ipv4_dhcp_enable = network_info['dhcp_enabled'] == '1'
-        ipv4status._lan_ipv4_netmask = IPv4Address(network_info['lan_mask'])
+        ipv4status._lan_ipv4_netmask = get_ip(network_info['lan_mask'])
         return ipv4status
 
     def get_ipv4_reservations(self) -> list[IPv4Reservation]:
@@ -276,7 +275,7 @@ class TplinkRE330Router(AbstractRouter):
 
         mapped_reservations: list[IPv4Reservation] = []
         for reservation in filtered_reservations:
-            reservation_to_add = IPv4Reservation(EUI48(reservation['mac']), IPv4Address(reservation['ip']),
+            reservation_to_add = IPv4Reservation(get_mac(reservation['mac']), get_ip(reservation['ip']),
                                                  reservation['name'], reservation['dhcpsEnable'] == '1')
             mapped_reservations.append(reservation_to_add)
         return mapped_reservations
@@ -294,7 +293,7 @@ class TplinkRE330Router(AbstractRouter):
 
         mapped_leases: list[IPv4DHCPLease] = []
         for lease in filtered_leases:
-            lease_to_add = IPv4DHCPLease(EUI48(lease['mac']), IPv4Address(lease['ip']),
+            lease_to_add = IPv4DHCPLease(get_mac(lease['mac']), get_ip(lease['ip']),
                                          lease['hostName'], f'expires {lease["expires"]}')
             mapped_leases.append(lease_to_add)
 
@@ -318,7 +317,7 @@ class TplinkRE330Router(AbstractRouter):
             else:
                 connection_type = Connection.UNKNOWN
 
-            device_to_add = Device(connection_type, EUI48(device['mac']), IPv4Address(device['ip']), device['name'])
+            device_to_add = Device(connection_type, get_mac(device['mac']), get_ip(device['ip']), device['name'])
             device_to_add.up_speed = 0  # Not supported by the router
             device_to_add.down_speed = 0  # Not supported by the router
             device_to_add.active = device['online'] == '1'

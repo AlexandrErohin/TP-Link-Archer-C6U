@@ -3,8 +3,6 @@ from re import search
 from json import loads
 from urllib.parse import urlencode
 from requests import post, Response
-from macaddress import EUI48
-from ipaddress import IPv4Address
 from logging import Logger
 from urllib.parse import parse_qsl
 from json import dumps
@@ -295,11 +293,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
 
         status = Status()
-        status._wan_macaddr = EUI48(data['wan_macaddr']) if 'wan_macaddr' in data and data['wan_macaddr'] else None
-        status._lan_macaddr = EUI48(data['lan_macaddr'])
-        status._wan_ipv4_addr = IPv4Address(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
-        status._lan_ipv4_addr = IPv4Address(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
-        status._wan_ipv4_gateway = IPv4Address(
+        status._wan_macaddr = get_mac(data['wan_macaddr']) if 'wan_macaddr' in data and data['wan_macaddr'] else None
+        status._lan_macaddr = get_mac(data['lan_macaddr'])
+        status._wan_ipv4_addr = get_ip(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
+        status._lan_ipv4_addr = get_ip(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
+        status._wan_ipv4_gateway = get_ip(
             data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.mem_usage = data.get('mem_usage')
@@ -382,7 +380,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 if item['mac'] not in devices:
                     status.wifi_clients_total += 1
                     type = self._map_wire_type(item.get('type'))
-                    devices[item['mac']] = Device(type, EUI48(item['mac']), IPv4Address('0.0.0.0'),
+                    devices[item['mac']] = Device(type, get_mac(item['mac']), get_ip('0.0.0.0'),
                                                   '')
                 devices[item['mac']].packets_sent = item.get('txpkts')
                 devices[item['mac']].packets_received = item.get('rxpkts')
@@ -420,7 +418,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         for item in data:
             ipv4_reservations.append(
-                IPv4Reservation(EUI48(item['mac']), IPv4Address(item['ip']), item['comment'],
+                IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), item['comment'],
                                 self._str2bool(item['enable'])))
 
         return ipv4_reservations
@@ -431,7 +429,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         for item in data:
             dhcp_leases.append(
-                IPv4DHCPLease(EUI48(item['macaddr']), IPv4Address(item['ipaddr']), item['name'],
+                IPv4DHCPLease(get_mac(item['macaddr']), get_ip(item['ipaddr']), item['name'],
                               item['leasetime']))
 
         return dhcp_leases

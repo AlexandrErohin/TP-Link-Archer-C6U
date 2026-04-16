@@ -1,11 +1,7 @@
 from datetime import timedelta
-from ipaddress import IPv4Address
 from logging import Logger
 from urllib.parse import unquote
-
-from macaddress import EUI48
 from requests import Session
-
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, IPv4Status,
@@ -146,8 +142,8 @@ class TPLinkXDRClient(AbstractRouter):
         for item_map in data['ip_mac_bind']['user_bind']:
             item = item_map[next(iter(item_map))]
             ipv4_reservations.append(IPv4Reservation(
-                EUI48(item['mac']),
-                IPv4Address(item['ip']),
+                get_mac(item['mac']),
+                get_ip(item['ip']),
                 item['hostname'],
                 True,
             ))

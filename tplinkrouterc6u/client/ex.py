@@ -1,8 +1,6 @@
 from base64 import b64encode
 from json import loads
 from datetime import timedelta
-from macaddress import EUI48
-from ipaddress import IPv4Address
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
@@ -105,15 +103,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
         if values[0].__class__ == list:
             values[0] = values[0][0]
 
-        status._lan_macaddr = EUI48(values[0]['MACAddress'])
-        status._lan_ipv4_addr = IPv4Address(values[0]['IPAddress'])
+        status._lan_macaddr = get_mac(values[0]['MACAddress'])
+        status._lan_ipv4_addr = get_ip(values[0]['IPAddress'])
 
         for item in values[1]:
             if int(item['enable']) == 0 and values[1].__class__ == list:
                 continue
-            status._wan_macaddr = EUI48(item['MACAddr']) if item.get('MACAddr') else None
-            status._wan_ipv4_addr = IPv4Address(item['connIPv4Address']) if item.get('connIPv4Address') else None
-            status._wan_ipv4_gateway = IPv4Address(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
+            status._wan_macaddr = get_mac(item['MACAddr']) if item.get('MACAddr') else None
+            status._wan_ipv4_addr = get_ip(item['connIPv4Address']) if item.get('connIPv4Address') else None
+            status._wan_ipv4_gateway = get_ip(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
 
         if values[2]:
             if values[2].__class__ != list:
@@ -141,7 +139,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
             elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
             devices[val['physAddress']] = Device(conn,
-                                                 EUI48(val['physAddress']),
+                                                 get_mac(val['physAddress']),
                                                  get_ip(val['IPAddress']),
                                                  val['hostName'])
 
@@ -166,8 +164,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
         for item in values[0]:
             ipv4_reservations.append(
                 IPv4Reservation(
-                    EUI48(item['chaddr']),
-                    IPv4Address(item['yiaddr']),
+                    get_mac(item['chaddr']),
+                    get_ip(item['yiaddr']),
                     '',
                     bool(int(item['enable']))
                 ))
@@ -186,8 +184,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
             lease_time = item['leaseTimeRemaining']
             dhcp_leases.append(
                 IPv4DHCPLease(
-                    EUI48(item['physAddress']),
-                    IPv4Address(item['IPAddress']),
+                    get_mac(item['physAddress']),
+                    get_ip(item['IPAddress']),
                     item['hostName'],
                     str(timedelta(seconds=int(lease_time))) if (lease_time.isdigit()
                                                                 and int(lease_time)) > 0 else 'Permanent',
