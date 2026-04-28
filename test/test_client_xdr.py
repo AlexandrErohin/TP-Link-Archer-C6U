@@ -630,7 +630,6 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertIsInstance(ipv4_status.lan_ipv4_netmask_address, IPv4Address)
         self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('0.0.0.0'))
 
-
     def test_authorize_new_firmware_md5(self) -> None:
         from hashlib import md5
 
