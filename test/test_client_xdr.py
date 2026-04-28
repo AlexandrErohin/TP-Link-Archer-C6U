@@ -631,5 +631,289 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertEqual(ipv4_status.lan_ipv4_netmask_address, get_ip('0.0.0.0'))
 
 
+    def test_authorize_new_firmware_md5(self) -> None:
+        from hashlib import md5
+
+        calls = []
+
+        class SessionTest:
+            def post(self, url, json, timeout, verify):
+                calls.append({'url': url, 'json': json})
+
+                class ResponseTest:
+                    def __init__(self, payload):
+                        self._payload = payload
+
+                    def json(self):
+                        return self._payload
+
+                if json.get('user_management', {}).get('get_encrypt_info', 'missing') is None:
+                    return ResponseTest({
+                        'nonce': 'ABCDEF12',
+                        'key': 'fakepem',
+                        'encrypt_type': ['3'],
+                        'password_encrypt_type': '-3',
+                        'compatible_password_length_limit': '32',
+                        'error_code': 0,
+                    })
+                return ResponseTest({'error_code': 0, 'stok': 'NEW_FW_TOKEN'})
+
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = SessionTest()
+        client.authorize()
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0]['json'],
+                         {'method': 'do', 'user_management': {'get_encrypt_info': None}})
+        expected_hash = md5(b'mypassword:ABCDEF12').hexdigest()
+        self.assertEqual(calls[1]['json'], {
+            'method': 'do',
+            'login': {'password': expected_hash, 'encrypt_type': '3'},
+        })
+        self.assertEqual(client._stok, 'NEW_FW_TOKEN')
+
+    def test_authorize_legacy_when_encrypt_type_lacks_3(self) -> None:
+        # Asserts the exact legacy body so any drift in the backward-compatible
+        # payload (extra fields, missing fields) breaks the test.
+        calls = []
+
+        class SessionTest:
+            def post(self, url, json, timeout, verify):
+                calls.append({'url': url, 'json': json, 'timeout': timeout})
+
+                class ResponseTest:
+                    def __init__(self, payload):
+                        self._payload = payload
+
+                    def json(self):
+                        return self._payload
+
+                if json.get('user_management', {}).get('get_encrypt_info', 'missing') is None:
+                    return ResponseTest({'encrypt_type': [], 'error_code': 0})
+                return ResponseTest({'error_code': 0, 'stok': 'LEGACY_TOKEN'})
+
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = SessionTest()
+        client.authorize()
+
+        self.assertEqual(len(calls), 2)
+        legacy_body = calls[1]['json']
+        self.assertEqual(legacy_body, {
+            'method': 'do',
+            'login': {
+                'password': TPLinkXDRClient._encode_password('mypassword'),
+            },
+        })
+        # Pin top-level + login key order so future refactors that preserve
+        # dict equality but change serialized JSON byte order will fail here.
+        self.assertEqual(list(legacy_body.keys()), ['method', 'login'])
+        self.assertEqual(list(legacy_body['login'].keys()), ['password'])
+        self.assertEqual(calls[1]['timeout'], 30)
+        self.assertEqual(client._stok, 'LEGACY_TOKEN')
+
+    def _make_probe_session(self, probe_payload, login_payload):
+        calls = []
+
+        class SessionTest:
+            def post(self, url, json, timeout, verify):
+                calls.append({'url': url, 'json': json, 'timeout': timeout})
+
+                class ResponseTest:
+                    def __init__(self, payload):
+                        self._payload = payload
+
+                    def json(self):
+                        return self._payload
+
+                if json.get('user_management', {}).get('get_encrypt_info', 'missing') is None:
+                    return ResponseTest(probe_payload)
+                return ResponseTest(login_payload)
+
+        return SessionTest(), calls
+
+    def test_authorize_normalizes_scalar_encrypt_type(self) -> None:
+        from hashlib import md5
+
+        session, calls = self._make_probe_session(
+            probe_payload={'nonce': 'NONCE1', 'encrypt_type': '3', 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'SCALAR_TOK'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertEqual(calls[1]['json']['login'].get('encrypt_type'), '3')
+        self.assertEqual(calls[1]['json']['login']['password'],
+                         md5(b'mypassword:NONCE1').hexdigest())
+        self.assertEqual(client._stok, 'SCALAR_TOK')
+
+    def test_authorize_normalizes_integer_encrypt_type(self) -> None:
+        from hashlib import md5
+
+        session, calls = self._make_probe_session(
+            probe_payload={'nonce': 'NONCE2', 'encrypt_type': [3], 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'INT_TOK'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertEqual(calls[1]['json']['login'].get('encrypt_type'), '3')
+        self.assertEqual(calls[1]['json']['login']['password'],
+                         md5(b'mypassword:NONCE2').hexdigest())
+
+    def test_authorize_falls_back_when_probe_error_code_nonzero(self) -> None:
+        session, calls = self._make_probe_session(
+            probe_payload={'nonce': 'BAD', 'encrypt_type': ['3'], 'error_code': -1},
+            login_payload={'error_code': 0, 'stok': 'FALLBACK_TOK_ERR'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertNotIn('encrypt_type', calls[1]['json']['login'])
+        self.assertEqual(calls[1]['json']['login']['password'],
+                         TPLinkXDRClient._encode_password('mypassword'))
+        self.assertEqual(client._stok, 'FALLBACK_TOK_ERR')
+
+    def test_authorize_falls_back_when_nonce_missing(self) -> None:
+        session, calls = self._make_probe_session(
+            probe_payload={'encrypt_type': ['3'], 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'FALLBACK_TOK_NONCE'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertNotIn('encrypt_type', calls[1]['json']['login'])
+        self.assertEqual(client._stok, 'FALLBACK_TOK_NONCE')
+
+    def test_authorize_uses_short_probe_timeout(self) -> None:
+        session, calls = self._make_probe_session(
+            probe_payload={'encrypt_type': [], 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'TOK'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertEqual(calls[0]['timeout'], 5)
+        self.assertEqual(calls[1]['timeout'], 30)
+
+    def test_authorize_probe_timeout_under_user_cap(self) -> None:
+        session, calls = self._make_probe_session(
+            probe_payload={'encrypt_type': [], 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'TOK'},
+        )
+        client = TPLinkXDRClient('', 'mypassword', timeout=2)
+        client._session = session
+        client.authorize()
+
+        self.assertEqual(calls[0]['timeout'], 2)
+        self.assertEqual(calls[1]['timeout'], 2)
+
+    def test_authorize_passes_through_non_numeric_timeout(self) -> None:
+        # Guards against TypeError when the caller passes a `requests`-style
+        # (connect, read) tuple or None — both must skip the min() cap.
+        for timeout_value in [(3, 10), None]:
+            with self.subTest(timeout=timeout_value):
+                session, calls = self._make_probe_session(
+                    probe_payload={'encrypt_type': [], 'error_code': 0},
+                    login_payload={'error_code': 0, 'stok': 'TOK'},
+                )
+                client = TPLinkXDRClient('', 'mypassword')
+                client.timeout = timeout_value
+                client._session = session
+                client.authorize()
+
+                self.assertEqual(calls[0]['timeout'], timeout_value)
+                self.assertEqual(calls[1]['timeout'], timeout_value)
+
+    def test_authorize_falls_back_on_non_iterable_encrypt_type(self) -> None:
+        # 3.0 stringifies to "3.0", not "3", so the MD5 path is NOT taken —
+        # this confirms scalars don't crash and don't accidentally match.
+        session, calls = self._make_probe_session(
+            probe_payload={'nonce': 'N', 'encrypt_type': 3.0, 'error_code': 0},
+            login_payload={'error_code': 0, 'stok': 'TOK_FALLBACK_FLOAT'},
+        )
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = session
+        client.authorize()
+
+        self.assertNotIn('encrypt_type', calls[1]['json']['login'])
+        self.assertEqual(client._stok, 'TOK_FALLBACK_FLOAT')
+
+    def test_authorize_falls_back_on_non_string_nonce(self) -> None:
+        for bad_nonce in (b'bytes', 12345, None, ''):
+            with self.subTest(bad_nonce=bad_nonce):
+                session, calls = self._make_probe_session(
+                    probe_payload={'nonce': bad_nonce, 'encrypt_type': ['3'],
+                                   'error_code': 0},
+                    login_payload={'error_code': 0, 'stok': 'TOK_BADNONCE'},
+                )
+                client = TPLinkXDRClient('', 'mypassword')
+                client._session = session
+                client.authorize()
+                self.assertNotIn('encrypt_type', calls[1]['json']['login'])
+                self.assertEqual(client._stok, 'TOK_BADNONCE')
+
+    def test_authorize_falls_back_on_request_exception(self) -> None:
+        from requests.exceptions import ConnectionError as RequestsConnectionError
+        calls = []
+
+        class SessionTest:
+            def __init__(self):
+                self._first = True
+
+            def post(self, url, json, timeout, verify):
+                calls.append({'url': url, 'json': json, 'timeout': timeout})
+                if self._first:
+                    self._first = False
+                    raise RequestsConnectionError('probe failed')
+
+                class ResponseTest:
+                    def json(self):
+                        return {'error_code': 0, 'stok': 'TOK_NET'}
+                return ResponseTest()
+
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = SessionTest()
+        client.authorize()
+
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn('encrypt_type', calls[1]['json']['login'])
+        self.assertEqual(client._stok, 'TOK_NET')
+
+    def test_authorize_falls_back_when_probe_errors(self) -> None:
+        calls = []
+
+        class SessionTest:
+            def post(self, url, json, timeout, verify):
+                calls.append({'url': url, 'json': json})
+
+                class ResponseTest:
+                    def __init__(self, payload, raise_on_json=False):
+                        self._payload = payload
+                        self._raise = raise_on_json
+
+                    def json(self):
+                        if self._raise:
+                            raise ValueError('not JSON')
+                        return self._payload
+
+                if json.get('user_management', {}).get('get_encrypt_info', 'missing') is None:
+                    return ResponseTest(None, raise_on_json=True)
+                return ResponseTest({'error_code': 0, 'stok': 'FALLBACK_TOKEN'})
+
+        client = TPLinkXDRClient('', 'mypassword')
+        client._session = SessionTest()
+        client.authorize()
+
+        self.assertEqual(len(calls), 2)
+        login_body = calls[1]['json']
+        self.assertNotIn('encrypt_type', login_body['login'])
+        self.assertEqual(client._stok, 'FALLBACK_TOKEN')
+
+
 if __name__ == '__main__':
     main()
