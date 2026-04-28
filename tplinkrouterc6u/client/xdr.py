@@ -1,7 +1,9 @@
 from datetime import timedelta
+from hashlib import md5
 from logging import Logger
 from urllib.parse import unquote
 from requests import Session
+from requests.exceptions import RequestException
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, IPv4Status,
@@ -30,12 +32,54 @@ class TPLinkXDRClient(AbstractRouter):
         return False
 
     def authorize(self) -> None:
-        response = self._session.post(self.host, json={
-            'method': 'do',
-            'login': {
-                'password': self._encode_password(self.password),
+        # New firmware (TL-7DR7270 1.0.18+) requires a `get_encrypt_info` probe
+        # for a nonce, then logs in with MD5(password+":"+nonce); legacy firmware
+        # rejects the probe and accepts the historic orgAuthPwd payload directly.
+        info = {}
+        # Cap probe at 5s so legacy devices that hang on the unknown call do
+        # not delay every login; pass non-numeric timeouts through unchanged.
+        probe_timeout = self.timeout
+        if isinstance(self.timeout, (int, float)):
+            probe_timeout = min(self.timeout, 5)
+        try:
+            info_resp = self._session.post(
+                self.host,
+                json={'method': 'do', 'user_management': {'get_encrypt_info': None}},
+                timeout=probe_timeout, verify=self._verify_ssl,
+            )
+            info = info_resp.json()
+        except (ValueError, RequestException):
+            info = {}
+
+        if not isinstance(info, dict):
+            info = {}
+
+        raw_encrypt_types = info.get('encrypt_type') or []
+        if isinstance(raw_encrypt_types, (list, tuple, set)):
+            encrypt_types = {str(t) for t in raw_encrypt_types}
+        else:
+            encrypt_types = {str(raw_encrypt_types)}
+
+        nonce = info.get('nonce')
+        if (info.get('error_code') == 0
+                and '3' in encrypt_types
+                and isinstance(nonce, str)
+                and nonce):
+            encrypted = md5('{}:{}'.format(self.password, nonce).encode('utf-8')).hexdigest()
+            login_body = {
+                'method': 'do',
+                'login': {'password': encrypted, 'encrypt_type': '3'},
             }
-        }, timeout=self.timeout, verify=self._verify_ssl)
+        else:
+            login_body = {
+                'method': 'do',
+                'login': {'password': self._encode_password(self.password)},
+            }
+
+        response = self._session.post(
+            self.host, json=login_body,
+            timeout=self.timeout, verify=self._verify_ssl,
+        )
         try:
             data = response.json()
             self._stok = data['stok']
