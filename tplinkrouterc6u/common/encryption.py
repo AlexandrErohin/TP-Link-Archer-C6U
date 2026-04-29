@@ -59,6 +59,8 @@ class EncryptionWrapper:
 
     @staticmethod
     def _unpad(s):
+        if not s:
+            return s
         return s[:-ord(s[len(s) - 1:])]
 
     def _get_aes_string(self) -> str:
