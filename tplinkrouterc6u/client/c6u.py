@@ -227,6 +227,8 @@ class TplinkEncryption(TplinkRequest):
         return {'sign': sign, 'data': encrypted_data}
 
     def _decrypt_response(self, data: dict) -> dict:
+        if not data.get('data'):
+            return {}
         return loads(self._encryption.aes_decrypt(data['data']))
 
 
