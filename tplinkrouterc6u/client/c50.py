@@ -22,7 +22,6 @@ import re
 from base64 import b64decode, b64encode
 from binascii import b2a_hex
 from datetime import datetime
-from hashlib import md5
 from logging import Logger
 from random import randint
 from time import sleep, time
@@ -130,7 +129,7 @@ class TPLinkC50Client(TPLinkMRClient):
         ts = str(round(time() * 1000))
         aes_key = (ts + str(randint(100_000_000, 999_999_999)))[:16]
         aes_iv = (ts + str(randint(100_000_000, 999_999_999)))[:16]
-        pw_hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
+        pw_hash = self._hash
 
         login_plain = (
             f"8\r\n"
@@ -232,7 +231,7 @@ class TPLinkC50Client(TPLinkMRClient):
         act_types, act_data = self._fill_acts(acts)
         data_str = "&".join(act_types) + "\r\n" + "".join(act_data)
 
-        pw_hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
+        pw_hash = self._hash
         enc_data = self._aes_enc(data_str, self._aes_key, self._aes_iv)
         sign = self._make_sign(
             self._login_seq + len(enc_data),
@@ -408,6 +407,7 @@ class TPLinkWR841NClient(TPLinkC50Client):
 
     def authorize(self) -> None:
         """Override to perform GET / before login — required by TL-WR841N."""
+        # Start with a clean HTTP session
         self._session = Session()
         if not self._verify_ssl:
             self._session.verify = False
@@ -425,12 +425,13 @@ class TPLinkWR841NClient(TPLinkC50Client):
             verify=self._verify_ssl,
         )
 
+        # Now proceed with the standard C50 login flow
         nn, ee, seq = self._fetch_rsa_key()
 
         ts = str(round(time() * 1000))
         aes_key = (ts + str(randint(100_000_000, 999_999_999)))[:16]
         aes_iv = (ts + str(randint(100_000_000, 999_999_999)))[:16]
-        pw_hash = md5(f"{self.username}{self.password}".encode()).hexdigest()
+        pw_hash = self._hash
 
         login_plain = (
             f"8\r\n"
@@ -532,22 +533,22 @@ class TPLinkWR841NClient(TPLinkC50Client):
         externalIPAddress or defaultGateway.
 
         The upstream TPLinkMRClient calls IPv4Address('') for these fields,
-        which raises AddressValueError on Python 3.14+ when the router is in
+        which raises AddressValueError on Python 3.10+ when the router is in
         AP mode or bridge mode and has no WAN connection.  Temporarily replace
-        IPv4Address in the mr module with a null-safe version that returns None
+        IPv4Address in the mr module with a null-safe wrapper that returns None
         for empty strings, then restore it.
         """
         from ipaddress import IPv4Address
         import tplinkrouterc6u.client.mr as _mr
 
-        class _NullSafeIPv4Address(IPv4Address):
-            def __new__(cls, addr):
-                if not addr:
-                    return None
-                return super().__new__(cls)
+        def _null_safe_ipv4(addr):
+            """Wrapper that returns None for empty addresses."""
+            if not addr:
+                return None
+            return IPv4Address(addr)
 
         _orig = _mr.IPv4Address
-        _mr.IPv4Address = _NullSafeIPv4Address
+        _mr.IPv4Address = _null_safe_ipv4
         try:
             return super().get_status()
         finally:
