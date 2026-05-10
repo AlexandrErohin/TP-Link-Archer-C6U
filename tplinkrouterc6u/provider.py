@@ -1,5 +1,7 @@
 from logging import Logger
+import requests
 
+from tplinkrouterc6u.client.c20 import TplinkC20Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
@@ -28,6 +30,25 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
+        import requests
+        session = requests.Session()
+        # Archer C20 / older /userRpm/ plain-text login detection
+        # Identified by: pcPassword field + no AES key endpoint + /userRpm/ login path
+        try:
+            probe = session.get(
+                f"{host}/userRpm/LoginRpm.htm",
+                timeout=timeout,
+                verify=verify_ssl,
+            )
+            if (
+                probe.status_code == 200
+                and "pcPassword" in probe.text
+                and "RSAPublicKey" not in probe.text  # rules out modern encrypted routers
+            ):
+                return TplinkC20Router(host, password, username, logger, verify_ssl, timeout)
+        except Exception:
+            pass
+
         for client in [
                        TplinkC5400XRouter,
                        TPLinkVRClient,

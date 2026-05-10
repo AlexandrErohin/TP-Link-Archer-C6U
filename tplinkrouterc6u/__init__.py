@@ -14,6 +14,7 @@ from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
+from tplinkrouterc6u.client.c20 import TplinkC20Router
 from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
