@@ -44,6 +44,8 @@ from tplinkrouterc6u import (
     TPLinkSG108EClient,
     TplinkC80Router,
     TplinkWDRRouter,
+    TPLinkC50Client,
+    TPLinkWR841NClient,
     TplinkRE330Router,
     TplinkC3200Router,
     Connection
@@ -360,6 +362,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer C3200 v1
 - Archer C5400X V1
 - Archer C6 (v2.0, v3.0, v3.20, 4.0)
+- Archer C50 v4
 - Archer C60 v2.0
 - Archer C64 1.0
 - Archer C6U v1.0
@@ -421,6 +424,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-SG108E v6.0
 - TL-WA1201 3.0
 - TL-WA3001 v1.0
+- TL-WR841N v14
 - TL-WDR3600 V1
 - TL-XDR3010 V2
 - TL-XDR5410 1.0
