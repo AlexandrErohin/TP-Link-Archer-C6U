@@ -1321,6 +1321,20 @@ class TestTPLinkClient(TestCase):
         with self.assertRaises(ClientException):
             client.get_vpn_client_status()
 
+    def test_decrypt_response_empty_data_returns_empty_dict(self) -> None:
+        """Some firmwares (e.g. newer Deco) return {'data': ''} for endpoints they
+        do not implement. _decrypt_response must not raise on those — return {} so the
+        caller falls through to its standard 'invalid response' handling instead of
+        bubbling up an opaque ord()/JSON error."""
+        from tplinkrouterc6u.client.c6u import TplinkEncryption
+
+        class _Stub(TplinkEncryption):
+            def __init__(self):
+                pass
+
+        self.assertEqual(_Stub()._decrypt_response({'data': ''}), {})
+        self.assertEqual(_Stub()._decrypt_response({}), {})
+
 
 if __name__ == '__main__':
     main()
