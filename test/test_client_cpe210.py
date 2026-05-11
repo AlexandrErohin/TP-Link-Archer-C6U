@@ -238,5 +238,43 @@ class TestTPLinkCPE210Client(TestCase):
         self.assertEqual(iface.traffic_usage, expected)
 
 
+
+    def test_get_status_populates_lan_macaddr(self) -> None:
+        """get_status() must set _lan_macaddr so callers get a real MAC, not 'None'."""
+        client = TPLinkCPE210Client('http://192.168.0.25', 'password', username='admin')
+
+        def fake_get_data(path: str, **params):
+            if path == '/data/station.json':
+                return []
+            if path == '/data/interfaces.json':
+                return []
+            if path == '/data/info.json':
+                return {'lanMacAddr': '3C-84-6A-B5-74-74', 'deviceName': 'CPE210'}
+            raise AssertionError(f'unexpected path: {path}')
+
+        client._get_data = __import__('unittest.mock', fromlist=['Mock']).Mock(side_effect=fake_get_data)
+
+        status = client.get_status()
+
+        self.assertIsNotNone(status._lan_macaddr)
+        self.assertEqual(status.lan_macaddr, '3C-84-6A-B5-74-74')
+
+    def test_get_status_lan_macaddr_tolerates_missing_mac(self) -> None:
+        """get_status() must not raise when device info contains no MAC address."""
+        client = TPLinkCPE210Client('http://192.168.0.25', 'password', username='admin')
+
+        def fake_get_data(path: str, **params):
+            if path in ('/data/station.json', '/data/interfaces.json'):
+                return []
+            if path == '/data/info.json':
+                return {}  # no MAC fields
+            raise AssertionError(f'unexpected path: {path}')
+
+        client._get_data = __import__('unittest.mock', fromlist=['Mock']).Mock(side_effect=fake_get_data)
+
+        status = client.get_status()
+        # Should not raise; lan_macaddr may be None or 'None'
+        _ = status.lan_macaddr
+
 if __name__ == '__main__':
     main()

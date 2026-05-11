@@ -235,6 +235,17 @@ class TPLinkCPE210Client(AbstractRouter):
         status.wifi_clients_total = len(station_devices)
         status.wired_total = 0
         status.guest_clients_total = 0
+
+        # Populate LAN MAC so callers can use status.lan_macaddr as a unique
+        # device identifier (e.g. for HA device registry).
+        try:
+            info = self._device_info()
+            mac_str = info.get("lanMacAddr") or info.get("lan_mac") or ""
+            if mac_str:
+                status._lan_macaddr = get_mac(mac_str)
+        except Exception:
+            pass
+
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
