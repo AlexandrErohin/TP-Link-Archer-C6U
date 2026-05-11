@@ -237,8 +237,6 @@ class TestTPLinkCPE210Client(TestCase):
         expected = 2 * (1024**3) + 11 * (1024**2)
         self.assertEqual(iface.traffic_usage, expected)
 
-
-
     def test_get_status_populates_lan_macaddr(self) -> None:
         """get_status() must set _lan_macaddr so callers get a real MAC, not 'None'."""
         client = TPLinkCPE210Client('http://192.168.0.25', 'password', username='admin')
@@ -275,6 +273,7 @@ class TestTPLinkCPE210Client(TestCase):
         status = client.get_status()
         # Should not raise; lan_macaddr may be None or 'None'
         _ = status.lan_macaddr
+
 
 if __name__ == '__main__':
     main()
