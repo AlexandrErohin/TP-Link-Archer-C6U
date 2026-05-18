@@ -383,6 +383,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer VX231v v1.0
 - BE11000 2.0
 - CPE210 v2.0
+- CPE220 v3.0
 - Deco BE25 1.0
 - Deco M4 2.0
 - Deco M4R 2.0
