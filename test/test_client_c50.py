@@ -53,57 +53,6 @@ def _make_post_resp(status=200, text=""):
 
 
 # ---------------------------------------------------------------------------
-# TPLinkC50Client --- supports()
-# ---------------------------------------------------------------------------
-
-class TestTPLinkC50ClientSupports(TestCase):
-
-    def _client(self):
-        c = TPLinkC50Client("http://192.168.0.1", "password")
-        c._session = _mock_session()
-        return c
-
-    def test_supports_true_for_512bit_pkcs1(self):
-        """supports() returns True when key is 512-bit and tpEncrypt.js has flag=1."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=(_FAKE_NN, _FAKE_EE, _FAKE_SEQ))
-        c._session.get.side_effect = [
-            _make_get_resp(200, "INCLUDE_LOGIN_GDPR_ENCRYPT=1"),
-            _make_get_resp(200, "$.rsa.encrypt(data,512,1)"),
-        ]
-        self.assertTrue(c.supports())
-
-    def test_supports_false_when_key_not_512bit(self):
-        """supports() rejects keys that are not exactly 128 hex chars (512-bit)."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=("b" * 256, _FAKE_EE, _FAKE_SEQ))
-        self.assertFalse(c.supports())
-
-    def test_supports_false_when_gdpr_flag_missing(self):
-        """supports() rejects when INCLUDE_LOGIN_GDPR_ENCRYPT=1 is absent."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=(_FAKE_NN, _FAKE_EE, _FAKE_SEQ))
-        c._session.get.return_value = _make_get_resp(200, "SOME_OTHER_FLAG=1")
-        self.assertFalse(c.supports())
-
-    def test_supports_false_for_raw_rsa_flag0(self):
-        """supports() rejects flag=0 devices --- those belong to TPLinkWR841NClient."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=(_FAKE_NN, _FAKE_EE, _FAKE_SEQ))
-        c._session.get.side_effect = [
-            _make_get_resp(200, "INCLUDE_LOGIN_GDPR_ENCRYPT=1"),
-            _make_get_resp(200, "$.rsa.encrypt(data,512,0)"),  # flag=0 --- WR841N
-        ]
-        self.assertFalse(c.supports())
-
-    def test_supports_false_on_connection_error(self):
-        """supports() returns False instead of propagating exceptions."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(side_effect=Exception("connection refused"))
-        self.assertFalse(c.supports())
-
-
-# ---------------------------------------------------------------------------
 # TPLinkC50Client --- authorize()
 # ---------------------------------------------------------------------------
 
