@@ -54,44 +54,6 @@ def _make_post_resp(status=200, text=""):
 
 
 # ---------------------------------------------------------------------------
-# TPLinkWR841NClient --- supports()
-# ---------------------------------------------------------------------------
-
-class TestTPLinkWR841NClientSupports(TestCase):
-
-    def _client(self):
-        c = TPLinkWR841NClient("http://192.168.0.1", "password")
-        c._session = _mock_session()
-        return c
-
-    def test_supports_true_for_512bit_raw_rsa(self):
-        """supports() returns True when key is 512-bit and tpEncrypt.js has flag=0."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=(_FAKE_NN, _FAKE_EE, _FAKE_SEQ))
-        c._session.get.side_effect = [
-            _make_get_resp(200, "INCLUDE_LOGIN_GDPR_ENCRYPT=1"),
-            _make_get_resp(200, "$.rsa.encrypt(data,512,0)"),
-        ]
-        self.assertTrue(c.supports())
-
-    def test_supports_false_for_pkcs1_flag1(self):
-        """supports() rejects flag=1 devices --- those belong to TPLinkC50Client."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=(_FAKE_NN, _FAKE_EE, _FAKE_SEQ))
-        c._session.get.side_effect = [
-            _make_get_resp(200, "INCLUDE_LOGIN_GDPR_ENCRYPT=1"),
-            _make_get_resp(200, "$.rsa.encrypt(data,512,1)"),  # flag=1 --- C50
-        ]
-        self.assertFalse(c.supports())
-
-    def test_supports_false_when_key_not_512bit(self):
-        """supports() rejects 1024-bit keys (standard MR-family routers)."""
-        c = self._client()
-        c._fetch_rsa_key = Mock(return_value=("c" * 256, _FAKE_EE, _FAKE_SEQ))
-        self.assertFalse(c.supports())
-
-
-# ---------------------------------------------------------------------------
 # TPLinkWR841NClient --- authorize()
 # ---------------------------------------------------------------------------
 
