@@ -30,32 +30,9 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        for client in [
-                       TplinkC5400XRouter,
-                       TPLinkVRClient,
-                       TPLinkEXClientGCM,
-                       TPLinkEXClient,
-                       TPLinkC50Client,
-                       TPLinkWR841NClient,
-                       TPLinkMRClientGCM,
-                       TPLinkMRClient,
-                       TPLinkMR200Client,
-                       TPLinkMR6400v7Client,
-                       TPLinkVR400v2Client,
-                       TPLinkDecoClient,
-                       TPLinkXDRClient,
-                       TPLinkRClient,
-                       TplinkRouterSG,
-                       TplinkRouterV1_11,
-                       TplinkRouter,
-                       TplinkC80Router,
-                       TplinkWDRRouter,
-                       TplinkRE330Router,
-                       TplinkC3200Router,
-                       TPLinkEAP115Client,
-                       TPLinkCPE210Client,
-                       TPLinkSG108EClient,
-                       ]:
+        for client_name, client in TplinkRouterProvider.get_clients().items():
+            if isinstance(client, TplinkC1200Router):
+                continue
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
                 return router
@@ -83,3 +60,33 @@ class TplinkRouterProvider:
                 pass
 
         raise ClientException(message)
+
+    @staticmethod
+    def get_clients() -> dict[str, type[AbstractRouter]]:
+        return {
+            TplinkC5400XRouter.__name__: TplinkC5400XRouter,
+            TPLinkVRClient.__name__: TPLinkVRClient,
+            TPLinkEXClientGCM.__name__: TPLinkEXClientGCM,
+            TPLinkEXClient.__name__: TPLinkEXClient,
+            TPLinkC50Client.__name__: TPLinkC50Client,
+            TPLinkWR841NClient.__name__: TPLinkWR841NClient,
+            TPLinkMRClientGCM.__name__: TPLinkMRClientGCM,
+            TPLinkMRClient.__name__: TPLinkMRClient,
+            TPLinkMR200Client.__name__: TPLinkMR200Client,
+            TPLinkMR6400v7Client.__name__: TPLinkMR6400v7Client,
+            TPLinkVR400v2Client.__name__: TPLinkVR400v2Client,
+            TPLinkDecoClient.__name__: TPLinkDecoClient,
+            TPLinkXDRClient.__name__: TPLinkXDRClient,
+            TPLinkRClient.__name__: TPLinkRClient,
+            TplinkRouterSG.__name__: TplinkRouterSG,
+            TplinkRouterV1_11.__name__: TplinkRouterV1_11,
+            TplinkRouter.__name__: TplinkRouter,
+            TplinkC80Router.__name__: TplinkC80Router,
+            TplinkWDRRouter.__name__: TplinkWDRRouter,
+            TplinkRE330Router.__name__: TplinkRE330Router,
+            TplinkC3200Router.__name__: TplinkC3200Router,
+            TPLinkEAP115Client.__name__: TPLinkEAP115Client,
+            TPLinkCPE210Client.__name__: TPLinkCPE210Client,
+            TPLinkSG108EClient.__name__: TPLinkSG108EClient,
+            TplinkC1200Router.__name__: TplinkC1200Router,
+        }
