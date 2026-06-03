@@ -269,6 +269,17 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         return status
 
+    def send_sms(self, phone_number: str, message: str) -> None:
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'DEV2_LTE_SMS_SENDNEWMSG', attrs=[
+                    '"index":"1"',
+                    f'"to":"{phone_number}"',
+                    f'"textContent":"{message}"',
+                ]),
+        ]
+        self.req_act(acts)
+
     def req_act(self, acts: list):
         '''
         Requests ACTs via the cgi_gdpr proxy
