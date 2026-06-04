@@ -426,6 +426,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TL-WA1201 3.0
 - TL-WA3001 v1.0
 - TL-WR841N v14
+- TL-WR3002X v1.0
 - TL-WDR3600 V1
 - TL-XDR3010 V2
 - TL-XDR5410 1.0
