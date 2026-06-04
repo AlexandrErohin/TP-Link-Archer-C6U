@@ -247,8 +247,6 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GET, 'DEV2_LTE_NET_STATUS', '1,0,0,0,0,0',
                          attrs=['smsUnreadCount', 'sigLevel', 'rfInfoRsrp', 'rfInfoRsrq', 'rfInfoSnr']),
             self.ActItem(self.ActItem.GET, 'DEV2_LTE_PROF_STAT', '1,0,0,0,0,0', attrs=['ispName']),
-            self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO', '0,0,0,0,0,0',
-                         attrs=['networkType', 'signalStrength', 'SSRSRP', 'SSRSRQ', 'SSSINR']),
         ]
         _, values = self.req_act(acts)
 
@@ -262,31 +260,32 @@ class TPLinkEXClient(TPLinkMRClientBase):
         status.cur_tx_speed = int(values[1]['curTxSpeed'])
 
         status.sms_unread_count = int(values[2]['smsUnreadCount'])
+        status.sig_level = int(values[2]['sigLevel'])
+        status.rsrp = int(values[2]['rfInfoRsrp'])
+        status.rsrq = int(values[2]['rfInfoRsrq'])
+        status.snr = int(values[2]['rfInfoSnr'])
 
         status.isp_name = values[3]['ispName']
 
-        lte_net_status = values[2]
-        serving_cell_info_list = values[4]
+        try:
+            acts = [self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO',
+                                 attrs=['networkType', 'signalStrength', 'SSRSRP', 'SSRSRQ', 'SSSINR'])]
+            _, values = self.req_act(acts)
 
-        # Each entry in serving_cell_info_list is one RAT. Match on active networkType.
-        active_serving_cell = next(
-            (c for c in serving_cell_info_list
-             if int(c.get('networkType', -1)) == status.network_type),
-            None,
-        )
-
-        if active_serving_cell is not None:
-            # Per-RAT signal from DEV2_LTE_SERVING_CELL_INFO
-            status.sig_level = int(active_serving_cell['signalStrength'])
-            status.rsrp = int(active_serving_cell['SSRSRP'])
-            status.rsrq = int(active_serving_cell['SSRSRQ'])
-            status.snr  = int(active_serving_cell['SSSINR'])
-        else:
-            # Fallback: aggregate RF from DEV2_LTE_NET_STATUS (different field names)
-            status.sig_level = int(lte_net_status['sigLevel'])
-            status.rsrp = int(lte_net_status['rfInfoRsrp'])
-            status.rsrq = int(lte_net_status['rfInfoRsrq'])
-            status.snr  = int(lte_net_status['rfInfoSnr'])
+            # Each entry in serving_cell_info_list is one RAT. Match on active networkType.
+            active_serving_cell = next(
+                (c for c in values[0]
+                 if int(c.get('networkType', -1)) == status.network_type),
+                None,
+            )
+            if active_serving_cell is not None:
+                # Per-RAT signal from DEV2_LTE_SERVING_CELL_INFO
+                status.sig_level = int(active_serving_cell['signalStrength'])
+                status.rsrp = int(active_serving_cell['SSRSRP'])
+                status.rsrq = int(active_serving_cell['SSRSRQ'])
+                status.snr = int(active_serving_cell['SSSINR'])
+        except Exception:
+            pass
 
         return status
 
