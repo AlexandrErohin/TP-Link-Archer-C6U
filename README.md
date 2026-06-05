@@ -53,14 +53,15 @@ from tplinkrouterc6u import (
 from logging import Logger
 
 router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
+logger=Logger('test')
 # You may use client directly like
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
-# router = TplinkRouter('http://192.168.0.1','password','admin2', logger=Logger('test'))
+# router = TplinkRouter('http://192.168.0.1','password','admin2', logger=logger)
 # If you have the TP-link C5400X or similar, you can use the TplinkC5400XRouter class instead of the TplinkRouter class.
 # Remember that the password for this router is different, here you need to use the web encrypted password.
 # To get web encrypted password, read Web Encrypted Password section
-# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger=Logger('test'))
+# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger=logger)
 
 try:
     router.authorize()  # authorizing
@@ -83,8 +84,9 @@ try:
     leases.sort(key=lambda a: a.ipaddr)
     for lease in leases:
         print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
-finally:
     router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
+except Exception as e:
+    logger.error(traceback.format_exc())
 ```
 
 The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
