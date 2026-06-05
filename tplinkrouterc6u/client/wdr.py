@@ -233,9 +233,12 @@ class TplinkWDRRouter(AbstractRouter, WDRRequest):
     def supports(self) -> bool:
         try:
             response: Response = self.request("check", "")
-            return response.status_code == 200
+            if response.status_code == 200:
+                self.get_firmware()
+                return True
         except Exception:
-            return False
+            pass
+        return False
 
     def get_firmware(self) -> Firmware:
         self._updateStatus()
