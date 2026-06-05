@@ -880,6 +880,25 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.snr, 270)
         self.assertEqual(status.isp_name, 'O2 2025')
 
+    def test_send_sms(self) -> None:
+        check_url = ''
+        check_data = ''
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                check_url = url
+                check_data = data_str
+                return 200, '{}'
+
+        client = TPLinkEXClientTest('', '')
+        client.send_sms('534324724234', 'test sms')
+
+        self.assertIn('http:///cgi_gdpr?9?_', check_url)
+        self.assertEqual(check_data, ('{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0","index":"1", '
+                                      '"to":"534324724234", "textContent":"test sms"},"operation":"so",'
+                                      '"oid":"DEV2_LTE_SMS_SENDNEWMSG"}'))
+
 
 if __name__ == '__main__':
     main()
