@@ -69,7 +69,9 @@ class TplinkRouterSG(TplinkBaseRouter):
             self.logout()
             return True
         except Exception:
-            return False
+            pass
+
+        return False
 
     def _check_sg_certification(self) -> bool:
         """Check if the router has SG_L1_S2 or CE_RED certification."""

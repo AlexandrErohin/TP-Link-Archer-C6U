@@ -647,7 +647,9 @@ class TplinkRouterV1_11(TplinkRouterJson):
                 self.logout()
                 return True
         except Exception:
-            return False
+            pass
+
+        return False
 
     def _request_pwd(self) -> None:
         """Get RSA public key for password encryption."""
