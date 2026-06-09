@@ -1,6 +1,7 @@
 from base64 import b64encode
 from json import loads
-from datetime import timedelta
+from datetime import timedelta, datetime
+from typing import List
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
@@ -12,6 +13,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     LTEStatus,
+    SMS,
     VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
@@ -32,6 +34,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
         SET = 'so'
         ADD = 'add'
         DEL = 'del'
+        DO = 'do'
         GL = 'gl'
         GS = 'gs'
         OP = 'op'
@@ -297,6 +300,85 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     f'"to":"{phone_number}"',
                     f'"textContent":"{message}"',
                 ]),
+        ]
+        self.req_act(acts)
+
+    def _fetch_sms_entries(self) -> list[tuple[int, dict]]:
+        acts = [
+            self.ActItem(self.ActItem.GO, 'DEV2_LTE_SMS_RECVMSGBOX'),
+        ]
+        _, values = self.req_act(acts)
+
+        total_number = int(values[0]['totalNumber']) if values else 0
+        if total_number == 0:
+            return []
+
+        sms_attrs = ['index', 'from', 'content', 'receivedTime', 'unread']
+        page_size = 8
+        num_pages = (total_number + page_size - 1) // page_size
+
+        entries = []
+        for page in range(1, num_pages + 1):
+            acts = [
+                self.ActItem(
+                    self.ActItem.SET, 'DEV2_LTE_SMS_RECVMSGBOX',
+                    attrs=[f'"pageNumber":"{page}"']),
+                self.ActItem(
+                    self.ActItem.GL, 'DEV2_LTE_SMS_RECVMSGENTRY', attrs=sms_attrs),
+            ]
+            _, values = self.req_act(acts)
+
+            for item in self._to_list(values[0]):
+                entries.append((page, item))
+
+        return entries
+
+    def _resolve_sms(self, sms: SMS) -> tuple[int, str]:
+        for page, item in self._fetch_sms_entries():
+            if int(item['index']) == sms.id:
+                return page, item['stack']
+
+        raise ClientError(f'SMS not found: index {sms.id}')
+
+    def get_sms(self) -> List[SMS]:
+        messages = []
+        for _, item in self._fetch_sms_entries():
+            messages.append(
+                SMS(
+                    int(item['index']),
+                    item['from'],
+                    item['content'],
+                    datetime.fromisoformat(item['receivedTime']),
+                    item['unread'] == '1',
+                )
+            )
+
+        return messages
+
+    def set_sms_read(self, sms: SMS) -> None:
+        page, stack = self._resolve_sms(sms)
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'DEV2_LTE_SMS_RECVMSGBOX',
+                attrs=[f'"pageNumber":"{page}"']),
+            self.ActItem(
+                self.ActItem.SET, 'DEV2_LTE_SMS_RECVMSGENTRY',
+                stack=stack,
+                attrs=['"unread":"0"'],
+            ),
+        ]
+        self.req_act(acts)
+
+    def delete_sms(self, sms: SMS) -> None:
+        page, stack = self._resolve_sms(sms)
+        acts = [
+            self.ActItem(
+                self.ActItem.SET, 'DEV2_LTE_SMS_RECVMSGBOX',
+                attrs=[f'"pageNumber":"{page}"']),
+            self.ActItem(
+                self.ActItem.DO, 'DEV2_LTE_SMS_RECVMSGENTRY',
+                stack=stack,
+            ),
         ]
         self.req_act(acts)
 
