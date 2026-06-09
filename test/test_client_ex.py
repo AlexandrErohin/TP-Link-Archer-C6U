@@ -989,7 +989,7 @@ class TestTPLinkEXClient(TestCase):
 
         self.assertIn('http:///cgi_gdpr?9?_', check_url)
         self.assertEqual(check_data, ('{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0","unread":"0"},'
-                                     '"operation":"so","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
+                                      '"operation":"so","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
 
     def test_delete_sms(self) -> None:
         DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"2","unreadNumber":"0","pageNumber":"0",'
@@ -1025,7 +1025,7 @@ class TestTPLinkEXClient(TestCase):
 
         self.assertIn('http:///cgi_gdpr?9?_', check_url)
         self.assertEqual(check_data, ('{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0"},'
-                                     '"operation":"do","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
+                                      '"operation":"do","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
 
 
 if __name__ == '__main__':

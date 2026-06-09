@@ -51,6 +51,7 @@ from tplinkrouterc6u import (
     Connection
 )
 from logging import Logger
+import traceback
 
 router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
 logger=Logger('test')
@@ -74,16 +75,18 @@ try:
         router.set_wifi(Connection.GUEST_2G, True)  # turn on guest 2.4G wifi
 
     # Get Address reservations, sort by ipaddr
-    reservations = router.get_ipv4_reservations()
-    reservations.sort(key=lambda a: a.ipaddr)
-    for res in reservations:
-        print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+    if hasattr(router, "get_ipv4_reservations"):
+        reservations = router.get_ipv4_reservations()
+        reservations.sort(key=lambda a: a.ipaddr)
+        for res in reservations:
+            print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
 
     # Get DHCP leases, sort by ipaddr
-    leases = router.get_ipv4_dhcp_leases()
-    leases.sort(key=lambda a: a.ipaddr)
-    for lease in leases:
-        print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
+    if hasattr(router, "get_ipv4_dhcp_leases"):
+        leases = router.get_ipv4_dhcp_leases()
+        leases.sort(key=lambda a: a.ipaddr)
+        for lease in leases:
+            print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
     router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
 except Exception as e:
     logger.error(traceback.format_exc())
