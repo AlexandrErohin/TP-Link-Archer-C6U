@@ -1,4 +1,5 @@
 from unittest import main, TestCase
+from datetime import datetime
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from tplinkrouterc6u import (
@@ -14,6 +15,7 @@ from tplinkrouterc6u import (
     ClientException,
     VPNStatus,
     VPN,
+    SMS,
 )
 
 
@@ -898,6 +900,132 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(check_data, ('{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0","index":"1", '
                                       '"to":"534324724234", "textContent":"test sms"},"operation":"so",'
                                       '"oid":"DEV2_LTE_SMS_SENDNEWMSG"}'))
+
+    def test_get_sms(self) -> None:
+        DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"2","unreadNumber":"0","pageNumber":"0",'
+                                   '"amountPerPage":"0","stack":"0,0,0,0,0,0"},"operation":"go",'
+                                   '"oid":"DEV2_LTE_SMS_RECVMSGBOX","success":true}')
+        DEV2_LTE_SMS_RECVMSGENTRY = ('{"data":[{"index":"2","from":"sender2","content":"text first",'
+                                     '"receivedTime":"2024-11-15 22:23:59","unread":"0",'
+                                     '"stack":"2,0,0,0,0,0"},{"index":"1","from":"sender1",'
+                                     '"content":"text second","receivedTime":"2024-11-15 22:28:09",'
+                                     '"unread":"1","stack":"1,0,0,0,0,0"}],'
+                                     '"operation":"gl","oid":"DEV2_LTE_SMS_RECVMSGENTRY","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_SMS_RECVMSGBOX' in data_str and '"operation":"go"' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGBOX
+                elif 'DEV2_LTE_SMS_RECVMSGBOX' in data_str:
+                    return 200, '{}'
+                elif 'DEV2_LTE_SMS_RECVMSGENTRY' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGENTRY
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual(len(messages), 2)
+        self.assertIsInstance(messages[0], SMS)
+        self.assertEqual(messages[0].id, 2)
+        self.assertEqual(messages[0].sender, 'sender2')
+        self.assertEqual(messages[0].content, 'text first')
+        self.assertEqual(messages[0].received_at, datetime.fromisoformat('2024-11-15 22:23:59'))
+        self.assertEqual(messages[0].unread, False)
+        self.assertIsInstance(messages[1], SMS)
+        self.assertEqual(messages[1].id, 1)
+        self.assertEqual(messages[1].sender, 'sender1')
+        self.assertEqual(messages[1].content, 'text second')
+        self.assertEqual(messages[1].received_at, datetime.fromisoformat('2024-11-15 22:28:09'))
+        self.assertEqual(messages[1].unread, True)
+
+    def test_get_sms_empty(self) -> None:
+        DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"0","unreadNumber":"0","pageNumber":"0",'
+                                   '"amountPerPage":"0","stack":"0,0,0,0,0,0"},"operation":"go",'
+                                   '"oid":"DEV2_LTE_SMS_RECVMSGBOX","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_SMS_RECVMSGBOX' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGBOX
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual(messages, [])
+
+    def test_set_sms_read(self) -> None:
+        DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"2","unreadNumber":"0","pageNumber":"0",'
+                                   '"amountPerPage":"0","stack":"0,0,0,0,0,0"},"operation":"go",'
+                                   '"oid":"DEV2_LTE_SMS_RECVMSGBOX","success":true}')
+        DEV2_LTE_SMS_RECVMSGENTRY = ('{"data":[{"index":"2","from":"sender2","content":"text first",'
+                                     '"receivedTime":"2024-11-15 22:23:59","unread":"0",'
+                                     '"stack":"2,0,0,0,0,0"},{"index":"1","from":"sender1",'
+                                     '"content":"text second","receivedTime":"2024-11-15 22:28:09",'
+                                     '"unread":"1","stack":"1,0,0,0,0,0"}],'
+                                     '"operation":"gl","oid":"DEV2_LTE_SMS_RECVMSGENTRY","success":true}')
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                if 'DEV2_LTE_SMS_RECVMSGBOX' in data_str and '"operation":"go"' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGBOX
+                elif 'DEV2_LTE_SMS_RECVMSGBOX' in data_str:
+                    return 200, '{}'
+                elif 'DEV2_LTE_SMS_RECVMSGENTRY' in data_str and '"operation":"gl"' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGENTRY
+                elif 'DEV2_LTE_SMS_RECVMSGENTRY' in data_str and '"operation":"so"' in data_str:
+                    check_url = url
+                    check_data = data_str
+                    return 200, '{}'
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.set_sms_read(SMS(2, '', '', datetime.now(), True))
+
+        self.assertIn('http:///cgi_gdpr?9?_', check_url)
+        self.assertEqual(check_data, ('{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0","unread":"0"},'
+                                     '"operation":"so","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
+
+    def test_delete_sms(self) -> None:
+        DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"2","unreadNumber":"0","pageNumber":"0",'
+                                   '"amountPerPage":"0","stack":"0,0,0,0,0,0"},"operation":"go",'
+                                   '"oid":"DEV2_LTE_SMS_RECVMSGBOX","success":true}')
+        DEV2_LTE_SMS_RECVMSGENTRY = ('{"data":[{"index":"2","from":"sender2","content":"text first",'
+                                     '"receivedTime":"2024-11-15 22:23:59","unread":"0",'
+                                     '"stack":"2,0,0,0,0,0"},{"index":"1","from":"sender1",'
+                                     '"content":"text second","receivedTime":"2024-11-15 22:28:09",'
+                                     '"unread":"1","stack":"1,0,0,0,0,0"}],'
+                                     '"operation":"gl","oid":"DEV2_LTE_SMS_RECVMSGENTRY","success":true}')
+
+        check_url = ''
+        check_data = ''
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_url, check_data
+                if 'DEV2_LTE_SMS_RECVMSGBOX' in data_str and '"operation":"go"' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGBOX
+                elif 'DEV2_LTE_SMS_RECVMSGBOX' in data_str:
+                    return 200, '{}'
+                elif 'DEV2_LTE_SMS_RECVMSGENTRY' in data_str and '"operation":"gl"' in data_str:
+                    return 200, DEV2_LTE_SMS_RECVMSGENTRY
+                elif 'DEV2_LTE_SMS_RECVMSGENTRY' in data_str and '"operation":"do"' in data_str:
+                    check_url = url
+                    check_data = data_str
+                    return 200, '{}'
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.delete_sms(SMS(2, '', '', datetime.now(), True))
+
+        self.assertIn('http:///cgi_gdpr?9?_', check_url)
+        self.assertEqual(check_data, ('{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0"},'
+                                     '"operation":"do","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
 
 
 if __name__ == '__main__':
