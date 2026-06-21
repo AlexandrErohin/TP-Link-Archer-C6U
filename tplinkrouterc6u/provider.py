@@ -31,32 +31,6 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
-        try:
-            import requests
-            import re
-
-            clean_host = re.sub(r'^https?://', '', host).split(':')[0]
-            target_username = 'user' if username == 'admin' else username
-            probe_url = f"http://{clean_host}/cgi/getGDPRParm"
-
-            # Native, clean, and fully programmatic headers
-            headers = {
-                "Content-Type": "text/plain;charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": f"http://{clean_host}/"
-            }
-
-            response = requests.post(probe_url, data=None, headers=headers, timeout=4)
-            # If it responds with 200 containing keys OR generates a 406, the hardware is definitely a VR1200v
-            if ("ee" in response.text and "nn" in response.text) or response.status_code == 406:
-                if logger is not None:
-                    logger.info('TplinkRouterProvider: Detected VR1200v hardware at %s. Loading dedicated client.', host)
-                return TplinkVR1200vRouter(host, password, target_username, logger, verify_ssl, timeout)
-
-        except Exception as e:
-            if logger is not None:
-                logger.debug('TplinkRouterProvider: VR1200v probe not applicable for %s: %s', host, e)
-
         for client_name, client in TplinkRouterProvider.get_clients().items():
             if isinstance(client, TplinkC1200Router):
                 continue
