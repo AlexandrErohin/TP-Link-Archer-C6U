@@ -11,8 +11,13 @@ from tplinkrouterc6u.common.exception import ClientException
 class TplinkVR1200vRouter(TPLinkEXClient):
     """Specific API Client for TP-Link Archer VR1200v with encrypted GDPR firmware."""
 
-    def __init__(self, host, password, username="user", logger=None, verify_ssl=True, timeout=30):
-        super().__init__(host, password, username, logger, verify_ssl, timeout)
+    def __init__(self, host, password, username="admin", logger=None, verify_ssl=True, timeout=30):
+        # Home Assistant might pass "admin" or something else. 
+        # VR1200v requires "admin" for the initial login RSA signature hash.
+        super().__init__(host, password, "admin", logger, verify_ssl, timeout)
+        # But the payload and subsequent requests require "user", so we change it now.
+        # Note: self._hash remains md5("admin" + password) from the super call!
+        self.username = "user"
         self.ip = re.sub(r'^https?://', '', self.host).split(':')[0]
         # Make sure url_rsa_key is set correctly
         self._url_rsa_key = 'cgi/getGDPRParm'
@@ -21,9 +26,6 @@ class TplinkVR1200vRouter(TPLinkEXClient):
         try:
             import requests
             
-            if self.username == 'admin':
-                self.username = 'user'
-                
             headers = {
                 "Content-Type": "text/plain;charset=UTF-8",
                 "X-Requested-With": "XMLHttpRequest",
