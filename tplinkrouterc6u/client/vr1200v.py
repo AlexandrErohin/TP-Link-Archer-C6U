@@ -4,42 +4,13 @@ from datetime import datetime, timedelta
 from hashlib import md5
 from time import sleep
 from requests import Response
-
 from tplinkrouterc6u.client.ex import TPLinkEXClient
 from tplinkrouterc6u.common.exception import ClientException
 
+
 class TplinkVR1200vRouter(TPLinkEXClient):
-    """Specific API Client for TP-Link Archer VR1200v with encrypted GDPR firmware."""
-
-    def __init__(self, host, password, username="admin", logger=None, verify_ssl=True, timeout=30):
-        # Home Assistant might pass "admin" or something else. 
-        # VR1200v requires "admin" for the initial login RSA signature hash.
-        super().__init__(host, password, "admin", logger, verify_ssl, timeout)
-        # But the payload and subsequent requests require "user", so we change it now.
-        # Note: self._hash remains md5("admin" + password) from the super call!
-        self.username = "user"
-        self.ip = re.sub(r'^https?://', '', self.host).split(':')[0]
-        # Make sure url_rsa_key is set correctly
-        self._url_rsa_key = 'cgi/getGDPRParm'
-
-    def supports(self) -> bool:
-        try:
-            import requests
-            
-            headers = {
-                "Content-Type": "text/plain;charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": f"http://{self.ip}/"
-            }
-            res = requests.post(f"http://{self.ip}/cgi/getGDPRParm", data=None, headers=headers, timeout=4)
-            if ("ee" in res.text and "nn" in res.text) or res.status_code == 406:
-                return True
-            return False
-        except Exception:
-            return False
-
     def authorize(self) -> None:
-        if self._token is not None and self._authorized_at and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
+        if self._token is not None and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
             return
         self._token = None
 
@@ -51,13 +22,13 @@ class TplinkVR1200vRouter(TPLinkEXClient):
             b64encode(bytes(self.username, "utf-8")).decode("utf-8"),
             b64encode(bytes(self.password, "utf-8")).decode("utf-8")
         )
-        
+
         sign, data = self._prepare_data(login_data, True)
         request_data = f"sign={sign}\r\ndata={data}\r\n"
         url = f"{self.host}/cgi_gdpr?9"
-        
+
         (code, response) = self._request(url, data_str=request_data)
-        
+
         # Try to parse it directly first, as VR1200v returns $.ret=0; directly
         ret_code = None
         if "$.ret=" in response:
@@ -65,13 +36,13 @@ class TplinkVR1200vRouter(TPLinkEXClient):
         else:
             response = self._encryption.aes_decrypt(response)
             ret_code = self._parse_ret_val(response)
-            
+
         if ret_code != self.HTTP_RET_OK:
             raise ClientException(f"VR1200v Login failed. Error code: {ret_code}")
 
         self._token = self._req_token()
         self._authorized_at = datetime.now()
-        
+
         # Override hash for subsequent requests: VR1200v uses MD5(username + token)
         self._hash = md5(f"{self.username}{self._token}".encode('utf-8')).hexdigest()
 
@@ -80,9 +51,9 @@ class TplinkVR1200vRouter(TPLinkEXClient):
         Overrides the _request method to handle the specific AES response body parsing of VR1200v
         """
         headers = self.HEADERS.copy()
-        
+
         # add referer to request headers, MUST HAVE trailing slash for VR1200v
-        headers['Referer'] = f"http://{self.ip}/"
+        headers['Referer'] = f"{self.host}/"
 
         if self._token is not None:
             headers['TokenID'] = self._token
@@ -104,7 +75,9 @@ class TplinkVR1200vRouter(TPLinkEXClient):
             else:
                 raise Exception('Unsupported method ' + str(method))
 
-            if r.status_code not in [500, 406] and '<title>500 Internal Server Error</title>' not in r.text and '<title>406 Not Acceptable</title>' not in r.text:
+            if (r.status_code not in [500, 406]
+                    and '<title>500 Internal Server Error</title>' not in r.text
+                    and '<title>406 Not Acceptable</title>' not in r.text):
                 break
 
             sleep(0.1)

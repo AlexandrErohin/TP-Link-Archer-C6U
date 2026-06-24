@@ -562,7 +562,7 @@ class TPLinkMRClientBase(AbstractRouter):
 
         # add referer to request headers,
         # otherwise we get 403 Forbidden
-        headers['Referer'] = self.host
+        headers['Referer'] = f"{self.host}/"
 
         # add token to request headers,
         # used for CGI auth (together with JSESSIONID cookie)

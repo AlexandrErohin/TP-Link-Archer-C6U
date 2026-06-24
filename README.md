@@ -34,6 +34,7 @@ from tplinkrouterc6u import (
     TPLinkMR6400v7Client,
     TPLinkVRClient,
     TPLinkVR400v2Client,
+    TplinkVR1200vRouter,
     TPLinkEXClient, # Class for EX series routers which supports old firmwares with AES cipher CBC mode
     TPLinkEXClientGCM, # Class for EX series routers which supports AES cipher GCM mode
     TPLinkRClient, # For routers like TL-R470GP-AC
@@ -378,7 +379,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3)
 - Archer NX200 (v1.0, v2.0)
-- Archer VR1200v v1
+- Archer VR1200v (v1, v2)
 - Archer VR2100v v1
 - Archer VR2800 v1
 - Archer VR400 (v2, v3)
@@ -418,7 +419,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - TD-W9960 (v1, V1.20)
 - TL-7DR6430 1.0
 - TL-7DR7270 1.0 (firmware 1.0.18+, new auth)
-- TL-MR100 v2.0
+- TL-MR100 (v2.0, v3.0)
 - TL-MR100-Outdoor v1.0
 - TL-MR105
 - TL-MR110-Outdoor v1.0
