@@ -54,6 +54,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         self._url_rsa_key = 'cgi/getGDPRParm'
 
+    def supports(self) -> bool:
+        try:
+            self.authorize()
+            return True
+        except Exception:
+            pass
+
+        return False
+
     def logout(self) -> None:
         '''
         Logs out from the host
