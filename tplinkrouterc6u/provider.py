@@ -24,6 +24,7 @@ from tplinkrouterc6u.client.re330 import TplinkRE330Router
 from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
+from tplinkrouterc6u.client.vr1200v import TplinkVR1200vRouter
 
 
 class TplinkRouterProvider:
@@ -64,6 +65,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
         return {
+            TplinkVR1200vRouter.__name__: TplinkVR1200vRouter,
             TplinkC5400XRouter.__name__: TplinkC5400XRouter,
             TPLinkVRClient.__name__: TPLinkVRClient,
             TPLinkEXClientGCM.__name__: TPLinkEXClientGCM,
