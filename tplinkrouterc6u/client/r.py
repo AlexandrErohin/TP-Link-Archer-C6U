@@ -98,15 +98,24 @@ class TPLinkRClient(TPLinkXDRClient):
                 conn_type = Connection.HOST_5G
                 status.wifi_clients_total += 1
 
-            dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
+            ipaddr = get_ip(item['ip']) if item.get('ip') else None
+            dev = Device(conn_type, get_mac(item['mac']), ipaddr, unquote(item['hostname']))
             if 'up_speed' in item:
                 dev.up_speed = int(item['up_speed'])
             if 'down_speed' in item:
                 dev.down_speed = int(item['down_speed'])
-            if 'signal' in item:
+            if 'rssi' in item:
                 dev.signal = int(item['rssi'])
+            elif 'signal' in item:
+                dev.signal = int(item['signal'])
             if 'state' in item:
                 dev.active = item['state'] == 'online'
+            if 'ap_name' in item:
+                dev.ap_name = unquote(item['ap_name'])
+            if 'ssid' in item:
+                dev.ssid = unquote(item['ssid'])
+            if 'freq_name' in item:
+                dev.frequency = item['freq_name']
             status.devices.append(dev)
         return status
 

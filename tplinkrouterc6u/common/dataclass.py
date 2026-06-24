@@ -17,7 +17,7 @@ class Firmware:
 class Device:
     type: Connection
     _macaddr: EUI48
-    _ipaddr: IPv4Address
+    _ipaddr: IPv4Address | None
     hostname: str
     packets_sent: int | None = None
     packets_received: int | None = None
@@ -29,6 +29,9 @@ class Device:
     traffic_usage: int | None = None
     signal: int | None = None
     active: bool = True
+    ap_name: str | None = None
+    ssid: str | None = None
+    frequency: str | None = None
 
     @property
     def macaddr(self):
@@ -40,7 +43,7 @@ class Device:
 
     @property
     def ipaddr(self):
-        return str(self._ipaddr)
+        return str(self._ipaddr) if self._ipaddr else None
 
     @property
     def ipaddress(self):
