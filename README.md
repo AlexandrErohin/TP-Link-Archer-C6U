@@ -113,6 +113,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | get_status |   | Gets status about the router info including wifi statuses and connected devices info | [Status](#status) |
 | get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
+| add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
 | set_wifi | wifi: [Connection](#connection), enable: bool | Allow to turn on/of 4 wifi networks |   |
 | reboot |   | reboot router |
