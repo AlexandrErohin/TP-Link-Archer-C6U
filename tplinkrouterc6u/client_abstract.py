@@ -1,7 +1,7 @@
 from requests.packages import urllib3
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status
 from abc import ABC, abstractmethod
 
 
@@ -43,6 +43,10 @@ class AbstractRouter(ABC):
     def get_ipv4_status(self) -> IPv4Status:
         pass
 
+    @abstractmethod
+    def get_ipv6_status(self) -> IPv6Status:
+        pass
+    
     @abstractmethod
     def reboot(self) -> None:
         pass

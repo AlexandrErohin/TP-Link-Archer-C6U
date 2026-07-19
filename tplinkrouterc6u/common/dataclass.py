@@ -1,6 +1,6 @@
 from __future__ import annotations
 from macaddress import EUI48
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from dataclasses import dataclass, field
 from datetime import datetime
 from tplinkrouterc6u.common.package_enum import Connection, VpnClientServerProtocol
@@ -54,6 +54,7 @@ class Status:
     _wan_ipv4_addr: IPv4Address | None = None
     _lan_ipv4_addr: IPv4Address | None = None
     _wan_ipv4_gateway: IPv4Address | None = None
+    _wan_ipv6_addr: IPv6Address | None = None
     wired_total: int = 0
     wifi_clients_total: int = 0
     guest_clients_total: int = 0
@@ -253,6 +254,47 @@ class IPv4Status:
     @property
     def lan_ipv4_netmask_address(self):
         return self._lan_ipv4_netmask
+
+
+@dataclass
+class IPv6Status:
+    _wan_ipv6_conn_status: str = ""
+    _wan_ipv6_addr_type: str = ""
+    _wan_ipv6_ipaddr: IPv6Address | None = None
+    _wan_ipv6_prefix_length: int = 0
+    _wan_ipv6_gateway: IPv6Address | None = None
+    _wan_ipv6_site_prefix: IPv6Address | None = None
+    _wan_ipv6_site_prefix_length: int = 0
+    _wan_ipv6_pridns_address: IPv6Address | None = None
+    _wan_ipv6_secdns_address: IPv6Address | None = None
+    
+    @property
+    def wan_ipv6_conn_status(self):
+        return str(self._wan_ipv6_conn_status) if self._wan_ipv6_conn_status else None
+    @property
+    def wan_ipv6_addr_type(self):
+        return str(self._wan_ipv6_addr_type) if self._wan_ipv6_addr_type else None
+    @property
+    def wan_ipv6_ipaddr(self):
+        return str(self._wan_ipv6_ipaddr) if self._wan_ipv6_ipaddr else None
+    @property
+    def wan_ipv6_prefix_length(self):
+        return str(self._wan_ipv6_prefix_length)
+    @property
+    def wan_ipv6_gateway(self):
+        return str(self._wan_ipv6_gateway) if self._wan_ipv6_gateway else None
+    @property
+    def wan_ipv6_site_prefix(self):
+        return str(self._wan_ipv6_site_prefix)
+    @property
+    def wan_ipv6_site_prefix_length(self):
+        return str(self._wan_ipv6_site_prefix_length)
+    @property
+    def wan_ipv6_pridns_address(self):
+        return self._wan_ipv6_pridns_address
+    @property
+    def wan_ipv6_secdns_address(self):
+        return self._wan_ipv6_secdns_address
 
 
 @dataclass

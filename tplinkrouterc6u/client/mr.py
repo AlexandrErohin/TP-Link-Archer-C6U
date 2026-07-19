@@ -5,7 +5,7 @@ from urllib.parse import quote
 from requests import Session, Response
 from datetime import timedelta, datetime
 from logging import Logger
-from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
+from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac, get_value
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
@@ -15,6 +15,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    IPv6Status,
     SMS,
     LTEStatus,
     VPNStatus,
@@ -152,7 +153,7 @@ class TPLinkMRClientBase(AbstractRouter):
         acts = [
             self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
             self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name']),
+                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'X_TP_ExternalIPv6Address', 'defaultGateway', 'name']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN', attrs=['enable', 'X_TP_Band']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN_GUESTNET', attrs=['enable', 'name']),
             self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=[
@@ -182,6 +183,7 @@ class TPLinkMRClientBase(AbstractRouter):
             status._wan_macaddr = get_mac(item['MACAddress']) if item.get('MACAddress') else None
             status._wan_ipv4_addr = get_ip(item['externalIPAddress'])
             status._wan_ipv4_gateway = get_ip(item['defaultGateway'])
+            status._wan_ipv6_addr = get_ipv6(item['X_TP_ExternalIPv6Address'])
             status.conn_type = item.get('name', '')
 
         if values['2'].__class__ != list:
@@ -312,6 +314,31 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return ipv4_status
 
+    def get_ipv6_status(self) -> IPv6Status:
+        acts = [
+           self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
+                         attrs=['enable', 'X_TP_IPv6ConnStatus', 'X_TP_IPv6AddressingType', 'X_TP_ExternalIPv6Address', 'X_TP_PrefixLength', 'X_TP_DefaultIPv6Gateway', 'X_TP_SitePrefix', 'X_TP_SitePrefixLength', 'X_TP_IPv6DNSServers'])
+        ]
+        _, values = self.req_act(acts)
+
+        ipv6_status = IPv6Status()
+
+        for item in self._to_list(values):
+            if int(item.get('enable', '0')) == 0:
+                continue
+            ipv6_status._wan_ipv6_conn_status = item.get('X_TP_IPv6ConnStatus', '')
+            ipv6_status._wan_ipv6_addr_type = item.get('X_TP_IPv6AddressingType', '')
+            ipv6_status._wan_ipv6_ipaddr = get_ipv6(item.get('X_TP_ExternalIPv6Address', '::'))
+            ipv6_status._wan_ipv6_prefix_length = item.get('X_TP_PrefixLength')
+            ipv6_status._wan_ipv6_gateway = get_ipv6(item.get('X_TP_DefaultIPv6Gateway', '::'))
+            ipv6_status._wan_ipv6_site_prefix = get_ipv6(item.get('X_TP_SitePrefix', '::'))
+            ipv6_status._wan_ipv6_site_prefix_length = item.get('X_TP_SitePrefixLength')
+            ipv6_dns = item.get('X_TP_IPv6DNSServers', '').split(',')
+            ipv6_status._wan_ipv6_pridns_address = get_ipv6(ipv6_dns[0] if len(ipv6_dns) > 0 else '::')
+            ipv6_status._wan_ipv6_secdns_address = get_ipv6(ipv6_dns[1] if len(ipv6_dns) > 0 else '::')
+
+        return ipv6_status
+    
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         acts = [
             self.ActItem(
