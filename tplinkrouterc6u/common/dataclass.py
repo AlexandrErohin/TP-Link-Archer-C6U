@@ -100,6 +100,10 @@ class Status:
         return self._wan_ipv4_addr
 
     @property
+    def wan_ipv6_addr(self) -> str | None:
+        return str(self._wan_ipv6_addr) if self._wan_ipv6_addr else None
+
+    @property
     def lan_ipv4_addr(self) -> str | None:
         return str(self._lan_ipv4_addr) if self._lan_ipv4_addr else None
 

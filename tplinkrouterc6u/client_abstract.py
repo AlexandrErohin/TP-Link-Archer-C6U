@@ -44,10 +44,6 @@ class AbstractRouter(ABC):
         pass
 
     @abstractmethod
-    def get_ipv6_status(self) -> IPv6Status:
-        pass
-    
-    @abstractmethod
     def reboot(self) -> None:
         pass
 
