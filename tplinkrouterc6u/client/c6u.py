@@ -17,6 +17,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     VPNStatus,
+    GuestWifiStatus,
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,
@@ -222,7 +223,9 @@ class TplinkEncryption(TplinkRequest):
         data_len = len(encrypted_data)
         hash = md5((self.username + self.password).encode()).hexdigest()
 
-        sign = self._encryption.get_signature(int(self._seq) + data_len, True, hash, self.nn, self.ee)
+        sign = self._encryption.get_signature(int(self._seq) + data_len,
+                                              True if self._logged is False else False,
+                                              hash, self.nn, self.ee)
 
         return {'sign': sign, 'data': encrypted_data}
 
@@ -259,7 +262,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def authorize(self) -> bool:
         pass
 
-    def set_wifi(self, wifi: Connection, enable: bool) -> None:
+    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
+                 encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
+                 hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
+                 disabled_all: str = None, portal_password: str = None) -> None:
         values = {
             Connection.HOST_2G: 'wireless_2g',
             Connection.HOST_5G: 'wireless_5g',
@@ -271,10 +277,86 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             Connection.IOT_5G: 'iot_5g',
             Connection.IOT_6G: 'iot_6g',
         }
+
         value = values.get(wifi)
+        if not value:
+            raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
+
+        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                   htmode, channel, txpower, disabled_all, portal_password]):
+            raise ValueError("At least one wireless setting must be provided")
+
+        data = "operation=write"
+
+        if enable is not None:
+            # Backward compatibility with existing tests
+            if all(v is None for v in [ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                       htmode, channel, txpower, disabled_all, portal_password]):
+                data += f"&enable={'on' if enable else 'off'}"
+            else:
+                data += f"&{value}_enable={'on' if enable else 'off'}"
+        if ssid is not None:
+            data += f"&{value}_ssid={ssid}"
+        if hidden is not None:
+            data += f"&{value}_hidden={hidden}"
+        if encryption is not None:
+            data += f"&{value}_encryption={encryption}"
+        if psk_version is not None:
+            data += f"&{value}_psk_version={psk_version}"
+        if psk_cipher is not None:
+            data += f"&{value}_psk_cipher={psk_cipher}"
+        if psk_key is not None:
+            data += f"&{value}_psk_key={psk_key}"
+        if hwmode is not None:
+            data += f"&{value}_hwmode={hwmode}"
+        if htmode is not None:
+            data += f"&{value}_htmode={htmode}"
+        if channel is not None:
+            data += f"&{value}_channel={channel}"
+        if txpower is not None:
+            data += f"&{value}_txpower={txpower}"
+        if disabled_all is not None:
+            data += f"&{value}_disabled_all={disabled_all}"
+        if portal_password is not None:
+            data += f"&{value}_portal_password={portal_password}"
+
         path = f"admin/wireless?form={value}"
-        data = f"operation=write&enable={'on' if enable else 'off'}"
         self.request(path, data)
+
+    def get_guest_wifi_info(self) -> GuestWifiStatus:
+        data = self.request('admin/wireless?form=guest_2g&form=guest_5g&form=guest_2g5g', 'operation=read')
+        guest_wifi = GuestWifiStatus()
+        guest_wifi.guest_2g_enable = self._str2bool(data.get('guest_2g_enable'))
+        guest_wifi.guest_2g_ssid = data.get('guest_2g_ssid')
+        guest_wifi.guest_2g_encryption = data.get('guest_2g_encryption')
+        guest_wifi.guest_2g_psk_key = data.get('guest_2g_psk_key')
+        guest_wifi.guest_2g_portal_enable = self._str2bool(data.get('guest_2g_portal_enable'))
+        guest_wifi.guest_2g_portal_password = data.get('guest_2g_portal_password')
+        guest_wifi.guest_5g_enable = self._str2bool(data.get('guest_5g_enable'))
+        guest_wifi.guest_5g_ssid = data.get('guest_5g_ssid')
+        guest_wifi.guest_5g_encryption = data.get('guest_5g_encryption')
+        guest_wifi.guest_5g_psk_key = data.get('guest_5g_psk_key')
+        guest_wifi.guest_5g_portal_enable = self._str2bool(data.get('guest_5g_portal_enable'))
+        guest_wifi.guest_5g_portal_password = data.get('guest_5g_portal_password')
+        return guest_wifi
+
+    def set_guest_wifi_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_psk_key={password}'
+        self.request(path, data, ignore_response=True)
+
+    def set_guest_wifi_portal_password(self, password: str, band: str = '2g5g') -> None:
+        if band not in ['2g', '5g', '2g5g']:
+            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
+        
+        form_name = f'guest_{band}'
+        path = f'admin/wireless?form=guest&form={form_name}'
+        data = f'operation=write&{form_name}_portal_password={password}'
+        self.request(path, data, ignore_response=True)
 
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
