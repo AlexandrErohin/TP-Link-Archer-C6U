@@ -860,6 +860,36 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(check_url, 'admin/wireless?form=iot_6g')
         self.assertEqual(check_data, 'operation=write&enable=on')
 
+    def test_add_ipv4_reservation(self) -> None:
+        check_url = ''
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        result = client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116', 'auto')
+        self.assertIsNone(result)
+        self.assertEqual(check_url, 'admin/dhcps?form=reservation')
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(body['operation'], 'insert')
+        self.assertEqual(
+            loads(body['new']),
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'})
+
+        # MAC is normalised to dash-uppercase and a disabled entry sends enable=off
+        client.add_ipv4_reservation('aa-bb-cc-dd-ee-ff', '10.0.0.50', enable=False)
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(
+            loads(body['new']),
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'})
+
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'
         router_class = self.router_class

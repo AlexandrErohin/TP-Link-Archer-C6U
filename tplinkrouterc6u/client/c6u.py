@@ -425,6 +425,21 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return ipv4_reservations
 
+    def add_ipv4_reservation(self, macaddr: str, ipaddr: str, comment: str = '', enable: bool = True) -> None:
+        """Add an IPv4 DHCP address reservation.
+
+        macaddr may be given in any common format (colon/dash, upper/lower);
+        it is normalised to the dash-uppercase form the router stores.
+        """
+        path = self._url_ipv4_reservations.split('&operation=')[0]
+        new = dumps({
+            'mac': str(get_mac(macaddr)),
+            'ip': ipaddr,
+            'comment': comment,
+            'enable': 'on' if enable else 'off',
+        })
+        self.request(path, urlencode({'operation': 'insert', 'new': new}))
+
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []
         data = self.request(self._url_ipv4_dhcp_leases, 'operation=load')
