@@ -1,4 +1,4 @@
-from hashlib import md5
+from hashlib import md5, sha256
 from re import search
 from time import time, sleep
 from urllib.parse import quote
@@ -6,7 +6,8 @@ from requests import Session, Response
 from datetime import timedelta, datetime
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
-from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM
+from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM, EncryptionWrapperMRECC
+from json import loads as json_loads
 from tplinkrouterc6u.common.package_enum import Connection, VPN
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
@@ -827,3 +828,141 @@ class TPLinkMRClient(TPLinkMRClientBase):
 # Class for MR series routers which supports AES cipher GCM mode
 class TPLinkMRClientGCM(TPLinkMRClientBaseGCM, TPLinkMRClient):
     pass
+
+
+# Class for MR600 v2 (and likely other MR-series units) on firmware generations
+# that replaced the RSA key exchange with ECIES over NIST P-224. Confirmed via
+# live protocol capture against an Archer MR600 v2 on firmware
+# "1.10.0 0.9.1 v0001.0 Build 260618 RC.40417n" (see issue #361). The act/OID
+# request format itself is unchanged - only the crypto/transport layer differs
+# from TPLinkMRClient/TPLinkMRClientGCM, so this subclasses TPLinkMRClient to
+# reuse get_firmware/get_status/get_lte_status/SMS/etc. unmodified.
+class TPLinkMR600Client(TPLinkMRClient):
+    ROUTER_NAME = "TP Link Router MR600"
+
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+
+        # this firmware generation hashes with SHA256, not MD5
+        self._hash = sha256(f"{self.username}{self.password}".encode()).hexdigest()
+        self._encryption = EncryptionWrapperMRECC()
+        self._ecc_pub_hex = None
+
+    def supports(self) -> bool:
+        try:
+            self._req_ecc_key()
+            return True
+        except ClientException:
+            return False
+
+    def authorize(self) -> None:
+        if self._token is not None and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
+            return
+        self._token = None
+
+        # request the ECC public key from the host
+        self._ecc_pub_hex, self._seq = self._req_ecc_key()
+
+        # authenticate
+        self._req_login()
+
+        # request TokenID
+        self._token = self._req_token()
+        self._authorized_at = datetime.now()
+
+    def logout(self) -> None:
+        # The logout act's decrypted response on this firmware does not carry
+        # a `$.ret=` code (unlike other MR clients) - treat the request as
+        # best-effort and always clear the local token afterwards.
+        if self._token is None:
+            return
+
+        acts = [
+            self.ActItem(self.ActItem.CGI, '/cgi/logout')
+        ]
+        try:
+            self.req_act(acts)
+        finally:
+            self._token = None
+
+    def _req_ecc_key(self):
+        """
+        Requests the ECC public key from the host. Unlike the RSA-based
+        MR clients (where /cgi/getParm returns inline JS `var nn=...;`), this
+        firmware generation returns JSON:
+            {"eccPubKey_X_HEX": "...", "eccPubKey_Y_HEX": "...",
+             "userSetting": 1, "seq": "266656725", "ret": 0}
+
+        Return value:
+            (ecc_pub_hex, seq) tuple, where ecc_pub_hex = '224' + X_HEX + Y_HEX
+        """
+        response = ''
+        try:
+            url = self._get_url(self._url_rsa_key)
+            (code, response) = self._request(url)
+            assert code == 200
+
+            parsed = json_loads(response)
+            assert parsed.get('ret') == self.HTTP_RET_OK
+
+            x_hex = parsed['eccPubKey_X_HEX']
+            y_hex = parsed['eccPubKey_Y_HEX']
+            seq = parsed['seq']
+
+            assert len(x_hex) == 56
+            assert len(y_hex) == 56
+            assert str(seq).isnumeric()
+        except Exception as e:
+            error = (self.ROUTER_NAME + '- {} - Unknown error ecc_key! Error - {}; Response - {}'
+                     .format(self.__class__.__name__, e, response))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+
+        return '224' + x_hex + y_hex, int(seq)
+
+    def _parse_ret_val(self, response_text):
+        # login (and some error) responses on this firmware are plain JSON
+        # (e.g. '{"ret":0}') rather than the '$.ret=0;' JS-var format used
+        # elsewhere - fall back to the base implementation for anything else.
+        try:
+            return int(json_loads(response_text)['ret'])
+        except Exception:
+            return super()._parse_ret_val(response_text)
+
+    def _req_login(self) -> None:
+        # Same as the base implementation, except the base's
+        # `assert len(sign) == 256` only holds for the fixed-length RSA-hex
+        # signature format - our ECIES signature is a variable-length JSON
+        # string, so that assertion does not apply here.
+        sign, data = self._prepare_data(self.username + '\n' + self.password, True)
+
+        data = {
+            'data': quote(data, safe='~()*!.\''),
+            'sign': sign,
+            'Action': 1,
+            'LoginStatus': 0,
+            'isMobile': 0
+        }
+
+        url = self._get_url('cgi/login', data)
+        (code, response) = self._request(url)
+        assert code == 200
+
+        ret_code = self._parse_ret_val(response)
+        if ret_code != self.HTTP_RET_OK:
+            error = self.ROUTER_NAME + ' - Login failed. Error code: {}'.format(ret_code)
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error)
+
+    def _prepare_data(self, data: str, is_login: bool) -> tuple[str, str]:
+        encrypted_data = self._encryption.aes_encrypt(data)
+        data_len = len(encrypted_data)
+        hmac_hex = self._encryption.compute_hmac(data)
+        signature = self._encryption.get_signature(
+            int(self._seq) + data_len, is_login, self._hash, self._ecc_pub_hex, hmac_hex
+        )
+
+        return signature, encrypted_data
