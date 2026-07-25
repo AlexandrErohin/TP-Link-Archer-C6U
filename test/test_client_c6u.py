@@ -1,4 +1,5 @@
 from unittest import main, TestCase
+from unittest.mock import patch, Mock
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from json import loads
@@ -15,6 +16,7 @@ from tplinkrouterc6u import (
     VpnClientServer,
     VpnClientDevice,
 )
+from tplinkrouterc6u.common.exception import ClientError
 
 
 class TestTPLinkClient(TestCase):
@@ -1368,3 +1370,54 @@ class TestTPLinkClient(TestCase):
 
 if __name__ == '__main__':
     main()
+
+
+class TestIPv4ListEnvelope(TestCase):
+    """Both response shapes must work: firmware differs, so neither may be assumed.
+
+    An Archer BE805 v1.20 on 1.5.1 Build 20260523 rel.11659(5347) answers the
+    reservation load with {"list": [...]}, while other models answer with a bare
+    array. Iterating the response directly walks dict KEYS on the former, so the
+    first item['mac'] raises TypeError.
+    """
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
+    def test_reservations_accept_bare_list(self, mock_request: Mock) -> None:
+        mock_request.return_value = [
+            {'mac': '02-00-00-00-00-01', 'ip': '10.0.0.1', 'comment': 'a', 'enable': 'on'},
+        ]
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        result = client.get_ipv4_reservations()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(str(result[0].macaddr), '02-00-00-00-00-01')
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
+    def test_reservations_accept_list_envelope(self, mock_request: Mock) -> None:
+        mock_request.return_value = {'list': [
+            {'mac': '02-00-00-00-00-02', 'ip': '10.0.0.2', 'comment': 'b', 'enable': 'on',
+             'hostname': 'host', 'key': 'k'},
+        ]}
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        result = client.get_ipv4_reservations()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(str(result[0].macaddr), '02-00-00-00-00-02')
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
+    def test_reservations_reject_unknown_shape(self, mock_request: Mock) -> None:
+        # A clear error beats TypeError from three frames deeper: the message
+        # names the keys actually received, which is what a bug report needs.
+        mock_request.return_value = {'unexpected': []}
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        with self.assertRaises(ClientError) as ctx:
+            client.get_ipv4_reservations()
+        self.assertIn('unexpected', str(ctx.exception))
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
+    def test_leases_accept_both_shapes(self, mock_request: Mock) -> None:
+        lease = {'macaddr': '02-00-00-00-00-03', 'ipaddr': '10.0.0.3',
+                 'name': 'n', 'leasetime': '1:00:00'}
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        mock_request.return_value = [lease]
+        self.assertEqual(len(client.get_ipv4_dhcp_leases()), 1)
+        mock_request.return_value = {'dhcp_clients': [lease]}
+        self.assertEqual(len(client.get_ipv4_dhcp_leases()), 1)
