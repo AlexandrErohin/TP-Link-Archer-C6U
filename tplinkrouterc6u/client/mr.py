@@ -824,6 +824,11 @@ class TPLinkMRClient(TPLinkMRClientBase):
 
         return status
 
+    def get_lte_serving_cells(self) -> list[dict]:
+        acts = [self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO')]
+        _, values = self.req_act(acts)
+        return [c for c in self._to_list(values) if c.get('cellConnectionStatus') == '1']
+
 
 # Class for MR series routers which supports AES cipher GCM mode
 class TPLinkMRClientGCM(TPLinkMRClientBaseGCM, TPLinkMRClient):
