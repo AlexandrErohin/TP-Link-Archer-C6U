@@ -9,6 +9,9 @@ from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Util.Padding import pad, unpad
 from time import time
 from random import randint
+from Crypto.PublicKey.ECC import EccPoint, _curves as _ecc_curves
+from Crypto.Hash import SHA256 as CryptoSHA256, HMAC as CryptoHMAC
+from json import dumps as json_dumps
 
 
 class EncryptionWrapper:
@@ -304,3 +307,92 @@ class EncryptionWrapperMRGCM:
         n = int('0x' + nn, 16)
         e = int('0x' + ee, 16)
         return RSA.construct((n, e))
+
+
+class EncryptionWrapperMRECC:
+    """
+    Used by MR-series routers whose firmware replaced the legacy RSA key exchange
+    with ECIES over NIST P-224 (this mirrors TP-Link's own client-side crypto,
+    served by the router itself as ecc.min.js/tpEncrypt.js - stock SJCL under the
+    hood). Session payload cipher is still AES-128-CBC/PKCS7, same as
+    EncryptionWrapperMR, but the per-request signature is ECIES-encrypted instead
+    of RSA-encrypted, and each request additionally carries a separate
+    HMAC-SHA256 (keyed with the raw ASCII session AES key) over the plaintext
+    payload, appended as a 4th field alongside the ECIES iv/ct/tag.
+    """
+    AES_KEY_LEN = 128 // 8
+    AES_IV_LEN = 16
+    ECC_FIELD_BYTES = 28  # NIST P-224 = 224 bits
+
+    def __init__(self) -> None:
+        ts = str(round(time() * 1000))
+
+        key = (ts + str(randint(100000000, 1000000000 - 1)))[:self.AES_KEY_LEN]
+        iv = (ts + str(randint(100000000, 1000000000 - 1)))[:self.AES_IV_LEN]
+
+        assert len(key) == self.AES_KEY_LEN
+        assert len(iv) == self.AES_IV_LEN
+
+        self._key = key
+        self._iv = iv
+
+    def aes_encrypt(self, raw: str) -> str:
+        data_padded = pad(raw.encode('utf8'), 16, 'pkcs7')
+        aes_encryptor = self._make_aes_cipher()
+        encrypted_data_bytes = aes_encryptor.encrypt(data_padded)
+        return b64encode(encrypted_data_bytes).decode('utf8')
+
+    def aes_decrypt(self, data: str):
+        encrypted_response_data = b64decode(data)
+        aes_decryptor = self._make_aes_cipher()
+        response = aes_decryptor.decrypt(encrypted_response_data)
+        return unpad(response, 16, 'pkcs7').decode('utf8')
+
+    def compute_hmac(self, data: str) -> str:
+        h = CryptoHMAC.new(self._key.encode('utf-8'), digestmod=CryptoSHA256)
+        h.update(data.encode('utf-8'))
+        return h.hexdigest()
+
+    def get_signature(self, seq: int, is_login: bool, hash: str, ecc_pub_hex: str, hmac_hex: str) -> str:
+        if is_login:
+            # on login we also send our AES key, which is subsequently
+            # used for E2E encrypted communication
+            sign_data = 'key={}&iv={}&h={}&s={}'.format(self._key, self._iv, hash, seq)
+        else:
+            sign_data = 'h={}&s={}'.format(hash, seq)
+
+        sign_obj = self._ecies_encrypt(sign_data, ecc_pub_hex)
+        sign_obj['hmac'] = hmac_hex
+
+        return json_dumps(sign_obj)
+
+    def _ecies_encrypt(self, plaintext: str, ecc_pub_hex: str) -> dict:
+        # ecc_pub_hex = '224' + X_HEX(56 chars) + Y_HEX(56 chars), as served by
+        # the router's own /cgi/getParm response
+        assert ecc_pub_hex[:3] == '224'
+        x = int(ecc_pub_hex[3:3 + 56], 16)
+        y = int(ecc_pub_hex[3 + 56:3 + 112], 16)
+        router_pub = EccPoint(x, y, curve='p224')
+
+        curve = _ecc_curves['p224']
+        order = int(curve.order)
+        e = int.from_bytes(Random.get_random_bytes(32), 'big') % (order - 1) + 1
+
+        ephemeral_pub = curve.G * e
+        tag_hex = (
+            int(ephemeral_pub.x).to_bytes(self.ECC_FIELD_BYTES, 'big')
+            + int(ephemeral_pub.y).to_bytes(self.ECC_FIELD_BYTES, 'big')
+        ).hex()
+
+        shared_point = router_pub * e
+        shared_x_bytes = int(shared_point.x).to_bytes(self.ECC_FIELD_BYTES, 'big')
+        kem_key = CryptoSHA256.new(shared_x_bytes).digest()[:16]
+
+        ecies_iv = Random.get_random_bytes(16)
+        cipher = AES.new(kem_key, AES.MODE_CBC, iv=ecies_iv)
+        ct = cipher.encrypt(pad(plaintext.encode('utf-8'), 16))
+
+        return {'iv': ecies_iv.hex(), 'ct': ct.hex(), 'tag': tag_hex}
+
+    def _make_aes_cipher(self) -> AES:
+        return AES.new(self._key.encode('utf8'), AES.MODE_CBC, iv=self._iv.encode('utf8'))
