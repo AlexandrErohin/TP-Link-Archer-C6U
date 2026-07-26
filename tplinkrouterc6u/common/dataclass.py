@@ -352,16 +352,12 @@ class VpnClientServer:
     status: str | None = None
 
 @dataclass
-class GuestWifiStatus:
-    guest_2g_enable: bool | None = None
-    guest_2g_ssid: str | None = None
-    guest_2g_encryption: str | None = None
-    guest_2g_psk_key: str | None = None
-    guest_2g_portal_enable: bool | None = None
-    guest_2g_portal_password: str | None = None
-    guest_5g_enable: bool | None = None
-    guest_5g_ssid: str | None = None
-    guest_5g_encryption: str | None = None
-    guest_5g_psk_key: str | None = None
-    guest_5g_portal_enable: bool | None = None
-    guest_5g_portal_password: str | None = None
+class WifiStatus:
+    enable: bool | None = None
+    ssid: str | None = None
+    hidden: bool | None = None
+    encryption: str | None = None
+    psk_key: str | None = None
+    portal_enable: bool | None = None
+    portal_password: str | None = None
+    channel: int | None = None

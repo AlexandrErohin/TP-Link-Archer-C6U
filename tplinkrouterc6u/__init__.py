@@ -34,7 +34,7 @@ from tplinkrouterc6u.common.dataclass import (
     SMS,
     LTEStatus,
     VPNStatus,
-    GuestWifiStatus,
+    WifiStatus,
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,

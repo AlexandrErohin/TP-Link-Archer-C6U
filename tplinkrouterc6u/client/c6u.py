@@ -17,7 +17,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4DHCPLease,
     IPv4Status,
     VPNStatus,
-    GuestWifiStatus,
+    WifiStatus,
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,
@@ -323,40 +323,38 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         path = f"admin/wireless?form={value}"
         self.request(path, data)
 
-    def get_guest_wifi_info(self) -> GuestWifiStatus:
-        data = self.request('admin/wireless?form=guest_2g&form=guest_5g&form=guest_2g5g', 'operation=read')
-        guest_wifi = GuestWifiStatus()
-        guest_wifi.guest_2g_enable = self._str2bool(data.get('guest_2g_enable'))
-        guest_wifi.guest_2g_ssid = data.get('guest_2g_ssid')
-        guest_wifi.guest_2g_encryption = data.get('guest_2g_encryption')
-        guest_wifi.guest_2g_psk_key = data.get('guest_2g_psk_key')
-        guest_wifi.guest_2g_portal_enable = self._str2bool(data.get('guest_2g_portal_enable'))
-        guest_wifi.guest_2g_portal_password = data.get('guest_2g_portal_password')
-        guest_wifi.guest_5g_enable = self._str2bool(data.get('guest_5g_enable'))
-        guest_wifi.guest_5g_ssid = data.get('guest_5g_ssid')
-        guest_wifi.guest_5g_encryption = data.get('guest_5g_encryption')
-        guest_wifi.guest_5g_psk_key = data.get('guest_5g_psk_key')
-        guest_wifi.guest_5g_portal_enable = self._str2bool(data.get('guest_5g_portal_enable'))
-        guest_wifi.guest_5g_portal_password = data.get('guest_5g_portal_password')
-        return guest_wifi
+    def get_wifi(self, wifi: Connection) -> WifiStatus:
+        values = {
+            Connection.HOST_2G: 'wireless_2g',
+            Connection.HOST_5G: 'wireless_5g',
+            Connection.HOST_6G: 'wireless_6g',
+            Connection.GUEST_2G: 'guest_2g',
+            Connection.GUEST_5G: 'guest_5g',
+            Connection.GUEST_6G: 'guest_6g',
+            Connection.IOT_2G: 'iot_2g',
+            Connection.IOT_5G: 'iot_5g',
+            Connection.IOT_6G: 'iot_6g',
+        }
+        value = values.get(wifi)
+        if not value:
+            raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
 
-    def set_guest_wifi_password(self, password: str, band: str = '2g5g') -> None:
-        if band not in ['2g', '5g', '2g5g']:
-            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
-        
-        form_name = f'guest_{band}'
-        path = f'admin/wireless?form=guest&form={form_name}'
-        data = f'operation=write&{form_name}_psk_key={password}'
-        self.request(path, data, ignore_response=True)
+        data = self.request(f'admin/wireless?form={value}', 'operation=read')
+        status = WifiStatus()
 
-    def set_guest_wifi_portal_password(self, password: str, band: str = '2g5g') -> None:
-        if band not in ['2g', '5g', '2g5g']:
-            raise ValueError("Invalid band specified. Must be one of '2g', '5g', '2g5g'.")
-        
-        form_name = f'guest_{band}'
-        path = f'admin/wireless?form=guest&form={form_name}'
-        data = f'operation=write&{form_name}_portal_password={password}'
-        self.request(path, data, ignore_response=True)
+        def get_v(key):
+            return data.get(f'{value}_{key}', data.get(key))
+
+        status.enable = self._str2bool(get_v('enable'))
+        status.ssid = get_v('ssid')
+        status.hidden = self._str2bool(get_v('hidden'))
+        status.encryption = get_v('encryption')
+        status.psk_key = get_v('psk_key')
+        status.portal_enable = self._str2bool(get_v('portal_enable'))
+        status.portal_password = get_v('portal_password')
+        status.channel = int(get_v('channel')) if get_v('channel') else None
+
+        return status
 
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', True)
