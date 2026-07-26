@@ -350,3 +350,14 @@ class VpnClientServer:
     protocol: VpnClientServerProtocol
     active: bool
     status: str | None = None
+
+@dataclass
+class WifiStatus:
+    enable: bool | None = None
+    ssid: str | None = None
+    hidden: bool | None = None
+    encryption: str | None = None
+    psk_key: str | None = None
+    portal_enable: bool | None = None
+    portal_password: str | None = None
+    channel: int | None = None

@@ -203,7 +203,7 @@ class TplinkRouterSG(TplinkBaseRouter):
 
         # Send login request
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
-        body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
+        body = {'sign': sign, 'data': encrypted_data}
         response = post(
             url, data=body, headers=self._headers_login,
             timeout=self.timeout, verify=self._verify_ssl,
@@ -253,7 +253,7 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign = self._build_request_signature(len(encrypted_data))
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
+        body = {'sign': sign, 'data': encrypted_data}
         response = post(
             url, data=body, headers=self._headers_request,
             cookies={'sysauth': self._sysauth},

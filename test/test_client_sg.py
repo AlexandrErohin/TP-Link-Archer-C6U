@@ -206,8 +206,9 @@ class TestTplinkRouterSGUnit(TestCase):
 
         call_kwargs = mock_post.call_args
         body = call_kwargs[1]['data']
-        self.assertTrue(body.startswith('sign='))
-        self.assertIn('&data=', body)
+        self.assertIsInstance(body, dict)
+        self.assertIn('sign', body)
+        self.assertIn('data', body)
 
         # Hash should have been updated to SHA256 of the encrypted data
         self.assertNotEqual(client._hash, 'fakehash')
