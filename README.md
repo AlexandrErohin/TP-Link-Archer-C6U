@@ -32,6 +32,7 @@ from tplinkrouterc6u import (
     TPLinkMRClientGCM, # Class for MR series routers which supports AES cipher GCM mode
     TPLinkMR200Client,
     TPLinkMR6400v7Client,
+    TPLinkMR600Client, # Class for MR series that replaced the RSA key exchange with ECIES over NIST P-224
     TPLinkVRClient,
     TPLinkVR400v2Client,
     TplinkVR1200vRouter,
@@ -408,6 +409,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - Deco XE75PRO (v3.0)
 - EAP115 v2.0
 - EX511 v2.0
+- HB810 v2.6
 - HX510 v1.0
 - M8550 v1
 - NE200-Outdoor v1.0
@@ -451,6 +453,7 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 - ME30 1.0
 - MR47BE v1.0
 - MR50G 1.0
+- MR80X v2.0
 
 Please let me know if you have tested integration with any other model. Open an issue with info about router's model, hardware and firmware versions.
 
