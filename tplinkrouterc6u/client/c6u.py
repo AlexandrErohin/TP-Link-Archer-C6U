@@ -414,11 +414,39 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return ipv4_status
 
+    @staticmethod
+    def _as_list(data, envelope_key: str, what: str) -> list:
+        """Return a list payload whether or not the router wrapped it.
+
+        Some firmware answers these `operation=load` calls with a bare JSON
+        array, and some wraps it as ``{"<key>": [...]}``. Observed on an Archer
+        BE805 v1.20 running 1.5.1 Build 20260523 rel.11659(5347), where the
+        reservation payload arrives as ``{"list": [...]}`` and iterating the
+        response directly yields dict *keys*, so the first ``item['mac']``
+        raises ``TypeError: string indices must be integers``.
+
+        Both shapes are accepted rather than one being replaced by the other:
+        these payloads are model- and firmware-specific, and swapping the
+        assumption would simply move the failure to whichever routers answer the
+        other way.
+        """
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            value = data.get(envelope_key)
+            if isinstance(value, list):
+                return value
+            raise ClientError(
+                '{} response is an object without a list "{}"; got keys {}'
+                .format(what, envelope_key, sorted(data.keys())))
+        raise ClientError('{} response is neither a list nor an object; got {}'
+                          .format(what, type(data).__name__))
+
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
         ipv4_reservations = []
         data = self.request(self._url_ipv4_reservations, 'operation=load')
 
-        for item in data:
+        for item in self._as_list(data, 'list', 'IPv4 reservation'):
             ipv4_reservations.append(
                 IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), item['comment'],
                                 self._str2bool(item['enable'])))
@@ -444,7 +472,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         dhcp_leases = []
         data = self.request(self._url_ipv4_dhcp_leases, 'operation=load')
 
-        for item in data:
+        for item in self._as_list(data, 'dhcp_clients', 'DHCP lease'):
             dhcp_leases.append(
                 IPv4DHCPLease(get_mac(item['macaddr']), get_ip(item['ipaddr']), item['name'],
                               item['leasetime']))
