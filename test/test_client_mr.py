@@ -14,6 +14,7 @@ from tplinkrouterc6u import (
     ClientError,
     SMS,
     LTEStatus,
+    ServingCell,
     VPNStatus,
     VPN,
 )
@@ -1018,11 +1019,17 @@ ARFCN=100
 
         self.assertIsInstance(cells, list)
         self.assertEqual(len(cells), 2)
-        self.assertEqual(cells[0]['networkType'], '3')
-        self.assertEqual(cells[0]['band'], '3')
-        self.assertEqual(cells[0]['RSRP'], '-95')
-        self.assertEqual(cells[1]['networkType'], '8')
-        self.assertEqual(cells[1]['band'], '78')
+        self.assertIsInstance(cells[0], ServingCell)
+        self.assertEqual(cells[0].network_type, 3)
+        self.assertEqual(cells[0].band, 3)
+        self.assertEqual(cells[0].arfcn, 1300)
+        self.assertEqual(cells[0].downlink_bandwidth, 20)
+        self.assertEqual(cells[0].downlink_frequency, 1830)
+        self.assertEqual(cells[0].rsrp, -95)
+        self.assertEqual(cells[0].rsrq, -10)
+        self.assertEqual(cells[1].network_type, 8)
+        self.assertEqual(cells[1].band, 78)
+        self.assertEqual(cells[1].downlink_bandwidth, 100)
 
     def test_get_lte_serving_cells_empty(self) -> None:
         response = '''[0,0,0,0,0,0]0

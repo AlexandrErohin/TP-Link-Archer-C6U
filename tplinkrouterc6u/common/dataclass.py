@@ -265,6 +265,22 @@ class SMS:
 
 
 @dataclass
+class ServingCell:
+    network_type: int
+    band: int
+    arfcn: int
+    downlink_bandwidth: int | None = None
+    downlink_frequency: int | None = None
+    downlink_modulation: str | None = None
+    uplink_modulation: str | None = None
+    cqi: int | None = None
+    ri: int | None = None
+    resource_blocks: int | None = None
+    rsrp: int | None = None
+    rsrq: int | None = None
+
+
+@dataclass
 class LTEStatus:
     enable: int | None = None
     connect_status: int | None = None

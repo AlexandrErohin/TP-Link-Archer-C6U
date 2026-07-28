@@ -16,6 +16,7 @@ from tplinkrouterc6u import (
     VPNStatus,
     VPN,
     SMS,
+    ServingCell,
 )
 
 
@@ -906,12 +907,18 @@ class TestTPLinkEXClient(TestCase):
 
         self.assertIsInstance(cells, list)
         self.assertEqual(len(cells), 2)
-        self.assertEqual(cells[0]['networkType'], '3')
-        self.assertEqual(cells[0]['band'], '3')
-        self.assertEqual(cells[0]['RSRP'], '-70')
-        self.assertEqual(cells[1]['networkType'], '8')
-        self.assertEqual(cells[1]['band'], '7')
-        self.assertEqual(cells[1]['downlinkModType'], '256QAM')
+        self.assertIsInstance(cells[0], ServingCell)
+        self.assertEqual(cells[0].network_type, 3)
+        self.assertEqual(cells[0].band, 3)
+        self.assertEqual(cells[0].arfcn, 1300)
+        self.assertEqual(cells[0].downlink_bandwidth, 20)
+        self.assertEqual(cells[0].downlink_frequency, 1815)
+        self.assertEqual(cells[0].rsrp, -70)
+        self.assertEqual(cells[0].rsrq, -6)
+        self.assertEqual(cells[1].network_type, 8)
+        self.assertEqual(cells[1].band, 7)
+        self.assertEqual(cells[1].downlink_bandwidth, 15)
+        self.assertEqual(cells[1].downlink_modulation, '256QAM')
 
     def test_get_lte_serving_cells_empty(self) -> None:
         DEV2_LTE_SERVING_CELL_INFO = (
