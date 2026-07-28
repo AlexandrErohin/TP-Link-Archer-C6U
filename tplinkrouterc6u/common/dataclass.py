@@ -260,7 +260,7 @@ class IPv4Status:
     def lan_ipv4_netmask_address(self):
         return self._lan_ipv4_netmask
 
-    @dataclass
+@dataclass
 class IPv6Status:
     _wan_ipv6_conn_status: str = ""
     _wan_ipv6_conntype: str = ""
