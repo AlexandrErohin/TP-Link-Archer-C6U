@@ -16,6 +16,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    IPv6Status,
     SMS,
     LTEStatus,
     VPNStatus,
@@ -313,6 +314,25 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return ipv4_status
 
+    def get_ipv6_status(self) -> IPv6Status:
+        acts = [
+           self.ActItem(self.ActItem.GS, 'WAN_IP_CONN')
+        ]
+        _, values = self.req_act(acts)
+
+        ipv6_status = IPv6Status()
+
+        for item in self._to_list(values):
+            if int(item.get('enable', '0')) == 0:
+                continue
+            ipv6_status._wan_ipv6_addr = get_ipv6(item.get('X_TP_ExternalIPv6Address', '::'))
+            ipv6_status._wan_ipv6_gateway = get_ipv6(item.get('X_TP_DefaultIPv6Gateway', '::'))
+            ipv6_dns = item.get('X_TP_IPv6DNSServers', '').split(',')
+            ipv6_status._wan_ipv6_pridns = get_ipv6(ipv6_dns[0] if len(ipv6_dns) > 0 else '::')
+            ipv6_status._wan_ipv6_snddns = get_ipv6(ipv6_dns[1] if len(ipv6_dns) > 0 else '::')
+
+        return ipv6_status
+    
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         acts = [
             self.ActItem(

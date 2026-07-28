@@ -1,4 +1,4 @@
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from macaddress import EUI48
 
 
@@ -7,6 +7,13 @@ def get_ip(ip: str) -> IPv4Address:
         return IPv4Address(ip)
     except Exception:
         return IPv4Address('0.0.0.0')
+
+
+def get_ipv6(ip: str) -> IPv6Address:
+    try:
+        return IPv6Address(ip)
+    except Exception:
+        return IPv6Address('::')
 
 
 def get_mac(mac: str) -> EUI48:
