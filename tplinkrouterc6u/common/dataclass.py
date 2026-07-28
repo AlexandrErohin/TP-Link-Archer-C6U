@@ -351,6 +351,7 @@ class VpnClientServer:
     active: bool
     status: str | None = None
 
+
 @dataclass
 class WifiStatus:
     enable: bool | None = None

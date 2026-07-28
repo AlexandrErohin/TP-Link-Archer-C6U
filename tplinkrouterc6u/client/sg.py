@@ -18,7 +18,6 @@ from hashlib import sha256
 from base64 import b64encode, b64decode
 from random import randint
 from logging import Logger
-from urllib.parse import quote
 
 from Crypto.PublicKey.RSA import construct
 from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5, AES
