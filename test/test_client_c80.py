@@ -162,6 +162,19 @@ STATUS_RESPONSE_TEXT = ('00000\r\nid 1|1,0,0\r\nauthKey aaa3eKKee\r\nreserved\r\
                         '\r\nuMaxDownloadSpeed -1\r\nbwCtrlEnable 0\r\nenableBackup 0\r\nbTr069APEnable 0'
                         '\r\nbTr069SSIDEnable 0')
 
+STATUS_RESPONSE_WITHOUT_WIFI = ('00000\r\nid 1|1,0,0\r\nauthKey token\r\nreserved\r\nsetWzd 1\r\nmode 4\r\n'
+                                'mac 0 40-ae-30-af-c8-72\r\nmac 1 40-ae-30-af-c8-73\r\nwanMacType 0\r\n'
+                                'id 4|1,0,0\r\nip 192.168.2.1\r\nmask 255.255.255.0\r\nmode 0\r\n'
+                                'smartIp 0\r\ngateway 0.0.0.0\r\n'
+                                'id 9|1,0,0\r\nhostName 0 LGwebOSTV\r\nhostName 1 Kaspars\r\n'
+                                'hostName 2 Redmi-Note-13-Pro-5G\r\nhostName 3\r\n'
+                                'mac 0 60-75-6c-a1-4a-82\r\nmac 1 70-08-10-0b-c6-24\r\n'
+                                'mac 2 d6-02-54-6b-67-c4\r\nmac 3 00-00-00-00-00-00\r\n'
+                                'ip 0 192.168.2.100\r\nip 1 192.168.2.101\r\nip 2 192.168.2.102\r\nip 3 0.0.0.0\r\n'
+                                'state 0 5\r\nstate 1 5\r\nstate 2 5\r\nstate 3 0\r\n'
+                                'expires 0 4979\r\nexpires 1 5514\r\nexpires 2 6296\r\nexpires 3 0\r\n'
+                                'id 0|1,0,0\r\nmodelName TL-WR844N\r\nhardVer TL-WR844N%201.0')
+
 STATUS_RESPONSE_IOT = ('00000\r\nid 1|1,0,0\r\nauthKey aaa3eKKee\r\nreserved\r\nsetWzd 8\r\nmode 1\r\n'
                        'logLevel 3\r\nfastpath 1\r\nmac 0 00-00-00-00-00-00\r\nmac 1 00-00-00-00-00-01'
                        '\r\nwanMacType 0\r\nmodelMergeCursor 8\r\nid 4|1,0,0\r\nip 192.168.0.1\r\n'
@@ -431,7 +444,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(vpn_status.pptpvpn_clients_total, 0)
         self.assertEqual(vpn_status.pptpvpn_enable, True)
 
-    def test_get_status(self) -> None:
+    def test_get_status_with_wifi(self) -> None:
         client = TplinkC80RouterTest('', '')
         client.authorize()
 
@@ -568,6 +581,39 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
         self.assertEqual(len(status.devices), 6)
+
+    def test_get_status_without_wifi(self) -> None:
+        client = TplinkC80RouterTest('http://192.168.0.68', '')
+        client.authorize()
+
+        client.set_encrypted_response(STATUS_RESPONSE_WITHOUT_WIFI)
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.lan_macaddr, '40-AE-30-AF-C8-72')
+        self.assertIsInstance(status.lan_macaddress, EUI48)
+        self.assertEqual(status.wan_macaddr, '40-AE-30-AF-C8-73')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.2.1')
+        self.assertIsInstance(status.lan_ipv4_address, IPv4Address)
+        self.assertEqual(status.wan_ipv4_addr, '192.168.0.68')
+        self.assertEqual(status.conn_type, 'Router/AP')
+        self.assertTrue(status.wifi_2g_enable)
+        self.assertEqual(status.clients_total, 3)
+        self.assertEqual(status.wifi_clients_total, 3)
+        self.assertEqual(status.wired_total, 0)
+        self.assertEqual(len(status.devices), 3)
+
+        device = status.devices[0]
+        self.assertIsInstance(device, Device)
+        self.assertEqual(device.type, Connection.HOST_2G)
+        self.assertEqual(device.hostname, 'LGwebOSTV')
+        self.assertEqual(device.ipaddr, '192.168.2.100')
+        self.assertEqual(device.macaddr, '60-75-6C-A1-4A-82')
+
+        device = status.devices[2]
+        self.assertEqual(device.hostname, 'Redmi-Note-13-Pro-5G')
+        self.assertEqual(device.ipaddr, '192.168.2.102')
+        self.assertEqual(device.macaddr, 'D6-02-54-6B-67-C4')
 
     def test_get_ipv4(self) -> None:
         client = TplinkC80RouterTest('', '')

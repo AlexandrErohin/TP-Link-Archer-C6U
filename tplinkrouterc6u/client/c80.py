@@ -4,6 +4,7 @@ from urllib import parse
 from collections import defaultdict
 import re
 import requests
+from urllib.parse import urlparse
 from requests import Session
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
@@ -73,6 +74,7 @@ class TplinkC80Router(AbstractRouter):
         if self._verify_ssl is False:
             self._session.verify = False
         self._encryption = EncryptionState()
+        self._wifi_request = None
 
     def supports(self) -> bool:
         try:
@@ -124,6 +126,13 @@ class TplinkC80Router(AbstractRouter):
                         parse.unquote(device_datamap['softVer']))
 
     def get_status(self) -> Status:
+        if self._wifi_request is None:
+            request = '13|1,0,0'
+            self._wifi_request = request in self._return_data_block(request)
+
+        return self._get_status_with_wifi() if self._wifi_request else self._get_status_without_wifi()
+
+    def _get_status_with_wifi(self) -> Status:
         mac_info_request = "1|1,0,0"
         lan_ip_request = "4|1,0,0"
         wan_ip_request = "23|1,0,0"
@@ -135,14 +144,7 @@ class TplinkC80Router(AbstractRouter):
             RouterConstants.IOT_WIFI_2G_REQUEST, RouterConstants.IOT_WIFI_5G_REQUEST
         ]
         request_text = '#'.join(all_requests)
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block(request_text)
 
         def extract_value(response_list, prefix):
             return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
@@ -191,6 +193,42 @@ class TplinkC80Router(AbstractRouter):
                                 status.guest_clients_total + status.iot_clients_total)
 
         status.devices = mapped_devices
+        return status
+
+    def _get_status_without_wifi(self) -> Status:
+        request_text = '#'.join([
+            '1|1,0,0',
+            '4|1,0,0',
+            '9|1,0,0',
+            '23|1,0,0',
+            '0|1,0,0',
+        ])
+        data_blocks = self._return_data_block(request_text)
+
+        mac_info = self._parse_last_values_from_block(data_blocks.get('1|1,0,0', []))
+        lan_info = self._parse_last_values_from_block(data_blocks.get('4|1,0,0', []))
+        wan_info = self._parse_last_values_from_block(data_blocks.get('23|1,0,0', []))
+
+        devices = self._parse_dhcp_devices(data_blocks.get('9|1,0,0', []))
+
+        status = Status()
+        status._lan_macaddr = get_mac(mac_info.get('mac 0', '00-00-00-00-00-00'))
+        status._wan_macaddr = get_mac(mac_info.get('mac 1', '00-00-00-00-00-00'))
+        status._lan_ipv4_addr = get_ip(lan_info.get('ip') or self._host_ip())
+        status._wan_ipv4_addr = get_ip(wan_info.get('ip') or self._host_ip())
+
+        gateway = wan_info.get('gateway') or lan_info.get('gateway')
+        if gateway and gateway != '0.0.0.0':
+            status._wan_ipv4_gateway = get_ip(gateway)
+
+        uptime = wan_info.get('upTime')
+        status.wan_ipv4_uptime = int(uptime) // 100 if uptime and uptime.isdigit() else None
+        status.devices = devices
+        status.wired_total = 0
+        status.wifi_clients_total = len(devices)
+        status.clients_total = len(devices)
+        status.wifi_2g_enable = True
+        status.conn_type = 'Router/AP'
         return status
 
     def reboot(self) -> None:
@@ -372,10 +410,46 @@ class TplinkC80Router(AbstractRouter):
         return f'sign={sign}\r\ndata={data}'
 
     def _decrypt_data(self, encrypted_text: str) -> str:
+        if isinstance(encrypted_text, str) and encrypted_text.startswith('00000\r\n'):
+            return encrypted_text
         return self._encryption.aes.aes_decrypt(encrypted_text)
 
     def _extract_value(self, response_list, prefix):
         return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
+
+    def _return_data_block(self, request_text: str) -> dict[str, str]:
+        body = self._encrypt_body(request_text)
+
+        response = self.request(2, 1, True, data=body)
+        response_text = self._decrypt_data(response.text)
+
+        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
+
+        return {match[0]: match[1].strip().split("\r\n") for match in matches}
+
+    def _parse_last_values_from_block(self, lines: list[str]) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for line in lines:
+            if line == '00000' or line.startswith('id '):
+                continue
+            key, _, value = line.rpartition(' ')
+            if key:
+                values[key] = value.strip()
+        return values
+
+    def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
+        devices: list[Device] = []
+        for item in self._parse_response_to_dict(response_data):
+            ip = item.get('ip')
+            mac = item.get('mac')
+            if not ip or not mac or mac == '00-00-00-00-00-00':
+                continue
+            devices.append(Device(Connection.HOST_2G, get_mac(mac), get_ip(ip),
+                                  parse.unquote(item.get('hostName', ''))))
+        return devices
+
+    def _host_ip(self) -> str:
+        return urlparse(self.host).hostname or '0.0.0.0'
 
     def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
         url = f"{self.host}/?code={code}&asyn={asyn}"
