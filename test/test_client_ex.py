@@ -882,6 +882,56 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.snr, 270)
         self.assertEqual(status.isp_name, 'O2 2025')
 
+    def test_get_lte_serving_cells(self) -> None:
+        DEV2_LTE_SERVING_CELL_INFO = (
+            '{"data":[{"networkType": "3", "cellConnectionStatus": "1", "band": "3", "ARFCN": "1300",'
+            '"downBandWidth": "20000", "downFreq": "1815", "downlinkModType": "QPSK", "uplinkModType": "16QAM",'
+            '"CQI": "9", "RI": "1", "numRbs": "8", "RSRP": "-70", "RSRQ": "-6"},'
+            '{"networkType": "8", "cellConnectionStatus": "1", "band": "7", "ARFCN": "536170",'
+            '"downBandWidth": "15000", "downFreq": "2680", "downlinkModType": "256QAM", "uplinkModType": "64QAM",'
+            '"CQI": "15", "RI": "2", "numRbs": "24", "RSRP": "-69", "RSRQ": "-11"},'
+            '{"networkType": "3", "cellConnectionStatus": "0", "band": "1", "ARFCN": "100",'
+            '"downBandWidth": "0", "downFreq": "0", "downlinkModType": "", "uplinkModType": "",'
+            '"CQI": "0", "RI": "0", "numRbs": "0", "RSRP": "0", "RSRQ": "0"}],'
+            '"operation":"go", "oid":"DEV2_LTE_SERVING_CELL_INFO","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_SERVING_CELL_INFO' in data_str:
+                    return 200, DEV2_LTE_SERVING_CELL_INFO
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        cells = client.get_lte_serving_cells()
+
+        self.assertIsInstance(cells, list)
+        self.assertEqual(len(cells), 2)
+        self.assertEqual(cells[0]['networkType'], '3')
+        self.assertEqual(cells[0]['band'], '3')
+        self.assertEqual(cells[0]['RSRP'], '-70')
+        self.assertEqual(cells[1]['networkType'], '8')
+        self.assertEqual(cells[1]['band'], '7')
+        self.assertEqual(cells[1]['downlinkModType'], '256QAM')
+
+    def test_get_lte_serving_cells_empty(self) -> None:
+        DEV2_LTE_SERVING_CELL_INFO = (
+            '{"data":[{"networkType": "3", "cellConnectionStatus": "0", "band": "3", "ARFCN": "1300",'
+            '"downBandWidth": "0", "downFreq": "0", "downlinkModType": "", "uplinkModType": "",'
+            '"CQI": "0", "RI": "0", "numRbs": "0", "RSRP": "0", "RSRQ": "0"}],'
+            '"operation":"go", "oid":"DEV2_LTE_SERVING_CELL_INFO","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_SERVING_CELL_INFO' in data_str:
+                    return 200, DEV2_LTE_SERVING_CELL_INFO
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        cells = client.get_lte_serving_cells()
+
+        self.assertIsInstance(cells, list)
+        self.assertEqual(len(cells), 0)
+
     def test_send_sms(self) -> None:
         check_url = ''
         check_data = ''

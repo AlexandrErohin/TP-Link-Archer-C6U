@@ -486,6 +486,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         self.req_act(acts)
 
+    def get_lte_serving_cells(self) -> list[dict]:
+        acts = [self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO', attrs=[
+            'networkType', 'cellConnectionStatus', 'band', 'ARFCN', 'downBandWidth', 'downFreq',
+            'downlinkModType', 'uplinkModType', 'CQI', 'RI', 'numRbs', 'RSRP', 'RSRQ',
+        ])]
+        _, values = self.req_act(acts)
+        cells = values[0] if values else []
+        return [c for c in cells if c.get('cellConnectionStatus') == '1']
+
 
 # Class for EX series routers which supports AES cipher GCM mode
 class TPLinkEXClientGCM(TPLinkMRClientBaseGCM, TPLinkEXClient):
