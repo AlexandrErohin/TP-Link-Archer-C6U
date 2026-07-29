@@ -20,6 +20,17 @@ class TestTPLinkClientSG(TestTPLinkClient):
 class TestTplinkRouterSGUnit(TestCase):
     """Unit tests specific to TplinkRouterSG authentication and encryption."""
 
+    def setUp(self):
+        self.host = 'http://192.168.0.1'
+        self.password = 'test_password'
+        self.client = TplinkRouterSG(self.host, self.password)
+        self.client._logged = True
+        self.client._stok = 'mock_stok'
+        self.client._hash = 'fakehash'
+        self.client._aes_key = '1234567890123456'
+        self.client._aes_iv = '6543210987654321'
+        self.client._seq = 100
+
     def test_supports_password_too_long(self) -> None:
         long_password = 'a' * 126
         client = TplinkRouterSG('http://192.168.0.1', long_password)
@@ -178,40 +189,48 @@ class TestTplinkRouterSGUnit(TestCase):
     @patch('tplinkrouterc6u.client.sg.post')
     def test_request_hmac_signature(self, mock_post: Mock) -> None:
         """Verify non-login requests use HMAC-SHA256 signature."""
-        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
-        client._logged = True
-        client._stok = 'test_stok'
-        client._sysauth = 'test_sysauth'
-        client._aes_key = '1234567890123456'
-        client._aes_iv = '6543210987654321'
-        client._hash = 'fakehash'
-        client._seq = 100
-
         response = Mock()
         decrypted_data = json.dumps({
             'success': True,
             'data': {'key': 'value'}
         })
         response.json.return_value = {'data': 'encrypted'}
-
         mock_post.return_value = response
 
-        with patch.object(
-            client, '_aes_decrypt', return_value=decrypted_data
-        ):
-            result = client.request(
-                'admin/status?form=all', 'operation=read')
+        with patch.object(self.client, '_aes_decrypt', return_value=decrypted_data):
+            result = self.client.request('admin/status?form=all', 'operation=read')
 
         self.assertEqual(result, {'key': 'value'})
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]['data']
+        # Default for READ is string format
+        self.assertIsInstance(body, str)
+        self.assertTrue(body.startswith('sign='))
+        self.assertIn('&data=', body)
+
+        # Hash should have been updated to SHA256 of the encrypted data
+        self.assertNotEqual(self.client._hash, 'fakehash')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_write_dict_body(self, mock_post: Mock) -> None:
+        """Verify that WRITE requests switch to dictionary format (BE-series Fix)."""
+        response = Mock()
+        response.json.return_value = {'data': 'encrypted'}
+        mock_post.return_value = response
+
+        with patch.object(self.client, '_aes_decrypt', return_value='{"success": true}'):
+            self.client.request('admin/wireless?form=guest_2g', 'operation=write&ssid=test')
 
         call_kwargs = mock_post.call_args
         body = call_kwargs[1]['data']
         self.assertIsInstance(body, dict)
         self.assertIn('sign', body)
         self.assertIn('data', body)
-
-        # Hash should have been updated to SHA256 of the encrypted data
-        self.assertNotEqual(client._hash, 'fakehash')
+        
+        # Verify mandatory header is present for WRITE
+        headers = call_kwargs[1]['headers']
+        self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
 
 
 if __name__ == '__main__':
