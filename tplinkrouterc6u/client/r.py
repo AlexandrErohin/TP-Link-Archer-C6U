@@ -98,8 +98,7 @@ class TPLinkRClient(TPLinkXDRClient):
                 conn_type = Connection.HOST_5G
                 status.wifi_clients_total += 1
 
-            ipaddr = get_ip(item['ip']) if item.get('ip') else None
-            dev = Device(conn_type, get_mac(item['mac']), ipaddr, unquote(item['hostname']))
+            dev = Device(conn_type, get_mac(item.get('mac')), get_ip(item.get('ip')), unquote(item.get('hostname', '')))
             if 'up_speed' in item:
                 dev.up_speed = int(item['up_speed'])
             if 'down_speed' in item:

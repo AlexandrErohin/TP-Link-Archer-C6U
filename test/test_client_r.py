@@ -447,8 +447,8 @@ $(document).ready(function(e){
         self.assertIsInstance(status.devices[4], Device)
         self.assertEqual(status.devices[4].active, False)
         self.assertEqual(status.devices[4].type, Connection.UNKNOWN)
-        self.assertIsNone(status.devices[4].ipaddr)
-        self.assertIsNone(status.devices[4].ipaddress)
+        self.assertEqual(status.devices[4].ipaddr, '0.0.0.0')
+        self.assertIsInstance(status.devices[4].ipaddress, IPv4Address)
 
     def test_set_wifi_enable_guest_2g(self) -> None:
         mock_data = json.loads('''{"error_code":0}''')
