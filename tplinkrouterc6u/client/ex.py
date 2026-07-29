@@ -14,6 +14,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Status,
     LTEStatus,
     SMS,
+    ServingCell,
     VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
@@ -485,6 +486,40 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
 
         self.req_act(acts)
+
+    def get_lte_serving_cells(self) -> List[ServingCell]:
+        acts = [self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO', attrs=[
+            'networkType', 'cellConnectionStatus', 'band', 'ARFCN', 'downBandWidth', 'downFreq',
+            'downlinkModType', 'uplinkModType', 'CQI', 'RI', 'numRbs', 'RSRP', 'RSRQ',
+        ])]
+        _, values = self.req_act(acts)
+        raw_cells = values[0] if values else []
+
+        def clean_int(raw: str | None) -> int | None:
+            if raw is None or raw == '' or raw == '268435455':
+                return None
+            return int(raw)
+
+        cells = []
+        for c in raw_cells:
+            if c.get('cellConnectionStatus') != '1':
+                continue
+            bandwidth = clean_int(c.get('downBandWidth'))
+            cells.append(ServingCell(
+                network_type=int(c['networkType']),
+                band=int(c['band']),
+                arfcn=int(c['ARFCN']),
+                downlink_bandwidth=bandwidth // 1000 if bandwidth is not None else None,
+                downlink_frequency=clean_int(c.get('downFreq')),
+                downlink_modulation=c.get('downlinkModType') or None,
+                uplink_modulation=c.get('uplinkModType') or None,
+                cqi=clean_int(c.get('CQI')),
+                ri=clean_int(c.get('RI')),
+                resource_blocks=clean_int(c.get('numRbs')),
+                rsrp=clean_int(c.get('RSRP')),
+                rsrq=clean_int(c.get('RSRQ')),
+            ))
+        return cells
 
 
 # Class for EX series routers which supports AES cipher GCM mode
