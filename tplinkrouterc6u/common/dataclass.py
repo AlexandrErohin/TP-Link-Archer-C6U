@@ -29,6 +29,9 @@ class Device:
     traffic_usage: int | None = None
     signal: int | None = None
     active: bool = True
+    ap_name: str | None = None
+    ssid: str | None = None
+    frequency: str | None = None
 
     @property
     def macaddr(self):
