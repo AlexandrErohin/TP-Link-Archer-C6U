@@ -8,6 +8,7 @@ class TestTPLinkClientV1_11(TestTPLinkClient):
     """Inherits all tests from TestTPLinkClient, using TplinkRouterV1_11."""
 
     router_class = TplinkRouterV1_11
+    firmware_path = 'admin/firmware?form=upgrade&operation=read'
     game_accelerator_path = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
     openvpn_config_path = 'admin/openvpn?form=config&operation=read'
     pptpd_config_path = 'admin/pptpd?form=config&operation=read'

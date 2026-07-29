@@ -8,6 +8,7 @@ from tplinkrouterc6u import (
     TplinkRouter,
     Connection,
     Status,
+    Firmware,
     IPv4Status,
     Device,
     ClientException,
@@ -22,10 +23,39 @@ from tplinkrouterc6u.common.exception import ClientError
 
 class TestTPLinkClient(TestCase):
     router_class = TplinkRouter
+    firmware_path = 'admin/firmware?form=upgrade'
     game_accelerator_path = 'admin/smart_network?form=game_accelerator'
     openvpn_config_path = 'admin/openvpn?form=config'
     pptpd_config_path = 'admin/pptpd?form=config'
     vpn_uses_data_param = True
+
+    def test_get_firmware(self) -> None:
+        response = '''
+        {
+            "success": true,
+            "data": {
+                "hardware_version": "h_version 3.2",
+                "model": "TP-Link C6U",
+                "firmware_version": "f_version 1"
+            }
+        }
+'''
+        firmware_path = self.firmware_path
+
+        class TPLinkRouterTest(self.router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == firmware_path:
+                    return loads(response)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        firmware = client.get_firmware()
+
+        self.assertIsInstance(firmware, Firmware)
+        self.assertEqual(firmware.firmware_version, 'f_version 1')
+        self.assertEqual(firmware.hardware_version, 'h_version 3.2')
+        self.assertEqual(firmware.model, 'TP-Link C6U')
 
     def test_get_status(self) -> None:
         response_status = '''

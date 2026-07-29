@@ -11,6 +11,7 @@ class TestTPLinkClientSG(TestTPLinkClient):
     """Inherits get_status and other tests from TestTPLinkClient."""
 
     router_class = TplinkRouterSG
+    firmware_path = 'admin/firmware?form=upgrade&operation=read'
     game_accelerator_path = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
     openvpn_config_path = 'admin/openvpn?form=config&operation=read'
     pptpd_config_path = 'admin/pptpd?form=config&operation=read'
