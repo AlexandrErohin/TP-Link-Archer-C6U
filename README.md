@@ -132,6 +132,8 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | set_sms_read | sms: [SMS](#sms) | Set sms message read from the first page for LTE routers |   |
 | delete_sms | sms: [SMS](#sms) | Delete sms message from the first page for LTE routers |   |
 | get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
+| get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
+| get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -193,6 +195,9 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | traffic_usage | total traffic usage (bytes) | int, None |
 | signal | Signal strength | int, None |
 | active | Is active device | bool |
+| ap_name | ap_name | str |
+| ssid | ssid | str |
+| frequency | frequency | str |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |
@@ -301,6 +306,34 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 | isp_name | ISP name  | str |
 | network_types | All possible network types - {0: "No Service", 1: "GSM", 2: "WCDMA", 3: "4G LTE", 4: "TD-SCDMA", 5: "CDMA 1x", 6: "CDMA 1x Ev-Do", 7: "4G+ LTE", 8: "5G NR"} | dict |
 | sim_statuses | All possible sim statuses - {0: "No SIM card detected or SIM card error.", 1: "No SIM card detected.", 2: "SIM card error.", 3: "SIM card prepared.", 4: "SIM locked.", 5: "SIM unlocked. Authentication succeeded.", 6: "PIN locked.", 7: "SIM card is locked permanently.", 8: "suspension of transmission", 9: "Unopened"} | dict |
+
+### <a id="serving_cell">ServingCell</a>
+| Field | Description | Type |
+| --- |---|---|
+| network_type | network type  | int |
+| band| band number | int |
+| arfcn | absolute radio frequency channel number | int |
+| downlink_bandwidth | MHz | int |
+| downlink_frequency | MHz | int |
+| downlink_modulation | Downlink modulation scheme | str |
+| uplink_modulation | Uplink modulation scheme | str |
+| cqi | Channel quality indicator | int |
+| ri | Rank indicator | int |
+| resource_blocks | Number of resource blocks allocated in the NR cell | int |
+| rsrp | dBm | int |
+| rsrq | dBm | int |
+
+### <a id="WifiStatus">WifiStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | enable | bool |
+| ssid | ssid | str |
+| hidden | hidden | bool |
+| encryption | encryption | str |
+| psk_key | psk_key | str |
+| portal_enable | portal_enable | bool |
+| portal_password | portal_password | str |
+| channel | channel | int |
 
 ## Enum
 ### <a id="connection">Connection</a>
