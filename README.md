@@ -45,6 +45,7 @@ from tplinkrouterc6u import (
     TPLinkCPE210Client,
     TPLinkSG108EClient,
     TplinkC80Router,
+    TplinkWR844NRouter,
     TplinkWDRRouter,
     TPLinkC50Client,
     TPLinkWR841NClient,
