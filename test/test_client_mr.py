@@ -14,6 +14,7 @@ from tplinkrouterc6u import (
     ClientError,
     SMS,
     LTEStatus,
+    ServingCell,
     VPNStatus,
     VPN,
 )
@@ -982,6 +983,72 @@ ispName=Name
         status = client.get_lte_status()
 
         self.assertIsInstance(status, LTEStatus)
+
+    def test_get_lte_serving_cells(self) -> None:
+        response = '''[0,0,0,0,0,0]0
+cellConnectionStatus=1
+networkType=3
+band=3
+ARFCN=1300
+downBandWidth=20000
+downFreq=1830
+RSRP=-95
+RSRQ=-10
+[0,0,0,0,0,0]0
+cellConnectionStatus=1
+networkType=8
+band=78
+ARFCN=632628
+downBandWidth=100000
+downFreq=3600
+[0,0,0,0,0,0]0
+cellConnectionStatus=0
+networkType=3
+band=1
+ARFCN=100
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        cells = client.get_lte_serving_cells()
+
+        self.assertIsInstance(cells, list)
+        self.assertEqual(len(cells), 2)
+        self.assertIsInstance(cells[0], ServingCell)
+        self.assertEqual(cells[0].network_type, 3)
+        self.assertEqual(cells[0].band, 3)
+        self.assertEqual(cells[0].arfcn, 1300)
+        self.assertEqual(cells[0].downlink_bandwidth, 20)
+        self.assertEqual(cells[0].downlink_frequency, 1830)
+        self.assertEqual(cells[0].rsrp, -95)
+        self.assertEqual(cells[0].rsrq, -10)
+        self.assertEqual(cells[1].network_type, 8)
+        self.assertEqual(cells[1].band, 78)
+        self.assertEqual(cells[1].downlink_bandwidth, 100)
+
+    def test_get_lte_serving_cells_empty(self) -> None:
+        response = '''[0,0,0,0,0,0]0
+cellConnectionStatus=0
+networkType=3
+band=3
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        cells = client.get_lte_serving_cells()
+
+        self.assertIsInstance(cells, list)
+        self.assertEqual(len(cells), 0)
 
     def test_get_vpn_status(self) -> None:
         response = '''[0,0,0,0,0,0]0
