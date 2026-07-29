@@ -264,7 +264,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
 
         response = post(
-            url, data=body, headers=hdrs, 
+            url, data=body, headers=hdrs,
             cookies={'sysauth': self._sysauth},
             timeout=self.timeout, verify=self._verify_ssl,
         )
