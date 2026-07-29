@@ -331,7 +331,6 @@ $(document).ready(function(e){
           ".name": "2EDE61E7EA70",
           "up_speed": "0",
           "host_save": "on",
-          "ip": "192.168.60.212",
           "time_obj": "any",
           "is_cur_host": "false",
           "limit": "0",
@@ -434,6 +433,10 @@ $(document).ready(function(e){
         self.assertEqual(status.devices[0].ipaddr, '192.168.60.112')
         self.assertIsInstance(status.devices[0].ipaddress, IPv4Address)
         self.assertEqual(status.devices[0].hostname, 'iPhone')
+        self.assertEqual(status.devices[0].ap_name, 'xxx-ap')
+        self.assertEqual(status.devices[0].ssid, 'xxx')
+        self.assertEqual(status.devices[0].frequency, '5GHz')
+        self.assertEqual(status.devices[0].signal, -77)
         self.assertIsInstance(status.devices[1], Device)
         self.assertEqual(status.devices[1].type, Connection.HOST_2G)
         self.assertEqual(status.devices[1].macaddr, '44-23-7C-8F-C2-42')
@@ -444,6 +447,8 @@ $(document).ready(function(e){
         self.assertIsInstance(status.devices[4], Device)
         self.assertEqual(status.devices[4].active, False)
         self.assertEqual(status.devices[4].type, Connection.UNKNOWN)
+        self.assertIsNone(status.devices[4].ipaddr)
+        self.assertIsNone(status.devices[4].ipaddress)
 
     def test_set_wifi_enable_guest_2g(self) -> None:
         mock_data = json.loads('''{"error_code":0}''')
