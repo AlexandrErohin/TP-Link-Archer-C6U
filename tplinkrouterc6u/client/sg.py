@@ -254,9 +254,6 @@ class TplinkRouterSG(TplinkBaseRouter):
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
 
-        # SURGICAL OPERATION LOGIC:
-        # BE-series requires dictionary format and explicit Content-Type for WRITE.
-        # But REJECTS the header for READ (get_firmware, etc).
         is_write = 'operation=write' in data or 'operation=save' in data or 'operation=update' in data
 
         hdrs = self._headers_request.copy()
@@ -266,8 +263,11 @@ class TplinkRouterSG(TplinkBaseRouter):
         else:
             body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
 
-        response = post(url, data=body, headers=hdrs, cookies={'sysauth': self._sysauth},
-                        timeout=self.timeout, verify=self._verify_ssl)
+        response = post(
+            url, data=body, headers=hdrs, 
+            cookies={'sysauth': self._sysauth},
+            timeout=self.timeout, verify=self._verify_ssl
+        )
 
         if ignore_response:
             return None
@@ -277,7 +277,6 @@ class TplinkRouterSG(TplinkBaseRouter):
             decrypted = json.loads(self._aes_decrypt(resp['data']))
 
             if self._is_valid_response(decrypted):
-                # Return data block if it exists, otherwise return top level
                 return decrypted.get(self._data_block, decrypted)
             elif ignore_errors:
                 return decrypted
