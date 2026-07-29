@@ -266,7 +266,7 @@ class TplinkRouterSG(TplinkBaseRouter):
         response = post(
             url, data=body, headers=hdrs, 
             cookies={'sysauth': self._sysauth},
-            timeout=self.timeout, verify=self._verify_ssl
+            timeout=self.timeout, verify=self._verify_ssl,
         )
 
         if ignore_response:
