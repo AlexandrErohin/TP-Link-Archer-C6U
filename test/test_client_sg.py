@@ -206,12 +206,40 @@ class TestTplinkRouterSGUnit(TestCase):
 
         call_kwargs = mock_post.call_args
         body = call_kwargs[1]['data']
+        self.assertTrue(body.startswith('sign='))
+        self.assertIn('&data=', body)
+
+        # Hash should have been updated to SHA256 of the encrypted data
+        self.assertNotEqual(client._hash, 'fakehash')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_write_dict_body(self, mock_post: Mock) -> None:
+        """Verify that WRITE requests use dictionary format for BE-series compatibility."""
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._logged = True
+        client._stok = 'test_stok'
+        client._sysauth = 'test_sysauth'
+        client._aes_key = '1234567890123456'
+        client._aes_iv = '6543210987654321'
+        client._hash = 'fakehash'
+        client._seq = 100
+
+        response = Mock()
+        response.json.return_value = {'data': 'encrypted'}
+        mock_post.return_value = response
+
+        with patch.object(client, '_aes_decrypt', return_value='{"success": true}'):
+            client.request('admin/wireless?form=guest_2g', 'operation=write&ssid=test')
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]['data']
         self.assertIsInstance(body, dict)
         self.assertIn('sign', body)
         self.assertIn('data', body)
 
-        # Hash should have been updated to SHA256 of the encrypted data
-        self.assertNotEqual(client._hash, 'fakehash')
+        # Verify mandatory header is present for WRITE
+        headers = call_kwargs[1]['headers']
+        self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
 
 
 if __name__ == '__main__':

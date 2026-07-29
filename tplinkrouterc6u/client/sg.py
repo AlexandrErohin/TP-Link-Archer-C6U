@@ -18,6 +18,7 @@ from hashlib import sha256
 from base64 import b64encode, b64decode
 from random import randint
 from logging import Logger
+from urllib.parse import quote
 
 from Crypto.PublicKey.RSA import construct
 from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5, AES
@@ -202,7 +203,7 @@ class TplinkRouterSG(TplinkBaseRouter):
 
         # Send login request
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
-        body = {'sign': sign, 'data': encrypted_data}
+        body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
         response = post(
             url, data=body, headers=self._headers_login,
             timeout=self.timeout, verify=self._verify_ssl,
@@ -252,9 +253,18 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign = self._build_request_signature(len(encrypted_data))
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-        body = {'sign': sign, 'data': encrypted_data}
+
+        is_write = 'operation=write' in data or 'operation=save' in data or 'operation=update' in data
+
+        hdrs = self._headers_request.copy()
+        if is_write:
+            body = {'sign': sign, 'data': encrypted_data}
+            hdrs['Content-Type'] = 'application/x-www-form-urlencoded'
+        else:
+            body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
+
         response = post(
-            url, data=body, headers=self._headers_request,
+            url, data=body, headers=hdrs,
             cookies={'sysauth': self._sysauth},
             timeout=self.timeout, verify=self._verify_ssl,
         )
@@ -267,7 +277,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             decrypted = json.loads(self._aes_decrypt(resp['data']))
 
             if self._is_valid_response(decrypted):
-                return decrypted.get(self._data_block)
+                return decrypted.get(self._data_block, decrypted)
             elif ignore_errors:
                 return decrypted
         except Exception as e:
@@ -284,4 +294,4 @@ class TplinkRouterSG(TplinkBaseRouter):
         raise ClientError(error)
 
     def _is_valid_response(self, data: dict) -> bool:
-        return 'success' in data and data['success'] and self._data_block in data
+        return 'success' in data and data['success']
