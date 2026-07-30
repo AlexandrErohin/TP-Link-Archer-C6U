@@ -166,7 +166,7 @@ class TPLinkXDRClient(AbstractRouter):
                 conn_type = Connection.HOST_5G
                 status.wifi_clients_total += 1
 
-            dev = Device(conn_type, get_mac(item['mac']), get_ip(item['ip']), unquote(item['hostname']))
+            dev = Device(conn_type, get_mac(item.get('mac')), get_ip(item.get('ip')), unquote(item.get('hostname')))
             dev.up_speed = item['up_speed']
             dev.down_speed = item['down_speed']
             if 'online' in item:
