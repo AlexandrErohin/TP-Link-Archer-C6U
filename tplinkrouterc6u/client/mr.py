@@ -5,7 +5,7 @@ from urllib.parse import quote
 from requests import Session, Response
 from datetime import timedelta, datetime
 from logging import Logger
-from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
+from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac, get_value
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM, EncryptionWrapperMRECC
 from json import loads as json_loads
 from tplinkrouterc6u.common.package_enum import Connection, VPN
@@ -330,6 +330,8 @@ class TPLinkMRClientBase(AbstractRouter):
             ipv6_dns = item.get('X_TP_IPv6DNSServers', '').split(',')
             ipv6_status._wan_ipv6_pridns = get_ipv6(ipv6_dns[0] if len(ipv6_dns) > 0 else '::')
             ipv6_status._wan_ipv6_snddns = get_ipv6(ipv6_dns[1] if len(ipv6_dns) > 0 else '::')
+            ipv6_status._ipv6_site_prefix = get_ipv6(item.get('X_TP_SitePrefix', '::'))
+            ipv6_status._ipv6_site_prefix_length = item.get('X_TP_SitePrefixLength')
 
         return ipv6_status
     
