@@ -26,6 +26,40 @@ class TestTplinkRouterSGUnit(TestCase):
         client = TplinkRouterSG('http://192.168.0.1', long_password)
         self.assertFalse(client.supports())
 
+    def test_build_login_signature_real_key_size(self) -> None:
+        """Regression test for #171/#185.
+
+        The auth ("nn"/"ee") key TP-Link actually serves is 512-bit (128 hex
+        chars). SIGNATURE_OFFSET (53) is sized for PKCS1v1.5's 11-byte
+        overhead; under OAEP's much larger overhead (2*hLen+2 = 42 bytes for
+        the SHA-1 pycryptodome defaults to) a 53-byte chunk does not fit in a
+        single 512-bit block, and PKCS1_OAEP.encrypt() raises
+        "Plaintext is too long.". Every previous test in this file mocks
+        either `request()` (via TestTPLinkClient) or `_build_login_signature`
+        itself, so this real, unmocked call is the only thing that exercises
+        the actual RSA-OAEP chunking against a realistically-sized key.
+        """
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._aes_key = '1234567890123456'
+        client._aes_iv = '6543210987654321'
+        client._hash = sha256(b'admintestpassword').hexdigest()
+        client._seq = 555111222
+        # A real 512-bit auth key as served by an Archer AX12 on SG CLS L1
+        # STAGE2 firmware (public key only -- no private counterpart needed
+        # to exercise the encryption path).
+        client._nn = (
+            'ca8f1711cc27576fb0dae0d7df1b6a90465e8ea31ccf46b0004f4c60f6617df'
+            '8fa147502e45353b4d3f8ad38cb9aee9a77d33973ce3d7d681bc2fb0ae242e631'
+        )
+        client._ee = '010001'
+
+        sign = client._build_login_signature(data_len=32)
+
+        # Must not raise ValueError("Plaintext is too long."), and the
+        # result must be a whole number of 512-bit (128 hex char) RSA blocks.
+        self.assertGreater(len(sign), 0)
+        self.assertEqual(len(sign) % 128, 0)
+
     @patch('tplinkrouterc6u.client.sg.post')
     def test_check_sg_certification_match(self, mock_post: Mock) -> None:
         response = Mock()
