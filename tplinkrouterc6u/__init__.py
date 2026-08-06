@@ -31,6 +31,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    IPv6Status,
     SMS,
     LTEStatus,
     ServingCell,

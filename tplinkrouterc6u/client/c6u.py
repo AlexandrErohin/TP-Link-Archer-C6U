@@ -6,7 +6,7 @@ from requests import post, Response
 from logging import Logger
 from urllib.parse import parse_qsl
 from json import dumps
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.package_enum import Connection, VPN, VpnClientServerProtocol
 from tplinkrouterc6u.common.dataclass import (
@@ -16,6 +16,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    IPv6Status,
     VPNStatus,
     WifiStatus,
     VpnClientStatus,
@@ -379,9 +380,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status._lan_macaddr = get_mac(data['lan_macaddr'])
         status._wan_ipv4_addr = get_ip(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
         status._lan_ipv4_addr = get_ip(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
-        status._wan_ipv4_gateway = get_ip(
-            data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
+        status._wan_ipv4_gateway = get_ip(data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
+        status.wan_ipv6_enabled = self._str2bool(data.get('wan_ipv6_enable', ''))
+        status._wan_ipv6_addr = get_ipv6(data.get('wan_ipv6_ip6addr', '::').split('/')[0])
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
         status.conn_type = data.get('conn_type')
@@ -494,6 +496,22 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return ipv4_status
 
+    def get_ipv6_status(self) -> IPv6Status:
+        ipv6_status = IPv6Status()
+        data = self.request('admin/network?form=status_ipv6&operation=read', 'operation=read')
+        ipv6_status.wan_ipv6_enabled = self._str2bool(data.get('wan_ipv6_enable', ''))
+        ipv6_status._wan_ipv6_conntype = data.get('wan_ipv6_conntype', '')
+        ipv6_status._wan_ipv6_addr = get_ipv6(data.get('wan_ipv6_ip6addr', '::').split('/')[0])
+        ipv6_status._wan_ipv6_gateway = get_ipv6(data.get('wan_ipv6_gateway', '::'))
+        ipv6_status._wan_ipv6_pridns = get_ipv6(data.get('wan_ipv6_pridns', '::'))
+        ipv6_status._wan_ipv6_snddns = get_ipv6(data.get('wan_ipv6_snddns', '::'))
+
+        data = self.request('admin/network?form=wan_ipv6_dynamic&operation=read', 'operation=read')
+        ipv6_status._wan_ipv6_conn_status = data.get('conn_status', '')
+        ipv6_status._ipv6_site_prefix = get_ipv6(data.get('prefix', '::'))
+
+        return ipv6_status
+    
     @staticmethod
     def _as_list(data, envelope_key: str, what: str) -> list:
         """Return a list payload whether or not the router wrapped it.

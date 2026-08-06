@@ -6,11 +6,11 @@ import re
 import requests
 from urllib.parse import urlparse
 from requests import Session
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv4Reservation
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
@@ -41,6 +41,18 @@ class RouterConstants:
         '2': 'PPPoE',
         '3': 'L2TP',
         '4': 'PPTP'
+    }
+
+    CONNECTION_STATUS_MAP_IPV6 = {
+        '0': "Disabled",
+        '7': 'Disconnected',
+        '8': 'Connecting',
+        '9': 'Connected'
+    }
+
+    ADDR_TYPE_MAP_IPV6 = {
+        '0': "Unknown",
+        '1': 'DHCPv6'
     }
 
 
@@ -324,6 +336,45 @@ class TplinkC80Router(AbstractRouter):
 
         return mapped_leases
 
+    def get_ipv6_status(self) -> IPv6Status:
+        wan_ipv6_request = "45|1,0,0"
+        site_ipv6_request = "48|1,0,0"
+        all_requests = [
+            wan_ipv6_request, site_ipv6_request ]
+        request_text = '#'.join(all_requests)
+        body = self._encrypt_body(request_text)
+
+        response = self.request(2, 1, True, data=body)
+        response_text = self._decrypt_data(response.text)
+
+        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
+
+        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+
+        network_info = {
+            'wan_ipv6_status': self._extract_value(data_blocks[wan_ipv6_request], "status "),
+            'wan_ipv6_getip': self._extract_value(data_blocks[wan_ipv6_request], "getIpWithDhcp "),
+            'wan_ipv6_ip': self._extract_value(data_blocks[wan_ipv6_request], "globalIp "),
+            'gateway_ipv6': self._extract_value(data_blocks[wan_ipv6_request], "gateway "),
+            'dns_1': self._extract_value(data_blocks[wan_ipv6_request], "dns 0 "),
+            'dns_2': self._extract_value(data_blocks[wan_ipv6_request], "dns 1 "),
+            'site_prefix': self._extract_value(data_blocks[site_ipv6_request], "prefixAddr "),
+            'site_prefix_len': self._extract_value(data_blocks[site_ipv6_request], "prefixLen "),
+        }
+
+        ipv6status = IPv6Status()
+        ipv6status.wan_ipv6_enabled = network_info['wan_ipv6_status'] != '0'
+        ipv6status._wan_ipv6_conn_status = RouterConstants.CONNECTION_STATUS_MAP_IPV6[network_info['wan_ipv6_status']]
+        ipv6status._wan_ipv6_addr_type = RouterConstants.ADDR_TYPE_MAP_IPV6[network_info['wan_ipv6_getip']]
+        ipv6status._wan_ipv6_addr = get_ipv6(network_info['wan_ipv6_ip'])
+        ipv6status._wan_ipv6_gateway = get_ipv6(network_info['gateway_ipv6'])
+        ipv6status._wan_ipv6_pridns = get_ipv6(network_info['dns_1'])
+        ipv6status._wan_ipv6_snddns = get_ipv6(network_info['dns_2'])
+        ipv6status._ipv6_site_prefix = get_ipv6(network_info['site_prefix'])
+        ipv6status._ipv6_site_prefix_length = network_info['site_prefix_len']
+
+        return ipv6status
+    
     def get_vpn_status(self) -> VPNStatus:
         body = self._encrypt_body("22|1,0,0")
 
