@@ -5,15 +5,13 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 [![Downloads](https://static.pepy.tech/personalized-badge/tplinkrouterc6u?period=total&units=international_system&left_color=grey&right_color=orange&left_text=Downloads)](https://pypi.org/project/tplinkrouterc6u/)
 ![Python versions](https://img.shields.io/pypi/pyversions/tplinkrouterc6u)
 
-> [!WARNING]
-> A new router firmware update breaks the compatibility. Please try [this fix](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/220#issuecomment-3396658175) 
-
 ## Installation
 `pip install tplinkrouterc6u`
 
 ## Dependencies
  - [requests](https://pypi.org/project/requests/)
  - [pycryptodome](https://pypi.org/project/pycryptodome/)
+ - [macaddress](https://pypi.org/project/macaddress/)
 
 ## Usage
 - Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
@@ -55,19 +53,19 @@ from tplinkrouterc6u import (
 from logging import Logger
 import traceback
 
+# Prefer the provider: it picks a matching client for your router
 router = TplinkRouterProvider.get_client('http://192.168.0.1', 'password')
-logger=Logger('test')
-# You may use client directly like
+logger = Logger('test')
+# You may use a client class directly, e.g.:
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
-# router = TplinkRouter('http://192.168.0.1','password','admin2', logger=logger)
-# If you have the TP-link C5400X or similar, you can use the TplinkC5400XRouter class instead of the TplinkRouter class.
-# Remember that the password for this router is different, here you need to use the web encrypted password.
-# To get web encrypted password, read Web Encrypted Password section
-# router = TplinkC5400XRouter('http://192.168.0.1','WebEncryptedPassword', logger=logger)
+# router = TplinkRouter('http://192.168.0.1', 'password', 'admin2', logger=logger)
+# C5400X / similar: use web encrypted password (see Web Encrypted Password below)
+# router = TplinkC5400XRouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 
 try:
-    router.authorize()  # authorizing
+    # Or: with router:  # authorize on enter, logout on exit
+    router.authorize()
     # Get firmware info - returns Firmware
     firmware = router.get_firmware()
 
@@ -76,26 +74,37 @@ try:
     if not status.guest_2g_enable:  # check if guest 2.4G wifi is disable
         router.set_wifi(Connection.GUEST_2G, True)  # turn on guest 2.4G wifi
 
-    # Get Address reservations, sort by ipaddr
-    if hasattr(router, "get_ipv4_reservations"):
+    # Get IPv6 status (not implemented on every client → NotImplementedError)
+    try:
+        ipv6_status = router.get_ipv6_status()
+        print(ipv6_status.wan_ipv6_addr, ipv6_status.wan_ipv6_gateway)
+    except NotImplementedError:
+        pass
+
+    # Optional methods (not on every client)
+    try:
         reservations = router.get_ipv4_reservations()
         reservations.sort(key=lambda a: a.ipaddr)
         for res in reservations:
             print(f"{res.macaddr} {res.ipaddr:16s} {res.hostname:36} {'Permanent':12}")
+    except (AttributeError, NotImplementedError):
+        pass
 
-    # Get DHCP leases, sort by ipaddr
-    if hasattr(router, "get_ipv4_dhcp_leases"):
+    try:
         leases = router.get_ipv4_dhcp_leases()
         leases.sort(key=lambda a: a.ipaddr)
         for lease in leases:
             print(f"{lease.macaddr} {lease.ipaddr:16s} {lease.hostname:36} {lease.lease_time:12}")
-    router.logout()  # always logout as TP-Link Web Interface only supports upto 1 user logged
+    except (AttributeError, NotImplementedError):
+        pass
+
+    router.logout()  # always logout; TP-Link Web Interface only supports up to 1 user logged in
 except Exception as e:
     logger.error(traceback.format_exc())
 ```
 
-The TP-Link Web Interface only supports upto 1 user logged in at a time (for security reasons, apparently).
-So before action you need to authorize and after logout
+The TP-Link Web Interface only supports up to 1 user logged in at a time (for security reasons, apparently).
+So before action you need to authorize and after logout. You can also use `with router:` (calls `authorize()` / `logout()` automatically).
 
 ### <a id="encrypted_pass">Web Encrypted Password</a>
 If you got exception - `use web encrypted password instead. Check the documentation!`
@@ -108,20 +117,23 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 6. Copy the returned value as password and use it.
 
 ## Functions
+Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
+
 | Function | Args | Description | Return |
 |---|---|---|---|
 | get_firmware |   | Gets firmware info about the router | [Firmware](#firmware) |
 | get_status |   | Gets status about the router info including wifi statuses and connected devices info | [Status](#status) |
 | get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
+| get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
-| set_wifi | wifi: [Connection](#connection), enable: bool | Allow to turn on/of 4 wifi networks |   |
+| set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | reboot |   | reboot router |
 | authorize |   | authorize for actions |
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
-| set_vpn | vpn: [VPNStatus](#vpn_status), enable: bool | Allow to turn on/of VPN |   |
+| set_vpn | vpn: [VPN](#vpn), enable: bool | Turn on/off VPN |   |
 | get_vpn_client_status |   | Gets VPN client status including enabled state, configured servers, and whitelisted devices | [VpnClientStatus](#vpn_client_status) |
 | set_vpn_client | enable: bool | Turn VPN client on or off |   |
 | set_vpn_client_server | server_id: str, enable: bool | Toggle a VPN server on or off; the router handles deactivating all others when one is enabled |   |
@@ -148,33 +160,35 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 |---|---|---|
 | wan_macaddr | router wan mac address | str, None |
 | wan_macaddress | router wan mac address | macaddress.EUI48, None |
-| lan_macaddr | router lan mac address | str |
-| lan_macaddress | router lan mac address | macaddress.EUI48 |
+| lan_macaddr | router lan mac address | str, None |
+| lan_macaddress | router lan mac address | macaddress.EUI48, None |
 | wan_ipv4_addr | router wan ipv4 address | str, None |
 | wan_ipv4_address | router wan ipv4 address | ipaddress.IPv4Address, None |
 | lan_ipv4_addr | router lan ipv4 address | str, None |
 | lan_ipv4_address | router lan ipv4 address | ipaddress.IPv4Address, None |
 | wan_ipv4_gateway | router wan ipv4 gateway | str, None |
 | wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
+| wan_ipv6_enabled | Is WAN IPv6 enabled | bool, None |
+| wan_ipv6_addr | router wan ipv6 address | str, None |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of host wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |
 | clients_total | Total amount of all connected clients | int |
 | iot_clients_total | Total amount of all iot connected clients | int, None |
-| guest_2g_enable | Is guest wifi 2.4G enabled | bool |
+| guest_2g_enable | Is guest wifi 2.4G enabled | bool, None |
 | guest_5g_enable | Is guest wifi 5G enabled | bool, None |
 | guest_6g_enable | Is guest wifi 6G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | iot_6g_enable | Is IoT wifi 6G enabled | bool, None |
-| wifi_2g_enable | Is host wifi 2.4G enabled | bool |
+| wifi_2g_enable | Is host wifi 2.4G enabled | bool, None |
 | wifi_5g_enable | Is host wifi 5G enabled | bool, None |
 | wifi_6g_enable | Is host wifi 6G enabled | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
 | conn_type | Connection type | str, None |
-| devices | List of all connectedd devices | list[[Device](#device)] |
+| devices | List of all connected devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
 | Field | Description | Type |
@@ -222,27 +236,46 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 ### <a id="IPv4Status">IPv4Status</a>
 | Field | Description | Type |
 | --- |---|---|
-| wan_macaddr | router mac address | str |
-| wan_macaddress | router mac address | macaddress |
-| wan_ipv4_ipaddr | router mac address | str, None |
-| wan_ipv4_ipaddress | router mac address | ipaddress.IPv4Address, None |
+| wan_macaddr | router WAN mac address | str, None |
+| wan_macaddress | router WAN mac address | macaddress.EUI48, None |
+| wan_ipv4_ipaddr | router WAN IPv4 address | str, None |
+| wan_ipv4_ipaddress | router WAN IPv4 address | ipaddress.IPv4Address, None |
 | wan_ipv4_gateway | router WAN gateway IP address | str, None |
 | wan_ipv4_gateway_address | router WAN gateway IP address | ipaddress.IPv4Address, None |
 | wan_ipv4_conntype | router connection type | str |
-| wan_ipv4_netmask | router WAN gateway IP netmask | str, None |
-| wan_ipv4_netmask_address | router WAN gateway IP netmask | ipaddress.IPv4Address, None |
-| wan_ipv4_pridns | router primary dns server | str |
-| wan_ipv4_pridns_address | router primary dns server | ipaddress |
-| wan_ipv4_snddns | router secondary dns server | str |
-| wan_ipv4_snddns_address | router secondary dns server | ipaddress |
-| lan_macaddr | router mac address | str |
-| lan_macaddress | router mac address | macaddress |
-| lan_ipv4_ipaddr | router LAN IP address | str |
-| lan_ipv4_ipaddress | router LAN IP address | ipaddress |
+| wan_ipv4_netmask | router WAN IP netmask | str, None |
+| wan_ipv4_netmask_address | router WAN IP netmask | ipaddress.IPv4Address, None |
+| wan_ipv4_pridns | router primary dns server | str, None |
+| wan_ipv4_pridns_address | router primary dns server | ipaddress.IPv4Address, None |
+| wan_ipv4_snddns | router secondary dns server | str, None |
+| wan_ipv4_snddns_address | router secondary dns server | ipaddress.IPv4Address, None |
+| lan_macaddr | router LAN mac address | str, None |
+| lan_macaddress | router LAN mac address | macaddress.EUI48, None |
+| lan_ipv4_ipaddr | router LAN IP address | str, None |
+| lan_ipv4_ipaddress | router LAN IP address | ipaddress.IPv4Address, None |
 | lan_ipv4_dhcp_enable | router LAN DHCP enabled | bool |
-| lan_ipv4_netmask | router LAN gateway IP netmask | str |
-| lan_ipv4_netmask_address | router LAN gateway IP netmask | ipaddress |
+| lan_ipv4_netmask | router LAN IP netmask | str, None |
+| lan_ipv4_netmask_address | router LAN IP netmask | ipaddress.IPv4Address, None |
 | remote | router remote | bool, None |
+
+### <a id="IPv6Status">IPv6Status</a>
+| Field | Description | Type |
+| --- |---|---|
+| wan_ipv6_enabled | Is WAN IPv6 enabled | bool, None |
+| wan_ipv6_conn_status | WAN IPv6 connection status (e.g. Connected, Disabled) | str, None |
+| wan_ipv6_conntype | WAN IPv6 connection type | str, None |
+| wan_ipv6_addr_type | WAN IPv6 address acquisition type (e.g. DHCPv6) | str, None |
+| wan_ipv6_addr | router WAN IPv6 address | str, None |
+| wan_ipv6_gateway | router WAN IPv6 gateway | str, None |
+| wan_ipv6_pridns | router primary IPv6 DNS server (unlike IPv4, returns address object, not str) | ipaddress.IPv6Address, None |
+| wan_ipv6_snddns | router secondary IPv6 DNS server (unlike IPv4, returns address object, not str) | ipaddress.IPv6Address, None |
+| ipv6_site_prefix | IPv6 site prefix | str, None |
+| ipv6_site_prefix_length | IPv6 site prefix length | str, None |
+
+Not all fields are filled by every client:
+- **c6u / SG / C5400X / C1200**: `wan_ipv6_enabled`, `wan_ipv6_conntype`, `wan_ipv6_addr`, `wan_ipv6_gateway`, `wan_ipv6_pridns`, `wan_ipv6_snddns`, `wan_ipv6_conn_status`, `ipv6_site_prefix`
+- **MR / EX / VR / MR200 / C50 / WR841 / C3200**: `wan_ipv6_enabled`, `wan_ipv6_conn_status`, `wan_ipv6_addr_type`, `wan_ipv6_conntype`, `wan_ipv6_addr`, `wan_ipv6_gateway`, `wan_ipv6_pridns`, `wan_ipv6_snddns`, `ipv6_site_prefix`, `ipv6_site_prefix_length`
+- **C80**: `wan_ipv6_enabled`, `wan_ipv6_conn_status`, `wan_ipv6_addr_type`, `wan_ipv6_addr`, `wan_ipv6_gateway`, `wan_ipv6_pridns`, `wan_ipv6_snddns`, `ipv6_site_prefix`, `ipv6_site_prefix_length`
 
 ### <a id="vpn_status">VPNStatus</a>
 | Field | Description | Type |
@@ -339,14 +372,15 @@ or you have TP-link C5400X or similar router you need to get web encrypted passw
 ### <a id="connection">Connection</a>
 - Connection.HOST_2G - host wifi 2.4G
 - Connection.HOST_5G - host wifi 5G
-- Connection.HOST_6G - host wifi 5G
+- Connection.HOST_6G - host wifi 6G
 - Connection.GUEST_2G - guest wifi 2.4G
 - Connection.GUEST_5G - guest wifi 5G
-- Connection.GUEST_6G - guest wifi 5G
+- Connection.GUEST_6G - guest wifi 6G
 - Connection.IOT_2G - IoT wifi 2.4G
 - Connection.IOT_5G - IoT wifi 5G
 - Connection.IOT_6G - IoT wifi 6G
 - Connection.WIRED - Wired
+- Connection.UNKNOWN - Unknown connection type
 
 ### <a id="vpn">VPN</a>
 - VPN.OPEN_VPN
@@ -499,7 +533,7 @@ Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6
 
 - Download this repository.
 - Run `pip install -e path/to/repo`.
-- Make changes to files within the `tplinkrouter6u` directory.
+- Make changes to files within the `tplinkrouterc6u` directory.
 - Exercise the changes following the "Usage" section above.
 
 The sanity check test.py illustrates a few tests and runs through a list of queries in queries.txt creating logs of the results of each query in the logs folder. This can be used to capture the dictionary output of all cgi-bin form submissions.

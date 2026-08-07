@@ -1,8 +1,8 @@
 from unittest import main, TestCase
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
-from tplinkrouterc6u.common.dataclass import IPv4Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
+from tplinkrouterc6u.common.dataclass import IPv4Status, IPv6Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
 from tplinkrouterc6u import Connection, ClientException
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 
@@ -375,6 +375,66 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(ipv4_status._lan_ipv4_ipaddr, IPv4Address('192.168.0.1'))
         self.assertEqual(ipv4_status.lan_ipv4_dhcp_enable, True)
         self.assertEqual(ipv4_status._lan_ipv4_netmask, IPv4Address('255.255.255.0'))
+
+    def test_get_ipv6_status(self) -> None:
+        response = (
+            '00000\r\nid 45|1,0,0\r\n'
+            'status 9\r\nerrorCode 0\r\ninterfaceType 0\r\nipGetMethod 0\r\nraReceived 1\r\n'
+            'getIpWithDhcp 1\r\ngetDnsWithDhcp 1\r\nglobalIp 2401:0005:1000::48\r\n'
+            'prefixAddr ::\r\nprefixLen 64\r\ngateway fe80::0001:0001:0001:3040\r\n'
+            'dns 0 2401:380:1::61\r\ndns 1 2401:380:1::62\r\n'
+            'linkLocalIp fe80::0001:0001:0001:8a86\r\n'
+            'id 48|1,0,0\r\n'
+            'linkLocalIp fe80::0001:0001:0001:e986\r\n'
+            'prefixAddr 2401:0005:1000:4800::\r\nprefixLen 64\r\n'
+            'lanUnicastIp 2401:0001:0001:0001:0001:0001:0001:e986'
+        )
+
+        client = TplinkC80RouterTest('', '')
+        client.authorize()
+        client.set_encrypted_response(response)
+
+        ipv6_status = client.get_ipv6_status()
+
+        self.assertIsInstance(ipv6_status, IPv6Status)
+        self.assertEqual(ipv6_status.wan_ipv6_enabled, True)
+        self.assertEqual(ipv6_status.wan_ipv6_conn_status, 'Connected')
+        self.assertEqual(ipv6_status.wan_ipv6_addr_type, 'DHCPv6')
+        self.assertEqual(ipv6_status.wan_ipv6_addr, '2401:5:1000::48')
+        self.assertEqual(ipv6_status.wan_ipv6_gateway, 'fe80::1:1:1:3040')
+        self.assertEqual(ipv6_status.wan_ipv6_pridns, IPv6Address('2401:380:1::61'))
+        self.assertEqual(ipv6_status.wan_ipv6_snddns, IPv6Address('2401:380:1::62'))
+        self.assertEqual(ipv6_status.ipv6_site_prefix, '2401:5:1000:4800::')
+        self.assertEqual(ipv6_status.ipv6_site_prefix_length, '64')
+        self.assertEqual(ipv6_status.wan_ipv6_conntype, None)
+
+    def test_get_ipv6_status_disabled(self) -> None:
+        response = (
+            '00000\r\nid 45|1,0,0\r\n'
+            'status 0\r\nerrorCode 0\r\ninterfaceType 0\r\nipGetMethod 0\r\nraReceived 0\r\n'
+            'getIpWithDhcp 0\r\ngetDnsWithDhcp 0\r\nglobalIp ::\r\n'
+            'prefixAddr ::\r\nprefixLen 0\r\ngateway ::\r\n'
+            'dns 0 ::\r\ndns 1 ::\r\nlinkLocalIp ::\r\n'
+            'id 48|1,0,0\r\n'
+            'linkLocalIp ::\r\nprefixAddr ::\r\nprefixLen 0\r\nlanUnicastIp ::'
+        )
+
+        client = TplinkC80RouterTest('', '')
+        client.authorize()
+        client.set_encrypted_response(response)
+
+        ipv6_status = client.get_ipv6_status()
+
+        self.assertIsInstance(ipv6_status, IPv6Status)
+        self.assertEqual(ipv6_status.wan_ipv6_enabled, False)
+        self.assertEqual(ipv6_status.wan_ipv6_conn_status, 'Disabled')
+        self.assertEqual(ipv6_status.wan_ipv6_addr_type, 'Unknown')
+        self.assertEqual(ipv6_status.wan_ipv6_addr, '::')
+        self.assertEqual(ipv6_status.wan_ipv6_gateway, '::')
+        self.assertEqual(ipv6_status.wan_ipv6_pridns, IPv6Address('::'))
+        self.assertEqual(ipv6_status.wan_ipv6_snddns, IPv6Address('::'))
+        self.assertEqual(ipv6_status.ipv6_site_prefix, '::')
+        self.assertEqual(ipv6_status.ipv6_site_prefix_length, '0')
 
     def test_get_ipv4_reservations(self) -> None:
         response = ('00000\r\nid 12|1,0,0\r\nip 0 192.168.0.112\r\nip 1 0.0.0.0\r\nmac 0 00-00-00-00-00-00\r\n'

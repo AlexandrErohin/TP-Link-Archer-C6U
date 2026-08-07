@@ -1,7 +1,7 @@
 from unittest import main, TestCase
 from unittest.mock import patch, Mock
 from macaddress import EUI48
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from json import loads
 from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
@@ -10,6 +10,7 @@ from tplinkrouterc6u import (
     Status,
     Firmware,
     IPv4Status,
+    IPv6Status,
     Device,
     ClientException,
     VPN,
@@ -278,6 +279,8 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.lan_ipv4_addr, '192.168.1.100')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.1.254')
         self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
+        self.assertTrue(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '::')
         self.assertEqual(status.wired_total, 2)
         self.assertEqual(status.wifi_clients_total, 3)
         self.assertEqual(status.guest_clients_total, 0)
@@ -950,6 +953,60 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
         self.assertEqual(result.lan_ipv4_dhcp_enable, False)
         self.assertEqual(result.remote, None)
+
+    def test_get_ipv6_status(self) -> None:
+        response_status_ipv6 = {
+            'wan_ipv6_pridns': '2401:380:1::61',
+            'wan_ipv6_enable': 'on',
+            'wan_ipv6_gateway': 'fe80::e803:feff:fee5:3040',
+            'wan_ipv6_conntype': 'dhcp6c',
+            'wan_ipv6_snddns': '2401:380:1::62',
+            'wan_ipv6_ip6addr': '2401:0005:1000::548/64',
+            'lan_ipv6_assign_type': 'slaac',
+        }
+        response_wan_ipv6_dynamic = {
+            'nonaddress_support': 1,
+            'prefix': '2401:0005:0005:4800::',
+            'pri_dns': '2401:380:1::61',
+            'dyn_pridns': '2401:380:1::61',
+            'link_status': 'plugged',
+            'conn_status': 'connected',
+            'conntype': 'dhcp6c',
+            'ip_mode': 'prefix',
+            'static_snddns': '',
+            'static_pridns': '',
+            'ip_config': 'auto',
+            'ip6addr': '2401:0005:1000::548/64',
+            'dns_mode': 'dynamic',
+            'dyn_snddns': '2401:380:1::62',
+            'snd_dns': '2401:380:1::62',
+            'pppshare': 3,
+        }
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/network?form=status_ipv6&operation=read':
+                    return response_status_ipv6
+                if path == 'admin/network?form=wan_ipv6_dynamic&operation=read':
+                    return response_wan_ipv6_dynamic
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_ipv6_status()
+
+        self.assertIsInstance(result, IPv6Status)
+        self.assertEqual(result.wan_ipv6_enabled, True)
+        self.assertEqual(result.wan_ipv6_conntype, 'dhcp6c')
+        self.assertEqual(result.wan_ipv6_addr, '2401:5:1000::548')
+        self.assertEqual(result.wan_ipv6_gateway, 'fe80::e803:feff:fee5:3040')
+        self.assertEqual(result.wan_ipv6_pridns, IPv6Address('2401:380:1::61'))
+        self.assertEqual(result.wan_ipv6_snddns, IPv6Address('2401:380:1::62'))
+        self.assertEqual(result.wan_ipv6_conn_status, 'connected')
+        self.assertEqual(result.ipv6_site_prefix, '2401:5:5:4800::')
+        self.assertEqual(result.wan_ipv6_addr_type, None)
+        self.assertEqual(result.ipv6_site_prefix_length, None)
 
     def test_get_status_wan_macaddr_empty(self) -> None:
         response_status = '''

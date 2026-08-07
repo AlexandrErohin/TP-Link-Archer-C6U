@@ -29,17 +29,6 @@ from abc import abstractmethod
 
 
 class TplinkRequest:
-    host = ''
-    _stok = ''
-    timeout = 10
-    _logged = False
-    _sysauth = None
-    _verify_ssl = False
-    _logger = None
-    _headers_request = {}
-    _headers_login = {}
-    _data_block = 'data'
-
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
         if self._logged is False:
             raise Exception('Not authorised')
@@ -89,14 +78,21 @@ class TplinkRequest:
 
 
 class TplinkEncryption(TplinkRequest):
-    username = ''
-    password = ''
-    nn = ''
-    ee = ''
-    _seq = ''
-    _pwdNN = ''
-    _pwdEE = ''
-    _encryption = EncryptionWrapper()
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        self._stok = ''
+        self._logged = False
+        self._sysauth = None
+        self._data_block = 'data'
+        self._headers_request = {}
+        self._headers_login = {}
+        self.nn = ''
+        self.ee = ''
+        self._seq = ''
+        self._pwdNN = ''
+        self._pwdEE = ''
+        self._encryption = EncryptionWrapper()
 
     def supports(self) -> bool:
         if len(self.password) > 125:
@@ -237,13 +233,16 @@ class TplinkEncryption(TplinkRequest):
 
 
 class TplinkBaseRouter(AbstractRouter, TplinkRequest):
-    _smart_network = True
-    _perf_status = True
-
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
+        self._stok = ''
+        self._logged = False
+        self._sysauth = None
+        self._data_block = 'data'
+        self._smart_network = True
+        self._perf_status = True
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
@@ -400,7 +399,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wifi_5g_enable = self._str2bool(data.get('wireless_5g_enable'))
         status.wifi_6g_enable = self._str2bool(data.get('wireless_6g_enable'))
 
-        if (status.mem_usage is None or status.mem_usage is None) and self._perf_status:
+        if (status.mem_usage is None or status.cpu_usage is None) and self._perf_status:
             try:
                 performance = self.request('admin/status?form=perf&operation=read', 'operation=read')
                 status.mem_usage = performance.get('mem_usage')
@@ -511,7 +510,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         ipv6_status._ipv6_site_prefix = get_ipv6(data.get('prefix', '::'))
 
         return ipv6_status
-    
+
     @staticmethod
     def _as_list(data, envelope_key: str, what: str) -> list:
         """Return a list payload whether or not the router wrapped it.

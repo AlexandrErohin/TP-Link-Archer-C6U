@@ -325,16 +325,20 @@ class TPLinkMRClientBase(AbstractRouter):
         for item in self._to_list(values):
             if int(item.get('enable', '0')) == 0:
                 continue
+            ipv6_status.wan_ipv6_enabled = bool(int(item.get('X_TP_IPv6Enabled', '0')))
+            ipv6_status._wan_ipv6_conn_status = item.get('X_TP_IPv6ConnStatus', '')
+            ipv6_status._wan_ipv6_addr_type = item.get('X_TP_IPv6AddressingType', '')
+            ipv6_status._wan_ipv6_conntype = item.get('connectionType', '')
             ipv6_status._wan_ipv6_addr = get_ipv6(item.get('X_TP_ExternalIPv6Address', '::'))
             ipv6_status._wan_ipv6_gateway = get_ipv6(item.get('X_TP_DefaultIPv6Gateway', '::'))
             ipv6_dns = item.get('X_TP_IPv6DNSServers', '').split(',')
             ipv6_status._wan_ipv6_pridns = get_ipv6(ipv6_dns[0] if len(ipv6_dns) > 0 else '::')
-            ipv6_status._wan_ipv6_snddns = get_ipv6(ipv6_dns[1] if len(ipv6_dns) > 0 else '::')
+            ipv6_status._wan_ipv6_snddns = get_ipv6(ipv6_dns[1] if len(ipv6_dns) > 1 else '::')
             ipv6_status._ipv6_site_prefix = get_ipv6(item.get('X_TP_SitePrefix', '::'))
-            ipv6_status._ipv6_site_prefix_length = item.get('X_TP_SitePrefixLength')
+            ipv6_status._ipv6_site_prefix_length = item.get('X_TP_SitePrefixLength', '')
 
         return ipv6_status
-    
+
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         acts = [
             self.ActItem(

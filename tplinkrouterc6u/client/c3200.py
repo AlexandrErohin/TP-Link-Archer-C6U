@@ -55,9 +55,8 @@ class TplinkC3200Router(TPLinkMR200Client):
         # We need to extract the domain form the host to fill the cookie.
         router_host = urlparse(self.host).hostname
         if not router_host:
-            raise ValueError(self.host & " must contain a valid host, ex. http://192.168.168.1")
+            raise ValueError(f"{self.host} must contain a valid host, ex. http://192.168.168.1")
 
-        """Return the string "Basic <base64(username:password)>"."""
         token_bytes = f"{self.username}:{self.password}".encode()
         encoded = base64.b64encode(token_bytes).decode()
         auth_cookie_value = f"Basic {encoded}"
@@ -86,14 +85,13 @@ class TplinkC3200Router(TPLinkMR200Client):
         self.SESSION.cookies.clear(domain=urlparse(self.host).hostname, path="/")
 
     def get_lte_status(self) -> LTEStatus:
-        pass
+        raise NotImplementedError(f'{self.ROUTER_NAME} does not support get_lte_status')
 
     def _get_params(self, retry=False) -> None:
-        pass
+        raise NotImplementedError(f'{self.ROUTER_NAME} does not support _get_params')
 
     def set_vpn(self, vpn: VPN, enable: bool) -> None:
-        # Unable to test it on my C3200
-        pass
+        raise NotImplementedError(f'{self.ROUTER_NAME} does not support set_vpn')
 
     def req_act(self, acts: list):
         act_types, act_data = self._fill_acts(acts)

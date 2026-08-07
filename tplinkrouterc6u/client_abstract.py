@@ -1,7 +1,7 @@
 from requests.packages import urllib3
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status
 from abc import ABC, abstractmethod
 
 
@@ -17,7 +17,7 @@ class AbstractRouter(ABC):
             self.host = "http://{}".format(self.host)
         self._verify_ssl = verify_ssl
         if self._verify_ssl is False:
-            urllib3.disable_warnings()
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     @abstractmethod
     def supports(self) -> bool:
@@ -42,6 +42,10 @@ class AbstractRouter(ABC):
     @abstractmethod
     def get_ipv4_status(self) -> IPv4Status:
         pass
+
+    def get_ipv6_status(self) -> IPv6Status:
+        raise NotImplementedError(
+            '{} does not support get_ipv6_status'.format(type(self).__name__))
 
     @abstractmethod
     def reboot(self) -> None:

@@ -1,6 +1,6 @@
 from unittest import main, TestCase
 from macaddress import EUI48
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from datetime import datetime
 from tplinkrouterc6u import (
     TPLinkMRClient,
@@ -11,6 +11,7 @@ from tplinkrouterc6u import (
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
+    IPv6Status,
     ClientError,
     SMS,
     LTEStatus,
@@ -664,6 +665,58 @@ DNSServers=0.0.0.0,0.0.0.0
         self.assertEqual(result.lan_ipv4_netmask, '255.255.255.0')
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
+
+    def test_get_ipv6_status(self) -> None:
+        response = '''[2,1,1,0,0,0]0
+enable=1
+connectionStatus=Connected
+connectionType=IP_Routed
+name=ipoe_0_d
+X_TP_IPv6Enabled=1
+X_TP_IPv6ConnStatus=Connected
+X_TP_IPv6AddressingType=DHCPv6
+X_TP_ExternalIPv6Address=2401:0005:1000::48
+X_TP_PrefixLength=64
+X_TP_DefaultIPv6Gateway=fe80::e803:0000:0000:3040
+X_TP_IPv6DNSServers=2401:380:1::61,2401:380:1::62
+X_TP_SitePrefix=2401:0005:0000:4800::
+X_TP_SitePrefixLength=56
+[3,1,1,0,0,0]0
+enable=0
+connectionStatus=Disconnected
+connectionType=IP_Routed
+name=dhcp_USB_4G
+X_TP_IPv6Enabled=0
+X_TP_IPv6ConnStatus=Unconfigured
+X_TP_IPv6AddressingType=DHCPv6
+X_TP_ExternalIPv6Address=::
+X_TP_PrefixLength=0
+X_TP_DefaultIPv6Gateway=::
+X_TP_IPv6DNSServers=::,::
+X_TP_SitePrefix=
+X_TP_SitePrefixLength=64
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        result = client.get_ipv6_status()
+
+        self.assertIsInstance(result, IPv6Status)
+        self.assertEqual(result.wan_ipv6_enabled, True)
+        self.assertEqual(result.wan_ipv6_addr, '2401:5:1000::48')
+        self.assertEqual(result.wan_ipv6_gateway, 'fe80::e803:0:0:3040')
+        self.assertEqual(result.wan_ipv6_pridns, IPv6Address('2401:380:1::61'))
+        self.assertEqual(result.wan_ipv6_snddns, IPv6Address('2401:380:1::62'))
+        self.assertEqual(result.ipv6_site_prefix, '2401:5:0:4800::')
+        self.assertEqual(result.ipv6_site_prefix_length, '56')
+        self.assertEqual(result.wan_ipv6_conn_status, 'Connected')
+        self.assertEqual(result.wan_ipv6_conntype, 'IP_Routed')
+        self.assertEqual(result.wan_ipv6_addr_type, 'DHCPv6')
 
     def test_set_wifi(self) -> None:
         response = '''

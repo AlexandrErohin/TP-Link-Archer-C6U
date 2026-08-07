@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import ClassVar, Mapping
+from types import MappingProxyType
 from macaddress import EUI48
 from ipaddress import IPv4Address, IPv6Address
 from dataclasses import dataclass, field
@@ -81,15 +83,15 @@ class Status:
 
     @property
     def wan_macaddr(self) -> str | None:
-        return str(self._wan_macaddr) if self._wan_macaddr else None
+        return str(self._wan_macaddr) if self._wan_macaddr is not None else None
 
     @property
     def wan_macaddress(self) -> EUI48 | None:
         return self._wan_macaddr
 
     @property
-    def lan_macaddr(self):
-        return str(self._lan_macaddr)
+    def lan_macaddr(self) -> str | None:
+        return str(self._lan_macaddr) if self._lan_macaddr is not None else None
 
     @property
     def lan_macaddress(self):
@@ -97,7 +99,7 @@ class Status:
 
     @property
     def wan_ipv4_addr(self) -> str | None:
-        return str(self._wan_ipv4_addr) if self._wan_ipv4_addr else None
+        return str(self._wan_ipv4_addr) if self._wan_ipv4_addr is not None else None
 
     @property
     def wan_ipv4_address(self) -> IPv4Address | None:
@@ -105,7 +107,7 @@ class Status:
 
     @property
     def lan_ipv4_addr(self) -> str | None:
-        return str(self._lan_ipv4_addr) if self._lan_ipv4_addr else None
+        return str(self._lan_ipv4_addr) if self._lan_ipv4_addr is not None else None
 
     @property
     def lan_ipv4_address(self) -> IPv4Address | None:
@@ -113,7 +115,7 @@ class Status:
 
     @property
     def wan_ipv4_gateway(self) -> str | None:
-        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway else None
+        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway is not None else None
 
     @property
     def wan_ipv4_gateway_address(self) -> IPv4Address | None:
@@ -121,7 +123,7 @@ class Status:
 
     @property
     def wan_ipv6_addr(self) -> str | None:
-        return str(self._wan_ipv6_addr) if self._wan_ipv6_addr else None
+        return str(self._wan_ipv6_addr) if self._wan_ipv6_addr is not None else None
 
 
 @dataclass
@@ -188,8 +190,8 @@ class IPv4Status:
     remote: bool | None = None
 
     @property
-    def wan_macaddr(self):
-        return str(self._wan_macaddr)
+    def wan_macaddr(self) -> str | None:
+        return str(self._wan_macaddr) if self._wan_macaddr is not None else None
 
     @property
     def wan_macaddress(self):
@@ -197,7 +199,7 @@ class IPv4Status:
 
     @property
     def wan_ipv4_ipaddr(self):
-        return str(self._wan_ipv4_ipaddr) if self._wan_ipv4_ipaddr else None
+        return str(self._wan_ipv4_ipaddr) if self._wan_ipv4_ipaddr is not None else None
 
     @property
     def wan_ipv4_conntype(self):
@@ -209,7 +211,7 @@ class IPv4Status:
 
     @property
     def wan_ipv4_gateway(self):
-        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway else None
+        return str(self._wan_ipv4_gateway) if self._wan_ipv4_gateway is not None else None
 
     @property
     def wan_ipv4_gateway_address(self):
@@ -217,51 +219,52 @@ class IPv4Status:
 
     @property
     def wan_ipv4_netmask(self):
-        return str(self._wan_ipv4_netmask) if self._wan_ipv4_netmask else None
+        return str(self._wan_ipv4_netmask) if self._wan_ipv4_netmask is not None else None
 
     @property
     def wan_ipv4_netmask_address(self):
         return self._wan_ipv4_netmask
 
     @property
-    def wan_ipv4_pridns(self):
-        return str(self._wan_ipv4_pridns)
+    def wan_ipv4_pridns(self) -> str | None:
+        return str(self._wan_ipv4_pridns) if self._wan_ipv4_pridns is not None else None
 
     @property
     def wan_ipv4_pridns_address(self):
         return self._wan_ipv4_pridns
 
     @property
-    def wan_ipv4_snddns(self):
-        return str(self._wan_ipv4_snddns)
+    def wan_ipv4_snddns(self) -> str | None:
+        return str(self._wan_ipv4_snddns) if self._wan_ipv4_snddns is not None else None
 
     @property
     def wan_ipv4_snddns_address(self):
         return self._wan_ipv4_snddns
 
     @property
-    def lan_macaddr(self):
-        return str(self._lan_macaddr)
+    def lan_macaddr(self) -> str | None:
+        return str(self._lan_macaddr) if self._lan_macaddr is not None else None
 
     @property
     def lan_macaddress(self):
         return self._lan_macaddr
 
     @property
-    def lan_ipv4_ipaddr(self):
-        return str(self._lan_ipv4_ipaddr)
+    def lan_ipv4_ipaddr(self) -> str | None:
+        return str(self._lan_ipv4_ipaddr) if self._lan_ipv4_ipaddr is not None else None
 
     @property
     def lan_ipv4_ipaddress(self):
         return self._lan_ipv4_ipaddr
 
     @property
-    def lan_ipv4_netmask(self):
-        return str(self._lan_ipv4_netmask)
+    def lan_ipv4_netmask(self) -> str | None:
+        return str(self._lan_ipv4_netmask) if self._lan_ipv4_netmask is not None else None
 
     @property
     def lan_ipv4_netmask_address(self):
         return self._lan_ipv4_netmask
+
 
 @dataclass
 class IPv6Status:
@@ -275,34 +278,42 @@ class IPv6Status:
     _wan_ipv6_snddns: IPv6Address | None = None
     _ipv6_site_prefix: IPv6Address | None = None
     _ipv6_site_prefix_length: str = ""
-    
+
     @property
-    def wan_ipv6_conn_status(self):
-        return str(self._wan_ipv6_conn_status) if self._wan_ipv6_conn_status else None
+    def wan_ipv6_conn_status(self) -> str | None:
+        return self._wan_ipv6_conn_status or None
+
     @property
-    def wan_ipv6_conntype(self):
-        return str(self._wan_ipv6_conntype) if self._wan_ipv6_conntype else None
+    def wan_ipv6_conntype(self) -> str | None:
+        return self._wan_ipv6_conntype or None
+
     @property
-    def wan_ipv6_addr_type(self):
-        return str(self._wan_ipv6_addr_type) if self._wan_ipv6_addr_type else None
+    def wan_ipv6_addr_type(self) -> str | None:
+        return self._wan_ipv6_addr_type or None
+
     @property
-    def wan_ipv6_addr(self):
-        return str(self._wan_ipv6_addr) if self._wan_ipv6_addr else None
+    def wan_ipv6_addr(self) -> str | None:
+        return str(self._wan_ipv6_addr) if self._wan_ipv6_addr is not None else None
+
     @property
-    def wan_ipv6_gateway(self):
-        return str(self._wan_ipv6_gateway) if self._wan_ipv6_gateway else None
+    def wan_ipv6_gateway(self) -> str | None:
+        return str(self._wan_ipv6_gateway) if self._wan_ipv6_gateway is not None else None
+
     @property
-    def wan_ipv6_pridns(self):
+    def wan_ipv6_pridns(self) -> IPv6Address | None:
         return self._wan_ipv6_pridns
+
     @property
-    def wan_ipv6_snddns(self):
+    def wan_ipv6_snddns(self) -> IPv6Address | None:
         return self._wan_ipv6_snddns
+
     @property
-    def ipv6_site_prefix(self):
-        return str(self._ipv6_site_prefix)
+    def ipv6_site_prefix(self) -> str | None:
+        return str(self._ipv6_site_prefix) if self._ipv6_site_prefix is not None else None
+
     @property
-    def ipv6_site_prefix_length(self):
-        return str(self._ipv6_site_prefix_length)
+    def ipv6_site_prefix_length(self) -> str | None:
+        return self._ipv6_site_prefix_length or None
 
 
 @dataclass
@@ -345,7 +356,7 @@ class LTEStatus:
     rsrq: int | None = None
     snr: int | None = None
     isp_name: str | None = None
-    network_types = {
+    network_types: ClassVar[Mapping[int, str]] = MappingProxyType({
         0: "No Service",
         1: "GSM",
         2: "WCDMA",
@@ -354,9 +365,9 @@ class LTEStatus:
         5: "CDMA 1x",
         6: "CDMA 1x Ev-Do",
         7: "4G+ LTE",
-        8: "5G NR"
-    }
-    sim_statuses = {
+        8: "5G NR",
+    })
+    sim_statuses: ClassVar[Mapping[int, str]] = MappingProxyType({
         0: "No SIM card detected or SIM card error.",
         1: "No SIM card detected.",
         2: "SIM card error.",
@@ -366,8 +377,8 @@ class LTEStatus:
         6: "PIN locked.",
         7: "SIM card is locked permanently.",
         8: "suspension of transmission",
-        9: "Unopened"
-    }
+        9: "Unopened",
+    })
 
     @property
     def network_type_info(self) -> str:

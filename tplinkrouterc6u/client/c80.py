@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from logging import Logger
 from urllib import parse
 from collections import defaultdict
@@ -65,9 +64,9 @@ class RouterConfig:
     PAD_CHAR: str = chr(187)
 
 
-@dataclass
 class EncryptionState:
     """Holds encryption-related state."""
+
     def __init__(self):
         self.nn_rsa = ''
         self.ee_rsa = ''
@@ -340,7 +339,7 @@ class TplinkC80Router(AbstractRouter):
         wan_ipv6_request = "45|1,0,0"
         site_ipv6_request = "48|1,0,0"
         all_requests = [
-            wan_ipv6_request, site_ipv6_request ]
+            wan_ipv6_request, site_ipv6_request]
         request_text = '#'.join(all_requests)
         body = self._encrypt_body(request_text)
 
@@ -364,8 +363,10 @@ class TplinkC80Router(AbstractRouter):
 
         ipv6status = IPv6Status()
         ipv6status.wan_ipv6_enabled = network_info['wan_ipv6_status'] != '0'
-        ipv6status._wan_ipv6_conn_status = RouterConstants.CONNECTION_STATUS_MAP_IPV6[network_info['wan_ipv6_status']]
-        ipv6status._wan_ipv6_addr_type = RouterConstants.ADDR_TYPE_MAP_IPV6[network_info['wan_ipv6_getip']]
+        ipv6status._wan_ipv6_conn_status = RouterConstants.CONNECTION_STATUS_MAP_IPV6.get(
+            network_info['wan_ipv6_status'], 'Unknown')
+        ipv6status._wan_ipv6_addr_type = RouterConstants.ADDR_TYPE_MAP_IPV6.get(
+            network_info['wan_ipv6_getip'], 'Unknown')
         ipv6status._wan_ipv6_addr = get_ipv6(network_info['wan_ipv6_ip'])
         ipv6status._wan_ipv6_gateway = get_ipv6(network_info['gateway_ipv6'])
         ipv6status._wan_ipv6_pridns = get_ipv6(network_info['dns_1'])
@@ -374,7 +375,7 @@ class TplinkC80Router(AbstractRouter):
         ipv6status._ipv6_site_prefix_length = network_info['site_prefix_len']
 
         return ipv6status
-    
+
     def get_vpn_status(self) -> VPNStatus:
         body = self._encrypt_body("22|1,0,0")
 

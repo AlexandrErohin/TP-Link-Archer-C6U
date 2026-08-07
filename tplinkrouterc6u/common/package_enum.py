@@ -18,7 +18,7 @@ class Connection(Enum):
         return self in [Connection.HOST_2G, Connection.HOST_5G, Connection.HOST_6G]
 
     def is_guest_wifi(self) -> bool:
-        return self in [Connection.GUEST_2G, Connection.GUEST_5G, Connection.GUEST_5G]
+        return self in [Connection.GUEST_2G, Connection.GUEST_5G, Connection.GUEST_6G]
 
     def is_iot(self) -> bool:
         return self in [Connection.IOT_2G, Connection.IOT_5G, Connection.IOT_6G]
