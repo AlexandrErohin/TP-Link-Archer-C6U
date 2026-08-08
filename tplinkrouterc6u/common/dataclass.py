@@ -21,6 +21,7 @@ class Device:
     _macaddr: EUI48
     _ipaddr: IPv4Address
     hostname: str
+    ap_name: str | None = None
     packets_sent: int | None = None
     packets_received: int | None = None
     down_speed: int | None = None
