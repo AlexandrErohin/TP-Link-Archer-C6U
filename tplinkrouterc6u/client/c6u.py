@@ -471,6 +471,22 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             # WiFi might be disabled on the router, skip wireless statistics
             pass
 
+        try:
+            easymesh_node_list = self.request('admin/easymesh_network?form=get_mesh_device_list_all&operation=read', 'operation=read')
+            for ap in easymesh_node_list:
+                # 'sclient' is mesh main or satellite, 'nclient' is a network device
+                sclient_detail = self.request('admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac='+ap['mac'], 'operation=read&mac='+ap['mac'])
+                for nclient in sclient_detail['mesh_nclient_list']:
+                    if ap['role'] == 'satellite_router':
+                        devices[nclient['mac']].ap_name = ap['name']
+                        devices[nclient['mac']].signal = nclient['signal_strength']
+                    else:
+                        # prefix * helps sorting main node devices in display
+                        devices[nclient['mac']].ap_name = '*'+ap['name']
+        except Exception:
+            # skip if router doesn't support EasyMesh
+            pass
+        
         status.devices = list(devices.values())
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (status.iot_clients_total or 0))
