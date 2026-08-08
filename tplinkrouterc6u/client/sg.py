@@ -166,10 +166,15 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign = ''
         # OAEP overhead (SHA-1, pycryptodome's default hash for PKCS1_OAEP.new())
         # is 2*hLen+2 = 42 bytes, unlike PKCS1v1.5's 11-byte overhead. The fixed
-        # SIGNATURE_OFFSET (53, sized for PKCS1v1.5) overflows the 512-bit auth
-        # key used here, raising "Plaintext is too long." on every login attempt.
+        # SIGNATURE_OFFSET (53, sized for PKCS1v1.5) overflows small auth keys
+        # (e.g. 512-bit, max OAEP payload 22 bytes), raising "Plaintext is too
+        # long." on every login attempt. Cap at SIGNATURE_OFFSET rather than
+        # always using the OAEP-safe max: for keys large enough that 53 never
+        # overflowed (e.g. 1024-bit, max payload 86 bytes), this keeps the
+        # exact legacy chunking unchanged, in case some firmware's signature
+        # parsing is sensitive to the resulting block size/count.
         rsa_byte_len = len(self._nn) // 2
-        oaep_step = rsa_byte_len - 2 * 20 - 2
+        oaep_step = min(SIGNATURE_OFFSET, rsa_byte_len - 2 * 20 - 2)
         for i in range(0, len(sign_str), oaep_step):
             chunk = sign_str[i:i + oaep_step]
             sign += self._rsa_oaep_encrypt(chunk, self._nn, self._ee)
