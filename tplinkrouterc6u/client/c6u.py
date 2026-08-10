@@ -242,11 +242,13 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._sysauth = None
         self._data_block = 'data'
         self._smart_network = True
+        self._easymesh = True
         self._perf_status = True
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
+        self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
         self._url_openvpn = 'admin/openvpn?form=config&operation=read'
         self._url_pptpd = 'admin/pptpd?form=config&operation=read'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
@@ -471,9 +473,15 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             # WiFi might be disabled on the router, skip wireless statistics
             pass
 
-        try:
-            easymesh_node_list = self.request('admin/easymesh_network?form=get_mesh_device_list_all&operation=read', 'operation=read')
-            for ap in easymesh_node_list:
+        easymesh_device_list = None
+        if self._easymesh:
+            try:
+                easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
+            except Exception:
+                self._easymesh = False
+
+        if easymesh_device_list:
+            for ap in easymesh_device_list:
                 # 'sclient' is mesh main or satellite, 'nclient' is a network device
                 sclient_detail = self.request('admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac='+ap['mac'], 'operation=read&mac='+ap['mac'])
                 for nclient in sclient_detail['mesh_nclient_list']:
@@ -481,11 +489,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                         devices[nclient['mac']].ap_name = ap['name']
                         devices[nclient['mac']].signal = nclient['signal_strength']
                     else:
-                        # prefix * helps sorting main node devices in display
+                        # prefix * helps identify and sort main node devices for display
                         devices[nclient['mac']].ap_name = '*'+ap['name']
-        except Exception:
-            # skip if router doesn't support EasyMesh
-            pass
         
         status.devices = list(devices.values())
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
