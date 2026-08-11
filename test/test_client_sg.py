@@ -3,7 +3,12 @@ from hashlib import sha256
 from unittest import main, TestCase
 from unittest.mock import patch, Mock
 
-from tplinkrouterc6u import TplinkRouterSG, ClientException
+from tplinkrouterc6u import (
+    TplinkRouterSG,
+    ClientException,
+    VpnClientServer,
+    VpnClientServerProtocol,
+)
 from test_client_c6u import TestTPLinkClient
 
 
@@ -305,6 +310,35 @@ class TestTplinkRouterSGUnit(TestCase):
         call_kwargs = mock_post.call_args
         headers = call_kwargs[1]['headers']
         self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
+
+
+class TestTplinkRouterSGVpnClientStatus(TestCase):
+    """Regression tests for WireGuard support in the VPN client server parser."""
+
+    def test_get_vpn_client_status_wireguard_server(self) -> None:
+        class TPLinkRouterTest(TplinkRouterSG):
+            def request(self, path, data, ignore_response=False, ignore_errors=False):
+                if 'admin/vpn?form=enable' in path:
+                    return {'enable': 'on'}
+                if 'admin/vpn?form=server' in path:
+                    return [
+                        {'.name': 'cfg1a2b3c', 'key': 'key-wg', 'type': 'wireguard',
+                         'enable': 'on', 'des': 'WG Server', 'status': 'connected'},
+                    ]
+                if 'admin/vpn?form=vpn_user_list' in path:
+                    return []
+                raise ClientException()
+
+        client = TPLinkRouterTest('http://192.168.0.1', 'testpassword')
+        result = client.get_vpn_client_status()
+
+        self.assertEqual(len(result.servers), 1)
+        server = result.servers[0]
+        self.assertIsInstance(server, VpnClientServer)
+        self.assertEqual(server.protocol, VpnClientServerProtocol.WIREGUARD)
+        self.assertEqual(server.id, 'key-wg')
+        self.assertTrue(server.active)
+        self.assertEqual(server.status, 'connected')
 
 
 if __name__ == '__main__':
