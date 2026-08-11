@@ -481,17 +481,36 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 self._easymesh = False
 
         if easymesh_device_list:
+            # Match EasyMesh MACs (often dash-uppercase) to devices keyed by other API formats
+            devices_by_mac = {device.macaddr: device for device in devices.values()}
             for ap in easymesh_device_list:
-                # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                sclient_detail = self.request('admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac='+ap['mac'], 'operation=read&mac='+ap['mac'])
-                for nclient in sclient_detail['mesh_nclient_list']:
-                    if ap['role'] == 'satellite_router':
-                        devices[nclient['mac']].ap_name = ap['name']
-                        devices[nclient['mac']].signal = nclient['signal_strength']
-                    else:
+                try:
+                    # 'sclient' is mesh main or satellite, 'nclient' is a network device
+                    sclient_detail = self.request(
+                        'admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac=' + ap['mac'],
+                        'operation=read&mac=' + ap['mac'])
+                except Exception:
+                    continue
+
+                if not sclient_detail:
+                    continue
+
+                for nclient in sclient_detail.get('mesh_nclient_list') or []:
+                    nclient_mac = nclient.get('mac')
+                    if not nclient_mac:
+                        continue
+                    device = devices_by_mac.get(str(get_mac(nclient_mac)))
+                    if device is None:
+                        continue
+                    if ap.get('role') == 'satellite_router':
+                        # Last satellite wins if the same client appears under multiple APs
+                        device.ap_name = ap.get('name')
+                        if nclient.get('signal_strength') is not None:
+                            device.signal = nclient['signal_strength']
+                    elif device.ap_name is None:
                         # prefix * helps identify and sort main node devices for display
-                        devices[nclient['mac']].ap_name = '*'+ap['name']
-        
+                        device.ap_name = '*' + (ap.get('name') or '')
+
         status.devices = list(devices.values())
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (status.iot_clients_total or 0))

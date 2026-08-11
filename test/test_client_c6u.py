@@ -26,6 +26,7 @@ class TestTPLinkClient(TestCase):
     router_class = TplinkRouter
     firmware_path = 'admin/firmware?form=upgrade'
     game_accelerator_path = 'admin/smart_network?form=game_accelerator'
+    easymesh_device_list_path = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
     openvpn_config_path = 'admin/openvpn?form=config'
     pptpd_config_path = 'admin/pptpd?form=config'
     vpn_uses_data_param = True
@@ -341,6 +342,9 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[4].packets_sent, 134815)
         self.assertEqual(status.devices[4].packets_received, 2953078)
         self.assertEqual(status.devices[4].active, True)
+        self.assertFalse(client._easymesh)
+        for device in status.devices:
+            self.assertIsNone(device.ap_name)
 
     def test_get_status_ax_55(self) -> None:
         response_status = '''
@@ -460,6 +464,9 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[3].hostname, '')
         self.assertEqual(status.devices[3].packets_sent, None)
         self.assertEqual(status.devices[3].packets_received, None)
+        self.assertFalse(client._easymesh)
+        for device in status.devices:
+            self.assertIsNone(device.ap_name)
 
     def test_get_status_with_game_accelerator(self) -> None:
         response_status = '''
@@ -642,6 +649,9 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.devices[6].hostname, '')
         self.assertEqual(status.devices[6].packets_sent, 134815)
         self.assertEqual(status.devices[6].packets_received, 2953078)
+        self.assertFalse(client._easymesh)
+        for device in status.devices:
+            self.assertIsNone(device.ap_name)
 
     def test_get_status_with_game_accelerator_fallback_values(self) -> None:
         response_status = '''
@@ -711,6 +721,8 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.online_time, 34990.64)
         self.assertEqual(device.traffic_usage, 19594852347)
         self.assertEqual(device.signal, -60)
+        self.assertFalse(client._easymesh)
+        self.assertIsNone(device.ap_name)
 
     def test_get_status_with_game_accelerator_alt_keys(self) -> None:
         response_status = '''
@@ -779,6 +791,333 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.online_time, 123.45)
         self.assertEqual(device.traffic_usage, 987654321)
         self.assertEqual(device.signal, -55)
+        self.assertFalse(client._easymesh)
+        self.assertIsNone(device.ap_name)
+
+    def test_get_status_with_easymesh(self) -> None:
+        """EasyMesh AX55 sample: main node gets '*name', satellites set ap_name + signal."""
+        # Status uses colon-lowercase MACs; EasyMesh responses use dash-uppercase —
+        # enrichment must still match via normalized Device.macaddr.
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "24:00:00:00:00:18",
+        "access_devices_wired": [
+            {
+                "wire_type": "wired",
+                "macaddr": "34:00:00:00:00:a8",
+                "ipaddr": "10.1.1.27",
+                "hostname": "Aircon_Bedroom"
+            },
+            {
+                "wire_type": "wired",
+                "macaddr": "60:00:00:00:00:2b",
+                "ipaddr": "10.1.1.12",
+                "hostname": "C110"
+            }
+        ],
+        "access_devices_wireless_host": [
+            {
+                "wire_type": "2.4G",
+                "macaddr": "34:00:00:00:00:0a",
+                "ipaddr": "10.1.1.21",
+                "hostname": "Aircon_LivingRoom"
+            },
+            {
+                "wire_type": "2.4G",
+                "macaddr": "dc:00:00:00:00:e6",
+                "ipaddr": "10.1.1.27",
+                "hostname": "L530"
+            },
+            {
+                "wire_type": "2.4G",
+                "macaddr": "e8:00:00:00:00:be",
+                "ipaddr": "10.1.1.2",
+                "hostname": "Solarman"
+            }
+        ],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '''
+{
+    "data": [],
+    "timeout": false,
+    "success": true,
+    "operator": "load"
+}
+'''
+        # From res/EasyMesh-device-list-responses.txt (AX55)
+        response_easymesh_list = '''
+{
+    "success": true,
+    "data": [
+        {
+            "mac": "24-00-00-00-00-18",
+            "client_num": 28,
+            "ip": "10.1.1.251",
+            "role": "main_router",
+            "name": "AX55 main",
+            "model": "Archer AX55",
+            "status": "connected",
+            "location": "meals",
+            "vendor": "TP-Link",
+            "device_type": "WirelessRouter"
+        },
+        {
+            "mac": "60-00-00-00-00-F5",
+            "connect_type": "wire",
+            "client_num": 3,
+            "parent_mac": "24-00-00-00-00-18",
+            "ip": "10.1.1.5",
+            "mesh_type": "easymesh",
+            "name": "Archer AX23",
+            "model": "Archer AX23",
+            "status": "connected",
+            "role": "satellite_router",
+            "device_type": "WirelessRouter"
+        },
+        {
+            "mac": "A8-00-00-00-00-EE",
+            "connect_type": "wireless",
+            "client_num": 1,
+            "parent_mac": "24-00-00-00-00-18",
+            "name": "RE200",
+            "model": "RE200",
+            "status": "connected",
+            "ip": "10.1.1.36",
+            "role": "satellite_router",
+            "device_type": "RangeExtender"
+        }
+    ]
+}
+'''
+        # From res/EasyMesh-sclient-detail-responses.txt
+        response_sclient_main = '''
+{
+    "success": true,
+    "data": {
+        "mac": "24-00-00-00-00-18",
+        "mesh_nclient_list": [
+            {"mac": "34-00-00-00-00-A8", "name": "Aircon_Bedroom", "is_wired": false,
+             "bind": false, "ip": "10.1.1.27"},
+            {"mac": "34-00-00-00-00-0A", "name": "Aircon_LivingRoom", "is_wired": false,
+             "bind": false, "ip": "10.1.1.21"},
+            {"mac": "AA-BB-CC-DD-EE-FF", "name": "OnlyInMesh", "is_wired": false,
+             "bind": false, "ip": "10.1.1.99"}
+        ],
+        "role": "main_router",
+        "name": "AX55 main",
+        "model": "Archer AX55"
+    }
+}
+'''
+        response_sclient_ax23 = '''
+{
+    "success": true,
+    "data": {
+        "mac": "60-00-00-00-00-F5",
+        "role": "satellite_router",
+        "name": "Archer AX23",
+        "model": "Archer AX23",
+        "connect_type": "wire",
+        "mesh_nclient_list": [
+            {"mac": "DC-00-00-00-00-E6", "signal_strength": -67, "connection_type": "2.4G",
+             "ip": "10.1.1.27", "guest": "NON_GUEST", "name": "L530", "rxrate": 26,
+             "is_wired": false, "bind": false, "txrate": 43},
+            {"mac": "E8-00-00-00-00-BE", "signal_strength": -47, "connection_type": "2.4G",
+             "ip": "10.1.1.2", "guest": "NON_GUEST", "name": "Solarman", "rxrate": 72,
+             "is_wired": false, "bind": false, "txrate": 14},
+            {"mac": "60-00-00-00-00-2B", "signal_strength": -23, "connection_type": "2.4G",
+             "ip": "10.1.1.12", "guest": "NON_GUEST", "name": "C110", "rxrate": 72,
+             "is_wired": false, "bind": false, "txrate": 72}
+        ]
+    }
+}
+'''
+        response_sclient_re200 = '''
+{
+    "success": true,
+    "data": {
+        "mac": "A8-00-00-00-00-EE",
+        "role": "satellite_router",
+        "name": "RE200",
+        "model": "RE200",
+        "connect_type": "wireless",
+        "mesh_nclient_list": [
+            {"mac": "DC-00-00-00-00-E6", "signal_strength": -47, "connection_type": "2.4G",
+             "ip": "10.1.1.13", "guest": "NON_GUEST", "name": "L530-BR1", "rxrate": 65,
+             "is_wired": false, "bind": false, "txrate": 72}
+        ]
+    }
+}
+'''
+        sclient_by_mac = {
+            '24-00-00-00-00-18': response_sclient_main,
+            '60-00-00-00-00-F5': response_sclient_ax23,
+            'A8-00-00-00-00-EE': response_sclient_re200,
+        }
+
+        router_class = self.router_class
+        easymesh_device_list_path = self.easymesh_device_list_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                elif path == easymesh_device_list_path:
+                    return loads(response_easymesh_list)['data']
+                elif path.startswith('admin/easymesh_network?form=mesh_sclient_detail'):
+                    mac = path.rsplit('mac=', 1)[-1]
+                    return loads(sclient_by_mac[mac])['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(client._easymesh)
+        # Mesh-only AA-BB-CC-DD-EE-FF is skipped (not in status devices)
+        self.assertEqual(len(status.devices), 5)
+        by_mac = {device.macaddr: device for device in status.devices}
+
+        # Main-router clients: '*' prefix, no signal from mesh_nclient_list
+        self.assertEqual(by_mac['34-00-00-00-00-A8'].ap_name, '*AX55 main')
+        self.assertIsNone(by_mac['34-00-00-00-00-A8'].signal)
+        self.assertEqual(by_mac['34-00-00-00-00-0A'].ap_name, '*AX55 main')
+        self.assertIsNone(by_mac['34-00-00-00-00-0A'].signal)
+
+        # Wired satellite clients
+        self.assertEqual(by_mac['E8-00-00-00-00-BE'].ap_name, 'Archer AX23')
+        self.assertEqual(by_mac['E8-00-00-00-00-BE'].signal, -47)
+        self.assertEqual(by_mac['60-00-00-00-00-2B'].ap_name, 'Archer AX23')
+        self.assertEqual(by_mac['60-00-00-00-00-2B'].signal, -23)
+
+        # Same MAC on AX23 then RE200 — last satellite wins
+        self.assertEqual(by_mac['DC-00-00-00-00-E6'].ap_name, 'RE200')
+        self.assertEqual(by_mac['DC-00-00-00-00-E6'].signal, -47)
+
+    def test_get_status_easymesh_detail_errors_are_skipped(self) -> None:
+        """A failing mesh_sclient_detail must not abort get_status or disable EasyMesh."""
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "24:00:00:00:00:18",
+        "access_devices_wireless_host": [
+            {
+                "wire_type": "2.4G",
+                "macaddr": "e8:00:00:00:00:be",
+                "ipaddr": "10.1.1.2",
+                "hostname": "Solarman"
+            }
+        ],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '{"data": [], "timeout": false, "success": true, "operator": "load"}'
+        response_easymesh_list = '''
+{
+    "success": true,
+    "data": [
+        {"mac": "24-00-00-00-00-18", "role": "main_router", "name": "AX55 main"},
+        {"mac": "60-00-00-00-00-F5", "role": "satellite_router", "name": "Archer AX23"}
+    ]
+}
+'''
+        response_sclient_ax23 = '''
+{
+    "success": true,
+    "data": {
+        "mac": "60-00-00-00-00-F5",
+        "role": "satellite_router",
+        "name": "Archer AX23",
+        "mesh_nclient_list": [
+            {"mac": "E8-00-00-00-00-BE", "signal_strength": -47, "name": "Solarman"}
+        ]
+    }
+}
+'''
+        router_class = self.router_class
+        easymesh_device_list_path = self.easymesh_device_list_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                if path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                if path == easymesh_device_list_path:
+                    return loads(response_easymesh_list)['data']
+                if path.endswith('mac=24-00-00-00-00-18'):
+                    raise ClientException('detail failed')
+                if path.endswith('mac=60-00-00-00-00-F5'):
+                    return loads(response_sclient_ax23)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(client._easymesh)
+        self.assertEqual(len(status.devices), 1)
+        self.assertEqual(status.devices[0].ap_name, 'Archer AX23')
+        self.assertEqual(status.devices[0].signal, -47)
+
+    def test_get_status_easymesh_unsupported_disables_flag(self) -> None:
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "access_devices_wired": [],
+        "access_devices_wireless_host": [],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '''
+{"data": [], "timeout": false, "success": true, "operator": "load"}
+'''
+        router_class = self.router_class
+        easymesh_device_list_path = self.easymesh_device_list_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                elif path == easymesh_device_list_path:
+                    raise ClientException('EasyMesh not supported')
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        self.assertTrue(client._easymesh)
+        status = client.get_status()
+        self.assertFalse(client._easymesh)
+        self.assertEqual(len(status.devices), 0)
+
+        # Second call must not attempt easymesh again
+        requested = []
+
+        def tracking_request(path, data, ignore_response=False, ignore_errors=False):
+            requested.append(path)
+            if path == 'admin/status?form=all&operation=read':
+                return loads(response_status)['data']
+            if path == 'admin/wireless?form=statistics':
+                return loads(response_stats)['data']
+            raise ClientException()
+
+        client.request = tracking_request
+        client.get_status()
+        self.assertFalse(any('easymesh_network' in path for path in requested))
 
     def test_get_status_with_perf_request(self) -> None:
         response_status = '''
@@ -849,6 +1188,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.mem_usage, 0.47)
         self.assertEqual(status.cpu_usage, 0.25)
         self.assertEqual(len(status.devices), 0)
+        self.assertFalse(client._easymesh)
 
     def test_set_wifi(self) -> None:
         check_url = ''
@@ -1047,6 +1387,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(result.wan_ipv4_addr, '0.0.0.0')
         self.assertEqual(result.wan_ipv4_gateway, '0.0.0.0')
         self.assertEqual(result.lan_macaddr, '06-E6-97-9E-23-F5')
+        self.assertFalse(client._easymesh)
 
     def test_get_status_wifi_disabled(self) -> None:
         """Test that get_status gracefully handles when WiFi is disabled and wireless statistics fail."""
@@ -1111,6 +1452,8 @@ class TestTPLinkClient(TestCase):
         # Devices list should only contain wired devices
         self.assertEqual(len(result.devices), 1)
         self.assertEqual(result.devices[0].type, Connection.WIRED)
+        self.assertFalse(client._easymesh)
+        self.assertIsNone(result.devices[0].ap_name)
 
     def test_vpn_status(self) -> None:
         response_openvpn_read = """
