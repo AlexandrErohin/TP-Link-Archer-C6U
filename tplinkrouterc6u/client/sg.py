@@ -273,6 +273,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             hdrs['Content-Type'] = 'application/x-www-form-urlencoded'
         else:
             body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
+            hdrs['Content-Type'] = 'application/x-www-form-urlencoded'
 
         response = post(
             url, data=body, headers=hdrs,
