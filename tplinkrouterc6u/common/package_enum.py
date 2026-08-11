@@ -61,3 +61,4 @@ class VpnClientServerProtocol(Enum):
     OPEN_VPN = 'openvpn'
     PPTP = 'pptp'
     L2TP_IPSEC = 'l2tp'
+    WIREGUARD = 'wireguard'

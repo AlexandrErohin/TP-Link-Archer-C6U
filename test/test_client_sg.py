@@ -3,7 +3,12 @@ from hashlib import sha256
 from unittest import main, TestCase
 from unittest.mock import patch, Mock
 
-from tplinkrouterc6u import TplinkRouterSG, ClientException
+from tplinkrouterc6u import (
+    TplinkRouterSG,
+    ClientException,
+    VpnClientServer,
+    VpnClientServerProtocol,
+)
 from test_client_c6u import TestTPLinkClient
 
 
@@ -275,6 +280,65 @@ class TestTplinkRouterSGUnit(TestCase):
         # Verify mandatory header is present for WRITE
         headers = call_kwargs[1]['headers']
         self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_read_content_type_header(self, mock_post: Mock) -> None:
+        """Regression test: BE3600 rejects READ requests missing Content-Type.
+
+        The write branch always set Content-Type, but the read (non-write)
+        branch left it unset, relying on requests' default. The BE3600
+        firmware requires it explicitly on every request, so it must be set
+        on reads too.
+        """
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._logged = True
+        client._stok = 'test_stok'
+        client._sysauth = 'test_sysauth'
+        client._aes_key = '1234567890123456'
+        client._aes_iv = '6543210987654321'
+        client._hash = 'fakehash'
+        client._seq = 100
+
+        response = Mock()
+        decrypted_data = json.dumps({'success': True, 'data': {'key': 'value'}})
+        response.json.return_value = {'data': 'encrypted'}
+        mock_post.return_value = response
+
+        with patch.object(client, '_aes_decrypt', return_value=decrypted_data):
+            client.request('admin/status?form=all', 'operation=read')
+
+        call_kwargs = mock_post.call_args
+        headers = call_kwargs[1]['headers']
+        self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
+
+
+class TestTplinkRouterSGVpnClientStatus(TestCase):
+    """Regression tests for WireGuard support in the VPN client server parser."""
+
+    def test_get_vpn_client_status_wireguard_server(self) -> None:
+        class TPLinkRouterTest(TplinkRouterSG):
+            def request(self, path, data, ignore_response=False, ignore_errors=False):
+                if 'admin/vpn?form=enable' in path:
+                    return {'enable': 'on'}
+                if 'admin/vpn?form=server' in path:
+                    return [
+                        {'.name': 'cfg1a2b3c', 'key': 'key-wg', 'type': 'wireguard',
+                         'enable': 'on', 'des': 'WG Server', 'status': 'connected'},
+                    ]
+                if 'admin/vpn?form=vpn_user_list' in path:
+                    return []
+                raise ClientException()
+
+        client = TPLinkRouterTest('http://192.168.0.1', 'testpassword')
+        result = client.get_vpn_client_status()
+
+        self.assertEqual(len(result.servers), 1)
+        server = result.servers[0]
+        self.assertIsInstance(server, VpnClientServer)
+        self.assertEqual(server.protocol, VpnClientServerProtocol.WIREGUARD)
+        self.assertEqual(server.id, 'key-wg')
+        self.assertTrue(server.active)
+        self.assertEqual(server.status, 'connected')
 
 
 if __name__ == '__main__':
