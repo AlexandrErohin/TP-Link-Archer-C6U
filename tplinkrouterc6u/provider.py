@@ -21,6 +21,7 @@ from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
+from tplinkrouterc6u.client.deco_e4r import TplinkDecoE4RRouter
 from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
@@ -87,6 +88,7 @@ class TplinkRouterProvider:
             TplinkC80Router.__name__: TplinkC80Router,
             TplinkWDRRouter.__name__: TplinkWDRRouter,
             TplinkRE330Router.__name__: TplinkRE330Router,
+            TplinkDecoE4RRouter.__name__: TplinkDecoE4RRouter,
             TplinkC3200Router.__name__: TplinkC3200Router,
             TPLinkEAP115Client.__name__: TPLinkEAP115Client,
             TPLinkCPE210Client.__name__: TPLinkCPE210Client,

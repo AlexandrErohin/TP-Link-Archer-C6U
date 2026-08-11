@@ -39,6 +39,7 @@ from tplinkrouterc6u import (
     TPLinkRClient, # For routers like TL-R470GP-AC
     TPLinkXDRClient,
     TPLinkDecoClient,
+    TplinkDecoE4RRouter,
     TPLinkEAP115Client,
     TPLinkCPE210Client,
     TPLinkSG108EClient,
@@ -461,6 +462,7 @@ Not all fields are filled by every client:
 - CPE210 v2.0
 - CPE220 v3.0
 - Deco BE25 1.0
+- Deco E4R
 - Deco M4 2.0
 - Deco M4R 2.0
 - Deco M5 v3
