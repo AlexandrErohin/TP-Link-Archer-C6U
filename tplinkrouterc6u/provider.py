@@ -3,6 +3,7 @@ from logging import Logger
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
+from tplinkrouterc6u.client.ax72 import TplinkRouterAX72
 from tplinkrouterc6u.client.sg import TplinkRouterSG
 from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -83,6 +84,7 @@ class TplinkRouterProvider:
             TPLinkRClient.__name__: TPLinkRClient,
             TplinkRouterSG.__name__: TplinkRouterSG,
             TplinkRouterV1_11.__name__: TplinkRouterV1_11,
+            TplinkRouterAX72.__name__: TplinkRouterAX72,
             TplinkRouter.__name__: TplinkRouter,
             TplinkC80Router.__name__: TplinkC80Router,
             TplinkWDRRouter.__name__: TplinkWDRRouter,
