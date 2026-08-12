@@ -1,7 +1,7 @@
 from unittest import main, TestCase
 from unittest.mock import patch, Mock
 
-from tplinkrouterc6u import TplinkRouterAX72
+from tplinkrouterc6u import TplinkRouterAX72, TplinkRouterProvider
 from test_client_c6u import TestTPLinkClient
 
 
@@ -9,8 +9,9 @@ class TestTPLinkClientAX72(TestTPLinkClient):
     """Inherits get_firmware/get_status/get_ipv4_status/etc.
     All other tests unchanged from TestTPLinkClient.
 
-    TplinkRouterAX72 extends TplinkRouter directly (unlike TplinkRouterSG, which extends TplinkBaseRouter),
-    so it inherits TplinkRouter's shortened URL scheme too - no path overrides needed here, unlike TestTPLinkClientSG's firmware_path/game_accelerator_path/etc.
+    TplinkRouterAX72 extends TplinkRouter directly, unlike TplinkRouterSG,
+    which extends TplinkBaseRouter, so it inherits TplinkRouter's shortened
+    URL scheme too. No path overrides are needed here.
     """
 
     router_class = TplinkRouterAX72
@@ -19,9 +20,10 @@ class TestTPLinkClientAX72(TestTPLinkClient):
 class TestTplinkRouterAX72Unit(TestCase):
     """Unit tests specific to TplinkRouterAX72's login signature and detection logic.
 
-    authorize() itself, its 403-retry logic, and password encryption are all inherited unchanged from TplinkEncryption/TplinkRouter
-    and are already covered by the base class's own tests
-    - only the pieces this class actually overrides (_get_login_data, _prepare_data, _build_login_signature, supports()) are tested here.
+    authorize() itself, its 403-retry logic, and password encryption are all
+    inherited unchanged from TplinkEncryption/TplinkRouter and are already
+    covered by the base class's own tests. Only the pieces this class actually
+    overrides are tested here.
     """
 
     def test_supports_password_too_long(self) -> None:
@@ -30,7 +32,7 @@ class TestTplinkRouterAX72Unit(TestCase):
         self.assertFalse(client.supports())
 
     def test_get_login_data_omits_confirm(self) -> None:
-        """The AX72 rejects a login body containing '&confirm=true' - the standard scheme sends it."""
+        """The AX72 rejects a login body containing '&confirm=true'."""
         data = TplinkRouterAX72._get_login_data('deadbeef')
 
         self.assertEqual(data, 'operation=login&password=deadbeef')
@@ -39,10 +41,12 @@ class TestTplinkRouterAX72Unit(TestCase):
     def test_build_login_signature_real_key_size(self) -> None:
         """Regression test mirroring #171/#185's test_build_login_signature_real_key_size.
 
-        Reuses the same real 512-bit auth key value already published in test_client_sg.py
-        (public key material - safe to reuse, and a genuine 512-bit modulus is what actually matters here, not which device it came from).
+        Reuses the same real 512-bit auth key value already published in
+        test_client_sg.py (public key material, so it is safe to reuse).
         Confirms this doesn't raise "Plaintext is too long."
-        (which the naive flat 53-byte-per-block chunking - sized for PKCS1v1.5's 11-byte overhead, not OAEP's 42-byte overhead - does raise against a key this size)
+        The naive flat 53-byte-per-block chunking, sized for PKCS1v1.5's
+        11-byte overhead rather than OAEP's 42-byte overhead, does raise
+        against a key this size.
         and produces a whole number of 512-bit (128 hex char) blocks.
         """
         client = TplinkRouterAX72('http://192.168.0.1', 'testpassword')
@@ -58,9 +62,12 @@ class TestTplinkRouterAX72Unit(TestCase):
 
         self.assertGreater(len(sign), 0)
         self.assertEqual(len(sign) % 128, 0)
+        self.assertTrue(
+            all(len(sign[i:i + 128]) == 128 for i in range(0, len(sign), 128))
+        )
 
     def test_prepare_data_hashes_with_sha256_not_md5(self) -> None:
-        """The AX72 expects SHA256(username+password) - the standard scheme's MD5 hash is rejected."""
+        """The AX72 expects SHA256(username+password) instead of MD5."""
         client = TplinkRouterAX72('http://192.168.0.1', 'testpassword', username='admin')
         client._seq = '100'
         client.nn = (
@@ -116,6 +123,14 @@ class TestTplinkRouterAX72Unit(TestCase):
 
         self.assertFalse(client.supports())
         mock_authorize.assert_not_called()
+
+    def test_registered_in_provider(self) -> None:
+        clients = list(TplinkRouterProvider.get_clients())
+        self.assertIn('TplinkRouterAX72', clients)
+
+        idx = clients.index('TplinkRouterAX72')
+        self.assertLess(clients.index('TplinkRouterV1_11'), idx)
+        self.assertLess(idx, clients.index('TplinkRouter'))
 
 
 if __name__ == '__main__':

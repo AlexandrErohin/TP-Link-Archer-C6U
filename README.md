@@ -23,6 +23,7 @@ from tplinkrouterc6u import (
     TplinkRouterProvider,
     TplinkRouterV1_11,
     TplinkRouterSG, # For routers like Archer BE3600, Archer BE230
+    TplinkRouterAX72,
     TplinkRouter,
     TplinkC1200Router,
     TplinkC5400XRouter,
