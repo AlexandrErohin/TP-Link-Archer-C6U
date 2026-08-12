@@ -22,12 +22,9 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
     handshake and the request transport are overridden here.
     """
 
-    # securityEncode alphabet / key, identical to the router's encrypt.js and to
-    # the values already used by TplinkC80Router / TplinkRE330Router.
-    ENCODING = ("yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8"
-                "ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70T"
-                "OoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW")
-    KEY = "RDpbLfCPsJZ7fiv"
+    ROUTER_NAME = 'TP-Link Deco E4R'
+    # RSA-512 PKCS#1 v1.5 limits the login password to 53 UTF-8 bytes.
+    _MAX_PASSWORD_BYTES = 53
     PAD_CHAR = chr(187)
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
@@ -49,6 +46,9 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
         }
 
     def supports(self) -> bool:
+        if len(self.password.encode('utf-8')) > self._MAX_PASSWORD_BYTES:
+            return False
+
         try:
             self.authorize()
             return True
@@ -56,6 +56,11 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
             return False
 
     def authorize(self) -> None:
+        if len(self.password.encode('utf-8')) > self._MAX_PASSWORD_BYTES:
+            raise ClientException(
+                '{} - password exceeds the RSA-512 limit ({} bytes)'
+                .format(self.ROUTER_NAME, self._MAX_PASSWORD_BYTES))
+
         # 1) getTmpKey - unauthenticated challenge carrying the token key material.
         response = self._code_request('code=7&asyn=1')
         text = response.text
@@ -63,7 +68,7 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
             text = text[:-2]
         lines = text.split('\r\n')
         if len(lines) < 5:
-            raise ClientException('TplinkDecoE4RRouter - unexpected challenge response')
+            raise ClientException('{} - unexpected challenge response'.format(self.ROUTER_NAME))
         key_string, alphabet = lines[3], lines[4]
 
         # id = securityEncode(line3, key=MD5(password), alphabet=line4)
@@ -77,20 +82,20 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
         response = self._code_request('code=16&asyn=0', data='get')
         key_data = response.text.split('\r\n')
         if len(key_data) < 4 or key_data[0] != '00000':
-            raise ClientException('TplinkDecoE4RRouter - invalid response for RSA keys')
+            raise ClientException('{} - invalid response for RSA keys'.format(self.ROUTER_NAME))
         self._ee, self._nn, self._seq = key_data[1], key_data[2], key_data[3]
         self._encryption = EncryptionWrapper()
 
         # 4) Login - the credential is the RSA-encrypted password.
         response = self._code_request('code=7&asyn=0', data=self._rsa_encrypt(self.password), use_token=True)
         if response.text.split('\r\n')[0] != '00000':
-            raise ClientException('TplinkDecoE4RRouter - login failed, check the router password')
+            raise ClientException('{} - login failed, check the router password'.format(self.ROUTER_NAME))
 
         # 5) Register the AES session key for subsequent encrypted requests.
         aes_string = self._encryption._get_aes_string()
         response = self._code_request('code=16&asyn=0', data='set ' + self._rsa_encrypt(aes_string), use_token=True)
         if response.text.split('\r\n')[0] != '00000':
-            raise ClientException('TplinkDecoE4RRouter - failed to register the session key')
+            raise ClientException('{} - failed to register the session key'.format(self.ROUTER_NAME))
 
         self._logged = True
 
@@ -101,8 +106,12 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
 
     def request(self, path: str, data: str, ignore_response: bool = False,
                 ignore_errors: bool = False) -> dict | None:
+        return self._retry_request(self._do_request, path, data, ignore_response, ignore_errors)
+
+    def _do_request(self, path: str, data: str, ignore_response: bool = False,
+                    ignore_errors: bool = False) -> dict | None:
         if self._logged is False:
-            raise ClientException('TplinkDecoE4RRouter - not authorised')
+            raise ClientException('{} - not authorised'.format(self.ROUTER_NAME))
 
         encrypted = self._encryption.aes_encrypt(data)
         body = 'sign={}&data={}'.format(self._signature(len(encrypted)), encrypted)
@@ -117,6 +126,7 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
             return None
 
         error = ''
+        parsed = None
         try:
             decrypted = self._encryption.aes_decrypt(response.text)
             parsed = loads(decrypted)
@@ -125,8 +135,11 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
             elif ignore_errors:
                 return parsed
         except Exception as e:
-            error = ('TplinkDecoE4RRouter - An unknown response - {}; Request {}'.format(e, path))
-        error = ('TplinkDecoE4RRouter - Response with error; Request {}'.format(path)) if not error else error
+            error = ('{} - An unknown response - {}; Request {} - Response {}'
+                     .format(self.ROUTER_NAME, e, path, response.text))
+        if not error:
+            error = ('{} - Response with error; Request {} - Response {}'
+                     .format(self.ROUTER_NAME, path, parsed))
         if self._logger:
             self._logger.debug(error)
         raise ClientError(error)
@@ -158,5 +171,5 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
                                       timeout=self.timeout, verify=self._verify_ssl)
         except requests.exceptions.RequestException as e:
             if self._logger:
-                self._logger.error('TplinkDecoE4RRouter - Network error: {}'.format(e))
-            raise ClientException('TplinkDecoE4RRouter - Network error: {}'.format(e)) from e
+                self._logger.error('{} - Network error: {}'.format(self.ROUTER_NAME, e))
+            raise ClientException('{} - Network error: {}'.format(self.ROUTER_NAME, e)) from e

@@ -2,9 +2,11 @@ from base64 import b64encode
 from hashlib import md5
 from json import dumps
 from unittest import main, TestCase
+from unittest.mock import patch
 from urllib import parse
 from ipaddress import IPv4Address
 from macaddress import EUI48
+from requests.exceptions import ConnectTimeout
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u import Connection, ClientException
 from tplinkrouterc6u.client.deco_e4r import TplinkDecoE4RRouter
@@ -201,6 +203,35 @@ class TestTplinkDecoE4RRouter(TestCase):
         bad.login_result = '00007\r\n00006\r\n'
         self.assertFalse(bad.supports())
 
+    def test_supports_password_too_long(self):
+        client = TplinkDecoE4RRouterTest('', 'a' * 54)
+        self.assertFalse(client.supports())
+
+    def test_authorize_password_too_long(self):
+        client = TplinkDecoE4RRouterTest('', 'a' * 54)
+        with self.assertRaises(ClientException):
+            client.authorize()
+
+    def test_request_retries_on_connect_timeout(self):
+        client = TplinkDecoE4RRouterTest('', 'pwd')
+        client.authorize()
+        client.use_fixtures({'form=performance': dumps({'error_code': 0, 'result': {'cpu_usage': 0.1}})})
+
+        attempts = {'count': 0}
+        original_post = client._session.post
+
+        def flaky_post(*args, **kwargs):
+            attempts['count'] += 1
+            if attempts['count'] < 3:
+                raise ConnectTimeout('timeout')
+            return original_post(*args, **kwargs)
+
+        with patch.object(client._session, 'post', side_effect=flaky_post):
+            result = client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+
+        self.assertEqual(attempts['count'], 3)
+        self.assertEqual(result['cpu_usage'], 0.1)
+
     def test_logout(self):
         client = TplinkDecoE4RRouterTest('', 'pwd')
         client.authorize()
@@ -212,8 +243,11 @@ class TestTplinkDecoE4RRouter(TestCase):
     def test_registered_in_provider(self):
         clients = list(TplinkRouterProvider.get_clients())
         self.assertIn('TplinkDecoE4RRouter', clients)
-        # Must be probed before the clients known to over-eagerly accept.
         idx = clients.index('TplinkDecoE4RRouter')
+        # Specific clients must be probed first so they are not shadowed by E4R.
+        for specific in ('TPLinkDecoClient', 'TplinkC80Router', 'TplinkRE330Router'):
+            self.assertLess(clients.index(specific), idx)
+        # Must be probed before the clients known to over-eagerly accept.
         for greedy in ('TPLinkEAP115Client', 'TPLinkSG108EClient', 'TplinkC3200Router'):
             self.assertLess(idx, clients.index(greedy))
 
