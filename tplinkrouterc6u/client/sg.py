@@ -254,6 +254,16 @@ class TplinkRouterSG(TplinkBaseRouter):
         if self._logged is False:
             raise Exception('Not authorised')
 
+        is_write = 'operation=write' in data or 'operation=save' in data or 'operation=update' in data
+
+        # The router only parses the body as form params when Content-Type is
+        # set. A param present in both the path's query string and the body is
+        # then rejected as a duplicate, so drop those from the body.
+        if not is_write and '?' in path:
+            path_keys = {p.split('=')[0] for p in path.split('?', 1)[1].split('&') if p}
+            data = '&'.join(p for p in data.split('&')
+                            if p and p.split('=')[0] not in path_keys)
+
         # AES encrypt the request data
         encrypted_data = self._aes_encrypt(data)
 
@@ -264,8 +274,6 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign = self._build_request_signature(len(encrypted_data))
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
-
-        is_write = 'operation=write' in data or 'operation=save' in data or 'operation=update' in data
 
         hdrs = self._headers_request.copy()
         if is_write:
