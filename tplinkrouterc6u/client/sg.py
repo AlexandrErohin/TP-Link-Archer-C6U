@@ -164,8 +164,16 @@ class TplinkRouterSG(TplinkBaseRouter):
         sign_str = '{}&h={}&s={}'.format(
             self._get_aes_formatted_key(), self._hash, self._seq + data_len)
         sign = ''
-        for i in range(0, len(sign_str), SIGNATURE_OFFSET):
-            chunk = sign_str[i:i + SIGNATURE_OFFSET]
+
+        # OAEP-SHA1 has a maximum plaintext size of
+        # modulus_bytes - 2 * hash_len - 2. Keep the legacy
+        # SIGNATURE_OFFSET for larger keys while avoiding
+        # "Plaintext is too long" errors with smaller RSA keys.
+        rsa_byte_len = len(self._nn) // 2
+        oaep_step = min(SIGNATURE_OFFSET, rsa_byte_len - 2 * 20 - 2)
+
+        for i in range(0, len(sign_str), oaep_step):
+            chunk = sign_str[i:i + oaep_step]
             sign += self._rsa_oaep_encrypt(chunk, self._nn, self._ee)
         return sign
 
