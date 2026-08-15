@@ -24,6 +24,9 @@ class RouterConstants:
     GUEST_WIFI_5G_REQUEST = '33|2,2,0'
     IOT_WIFI_2G_REQUEST = '33|1,9,0'
     IOT_WIFI_5G_REQUEST = '33|2,9,0'
+    IPV6_WAN_REQUEST = '45|1,0,0'
+    IPV6_SITE_REQUEST = '48|1,0,0'
+
 
     CONNECTION_REQUESTS_MAP = {
             Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
@@ -86,6 +89,7 @@ class TplinkC80Router(AbstractRouter):
             self._session.verify = False
         self._encryption = EncryptionState()
         self._wifi_request = None
+        self._ipv6_support = True
 
     def supports(self) -> bool:
         try:
@@ -204,6 +208,19 @@ class TplinkC80Router(AbstractRouter):
                                 status.guest_clients_total + status.iot_clients_total)
 
         status.devices = mapped_devices
+
+        if self._ipv6_support:
+            ipv6_request_text = '#'.join([
+                RouterConstants.IPV6_WAN_REQUEST,
+            ])
+            data_blocks = self._return_data_block(ipv6_request_text)
+            if data_blocks:
+                ipv6_wan_info = self._parse_last_values_from_block(data_blocks.get(RouterConstants.IPV6_WAN_REQUEST, []))
+                status.wan_ipv6_enabled = int(ipv6_wan_info.get('status', '0')) != 0
+                status._wan_ipv6_addr = get_ipv6(ipv6_wan_info.get('globalIp', '::'))
+            else:
+                self._ipv6_support = False
+
         return status
 
     def _get_status_without_wifi(self) -> Status:
@@ -240,6 +257,19 @@ class TplinkC80Router(AbstractRouter):
         status.clients_total = len(devices)
         status.wifi_2g_enable = True
         status.conn_type = 'Router/AP'
+
+        if self._ipv6_support:
+            ipv6_request_text = '#'.join([
+                RouterConstants.IPV6_WAN_REQUEST,
+            ])
+            data_blocks = self._return_data_block(ipv6_request_text)
+            if data_blocks:
+                ipv6_wan_info = self._parse_last_values_from_block(data_blocks.get(RouterConstants.IPV6_WAN_REQUEST, []))
+                status.wan_ipv6_enabled = int(ipv6_wan_info.get('status','0')) != 0
+                status._wan_ipv6_addr = get_ipv6(ipv6_wan_info.get('globalIp', '::'))
+            else:
+                self._ipv6_support = False
+
         return status
 
     def reboot(self) -> None:
