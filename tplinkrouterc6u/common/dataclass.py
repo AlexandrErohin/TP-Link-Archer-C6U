@@ -61,6 +61,7 @@ class Status:
     _wan_ipv4_gateway: IPv4Address | None = None
     wan_ipv6_enabled: bool | None = None
     _wan_ipv6_addr: IPv6Address | None = None
+    ipv4_dhcps: bool | None = None
     wired_total: int = 0
     wifi_clients_total: int = 0
     guest_clients_total: int = 0
