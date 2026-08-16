@@ -18,7 +18,7 @@ from hashlib import sha256
 from base64 import b64encode, b64decode
 from random import randint
 from logging import Logger
-from urllib.parse import quote
+from urllib.parse import quote, parse_qsl, urlencode
 
 from Crypto.PublicKey.RSA import construct
 from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5, AES
@@ -247,6 +247,44 @@ class TplinkRouterSG(TplinkBaseRouter):
                 self._logger.debug(error)
             raise ClientException(error)
 
+    @staticmethod
+    def _merge_path_and_body_params(path: str, data: str) -> tuple[str, str]:
+        """Reconcile form params that appear in both the path query and body.
+
+        With Content-Type set, the router parses the decrypted body and rejects
+        duplicate query keys. Exact path/body pairs are dropped from the body
+        (path wins). Differing values for the same key keep the body value and
+        strip the key from the path (needed for writes like set_vpn, where the
+        URL still embeds operation=read from the base client).
+        """
+        if '?' not in path:
+            return path, data
+
+        base, qs = path.split('?', 1)
+        path_params = parse_qsl(qs, keep_blank_values=True)
+        body_params = parse_qsl(data, keep_blank_values=True)
+        path_dict = dict(path_params)
+
+        new_body: list[tuple[str, str]] = []
+        conflict_keys: set[str] = set()
+        for key, value in body_params:
+            if key not in path_dict:
+                new_body.append((key, value))
+            elif path_dict[key] == value:
+                continue
+            else:
+                new_body.append((key, value))
+                conflict_keys.add(key)
+
+        new_path_params = [
+            (key, value) for key, value in path_params
+            if key not in conflict_keys
+        ]
+        new_path = base
+        if new_path_params:
+            new_path = '{}?{}'.format(base, urlencode(new_path_params))
+        return new_path, urlencode(new_body)
+
     def request(self, path: str, data: str,
                 ignore_response: bool = False,
                 ignore_errors: bool = False) -> dict | None:
@@ -255,14 +293,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             raise Exception('Not authorised')
 
         is_write = 'operation=write' in data or 'operation=save' in data or 'operation=update' in data
-
-        # The router only parses the body as form params when Content-Type is
-        # set. A param present in both the path's query string and the body is
-        # then rejected as a duplicate, so drop those from the body.
-        if not is_write and '?' in path:
-            path_keys = {p.split('=')[0] for p in path.split('?', 1)[1].split('&') if p}
-            data = '&'.join(p for p in data.split('&')
-                            if p and p.split('=')[0] not in path_keys)
+        path, data = self._merge_path_and_body_params(path, data)
 
         # AES encrypt the request data
         encrypted_data = self._aes_encrypt(data)

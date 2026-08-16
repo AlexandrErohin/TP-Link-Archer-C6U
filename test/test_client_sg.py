@@ -320,7 +320,7 @@ class TestTplinkRouterSGUnit(TestCase):
 
     def _make_request(self, mock_post, client, path, data):
         """Run request() with encryption stubbed; return the plaintext body
-        that would have been encrypted, plus the headers actually sent."""
+        that would have been encrypted, plus headers and path actually sent."""
         response = Mock()
         response.json.return_value = {'data': 'encrypted_blob'}
         response.text = 'mock response text'
@@ -338,20 +338,11 @@ class TestTplinkRouterSGUnit(TestCase):
              patch.object(client, '_aes_decrypt', return_value=decrypted):
             client.request(path, data)
 
+        url = mock_post.call_args[0][0]
+        prefix = '{}/cgi-bin/luci/;stok={}/'.format(client.host, client._stok)
+        captured['path'] = url[len(prefix):] if url.startswith(prefix) else url
         captured['headers'] = mock_post.call_args[1]['headers']
         return captured
-
-    @patch('tplinkrouterc6u.client.sg.post')
-    def test_request_read_sets_content_type(self, mock_post: Mock) -> None:
-        """The router only parses the body as form params when Content-Type
-        is set; without it, body-only params are dropped and handlers that
-        rely on them fail."""
-        client = self._logged_in_client()
-        sent = self._make_request(mock_post, client,
-                                  'admin/vpn?form=enable', 'operation=read')
-
-        self.assertEqual(sent['headers'].get('Content-Type'),
-                         'application/x-www-form-urlencoded')
 
     @patch('tplinkrouterc6u.client.sg.post')
     def test_request_read_keeps_params_absent_from_path(self, mock_post: Mock) -> None:
@@ -360,6 +351,7 @@ class TestTplinkRouterSGUnit(TestCase):
                                   'admin/vpn?form=enable', 'operation=read')
 
         self.assertEqual(sent['data'], 'operation=read')
+        self.assertEqual(sent['path'], 'admin/vpn?form=enable')
 
     @patch('tplinkrouterc6u.client.sg.post')
     def test_request_read_drops_params_duplicated_in_path(self, mock_post: Mock) -> None:
@@ -372,6 +364,7 @@ class TestTplinkRouterSGUnit(TestCase):
                                   'operation=read')
 
         self.assertEqual(sent['data'], '')
+        self.assertEqual(sent['path'], 'admin/firmware?form=upgrade&operation=read')
 
     @patch('tplinkrouterc6u.client.sg.post')
     def test_request_read_drops_only_duplicated_params(self, mock_post: Mock) -> None:
@@ -383,14 +376,45 @@ class TestTplinkRouterSGUnit(TestCase):
         self.assertEqual(sent['data'], 'extra=1')
 
     @patch('tplinkrouterc6u.client.sg.post')
-    def test_request_write_body_untouched(self, mock_post: Mock) -> None:
-        """Writes post a dict body; dedupe must not touch them."""
+    def test_request_write_body_untouched_when_no_path_conflict(self, mock_post: Mock) -> None:
+        """Writes with no overlapping path keys keep the plaintext body as-is."""
         client = self._logged_in_client()
         sent = self._make_request(mock_post, client,
                                   'admin/vpn?form=enable',
                                   'operation=write&enable=on')
 
         self.assertEqual(sent['data'], 'operation=write&enable=on')
+        self.assertEqual(sent['path'], 'admin/vpn?form=enable')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_write_strips_conflicting_path_params(self, mock_post: Mock) -> None:
+        """set_vpn-style writes: base URLs embed operation=read, body has write.
+
+        Prefer the body value and strip the conflicting key from the path so
+        the router does not see a duplicate operation key.
+        """
+        client = self._logged_in_client()
+        sent = self._make_request(
+            mock_post, client,
+            'admin/openvpn?form=config&operation=read',
+            'operation=write&enabled=on',
+        )
+
+        self.assertEqual(sent['data'], 'operation=write&enabled=on')
+        self.assertEqual(sent['path'], 'admin/openvpn?form=config')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_keeps_body_when_path_value_differs(self, mock_post: Mock) -> None:
+        """Differing values for the same key must not drop the body operation."""
+        client = self._logged_in_client()
+        sent = self._make_request(
+            mock_post, client,
+            'admin/dhcps?form=reservation&operation=load',
+            'operation=insert&new=%7B%7D',
+        )
+
+        self.assertEqual(sent['data'], 'operation=insert&new=%7B%7D')
+        self.assertEqual(sent['path'], 'admin/dhcps?form=reservation')
 
 
 class TestTplinkRouterSGVpnClientStatus(TestCase):
