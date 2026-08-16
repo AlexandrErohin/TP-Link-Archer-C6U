@@ -311,6 +311,87 @@ class TestTplinkRouterSGUnit(TestCase):
         headers = call_kwargs[1]['headers']
         self.assertEqual(headers.get('Content-Type'), 'application/x-www-form-urlencoded')
 
+    def _logged_in_client(self):
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._logged = True
+        client._stok = 'test_stok'
+        client._sysauth = 'test_sysauth'
+        return client
+
+    def _make_request(self, mock_post, client, path, data):
+        """Run request() with encryption stubbed; return the plaintext body
+        that would have been encrypted, plus the headers actually sent."""
+        response = Mock()
+        response.json.return_value = {'data': 'encrypted_blob'}
+        response.text = 'mock response text'
+        mock_post.return_value = response
+
+        captured = {}
+
+        def fake_encrypt(payload):
+            captured['data'] = payload
+            return 'encrypted_data_b64'
+
+        decrypted = json.dumps({'success': True, 'data': {'ok': True}})
+        with patch.object(client, '_aes_encrypt', side_effect=fake_encrypt), \
+             patch.object(client, '_build_request_signature', return_value='mock_sign'), \
+             patch.object(client, '_aes_decrypt', return_value=decrypted):
+            client.request(path, data)
+
+        captured['headers'] = mock_post.call_args[1]['headers']
+        return captured
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_read_sets_content_type(self, mock_post: Mock) -> None:
+        """The router only parses the body as form params when Content-Type
+        is set; without it, body-only params are dropped and handlers that
+        rely on them fail."""
+        client = self._logged_in_client()
+        sent = self._make_request(mock_post, client,
+                                  'admin/vpn?form=enable', 'operation=read')
+
+        self.assertEqual(sent['headers'].get('Content-Type'),
+                         'application/x-www-form-urlencoded')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_read_keeps_params_absent_from_path(self, mock_post: Mock) -> None:
+        client = self._logged_in_client()
+        sent = self._make_request(mock_post, client,
+                                  'admin/vpn?form=enable', 'operation=read')
+
+        self.assertEqual(sent['data'], 'operation=read')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_read_drops_params_duplicated_in_path(self, mock_post: Mock) -> None:
+        """Regression test: a param present in both the path query string and
+        the body is rejected by the router as a duplicate, breaking every
+        endpoint whose URL embeds operation (firmware, DHCP, VPN server)."""
+        client = self._logged_in_client()
+        sent = self._make_request(mock_post, client,
+                                  'admin/firmware?form=upgrade&operation=read',
+                                  'operation=read')
+
+        self.assertEqual(sent['data'], '')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_read_drops_only_duplicated_params(self, mock_post: Mock) -> None:
+        client = self._logged_in_client()
+        sent = self._make_request(mock_post, client,
+                                  'admin/dhcps?form=client&operation=load',
+                                  'operation=load&extra=1')
+
+        self.assertEqual(sent['data'], 'extra=1')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_write_body_untouched(self, mock_post: Mock) -> None:
+        """Writes post a dict body; dedupe must not touch them."""
+        client = self._logged_in_client()
+        sent = self._make_request(mock_post, client,
+                                  'admin/vpn?form=enable',
+                                  'operation=write&enable=on')
+
+        self.assertEqual(sent['data'], 'operation=write&enable=on')
+
 
 class TestTplinkRouterSGVpnClientStatus(TestCase):
     """Regression tests for WireGuard support in the VPN client server parser."""
