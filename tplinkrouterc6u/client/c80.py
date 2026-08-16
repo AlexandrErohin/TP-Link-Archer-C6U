@@ -27,7 +27,6 @@ class RouterConstants:
     IPV6_WAN_REQUEST = '45|1,0,0'
     IPV6_SITE_REQUEST = '48|1,0,0'
 
-
     CONNECTION_REQUESTS_MAP = {
             Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
             Connection.HOST_5G: HOST_WIFI_5G_REQUEST,
@@ -208,19 +207,7 @@ class TplinkC80Router(AbstractRouter):
                                 status.guest_clients_total + status.iot_clients_total)
 
         status.devices = mapped_devices
-
-        if self._ipv6_support:
-            ipv6_request_text = '#'.join([
-                RouterConstants.IPV6_WAN_REQUEST,
-            ])
-            data_blocks = self._return_data_block(ipv6_request_text)
-            if data_blocks:
-                ipv6_wan_info = self._parse_last_values_from_block(data_blocks.get(RouterConstants.IPV6_WAN_REQUEST, []))
-                status.wan_ipv6_enabled = int(ipv6_wan_info.get('status', '0')) != 0
-                status._wan_ipv6_addr = get_ipv6(ipv6_wan_info.get('globalIp', '::'))
-            else:
-                self._ipv6_support = False
-
+        self._enrich_status_ipv6(status)
         return status
 
     def _get_status_without_wifi(self) -> Status:
@@ -257,20 +244,30 @@ class TplinkC80Router(AbstractRouter):
         status.clients_total = len(devices)
         status.wifi_2g_enable = True
         status.conn_type = 'Router/AP'
-
-        if self._ipv6_support:
-            ipv6_request_text = '#'.join([
-                RouterConstants.IPV6_WAN_REQUEST,
-            ])
-            data_blocks = self._return_data_block(ipv6_request_text)
-            if data_blocks:
-                ipv6_wan_info = self._parse_last_values_from_block(data_blocks.get(RouterConstants.IPV6_WAN_REQUEST, []))
-                status.wan_ipv6_enabled = int(ipv6_wan_info.get('status','0')) != 0
-                status._wan_ipv6_addr = get_ipv6(ipv6_wan_info.get('globalIp', '::'))
-            else:
-                self._ipv6_support = False
-
+        self._enrich_status_ipv6(status)
         return status
+
+    def _enrich_status_ipv6(self, status: Status) -> None:
+        """Fill Status IPv6 fields via a separate WAN probe.
+
+        Kept out of the main status batch: some firmwares reject unknown ids.
+        On failure or a response without the WAN IPv6 block, disable further
+        probes for this client instance (same pattern as MR _ipv6_support).
+        """
+        if not self._ipv6_support:
+            return
+        try:
+            data_blocks = self._return_data_block(RouterConstants.IPV6_WAN_REQUEST)
+            wan_lines = data_blocks.get(RouterConstants.IPV6_WAN_REQUEST) if data_blocks else None
+            if not wan_lines:
+                self._ipv6_support = False
+                return
+            ipv6_wan_info = self._parse_last_values_from_block(wan_lines)
+            # Match get_ipv6_status: any non-'0' status means IPv6 is enabled.
+            status.wan_ipv6_enabled = ipv6_wan_info.get('status', '0') != '0'
+            status._wan_ipv6_addr = get_ipv6(ipv6_wan_info.get('globalIp', '::'))
+        except Exception:
+            self._ipv6_support = False
 
     def reboot(self) -> None:
         self.request(6, 1, True)
@@ -366,8 +363,8 @@ class TplinkC80Router(AbstractRouter):
         return mapped_leases
 
     def get_ipv6_status(self) -> IPv6Status:
-        wan_ipv6_request = "45|1,0,0"
-        site_ipv6_request = "48|1,0,0"
+        wan_ipv6_request = RouterConstants.IPV6_WAN_REQUEST
+        site_ipv6_request = RouterConstants.IPV6_SITE_REQUEST
         all_requests = [
             wan_ipv6_request, site_ipv6_request]
         request_text = '#'.join(all_requests)

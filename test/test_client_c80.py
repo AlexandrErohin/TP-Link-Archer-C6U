@@ -4,7 +4,7 @@ from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u.common.dataclass import IPv4Status, IPv6Status, IPv4Reservation, IPv4DHCPLease, VPNStatus
 from tplinkrouterc6u import Connection, ClientException
-from tplinkrouterc6u.client.c80 import TplinkC80Router
+from tplinkrouterc6u.client.c80 import TplinkC80Router, RouterConstants
 
 
 IPV4_STATUS_RESPONSE = ('00000\r\nid 1|1,0,0\r\nauthKey token\r\nreserved\r\nsetWzd 8\r\nmode 1\r\nlogLevel 3\r\n'
@@ -694,6 +694,109 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(ipv4status._lan_ipv4_ipaddr, IPv4Address('192.168.0.1'))
         self.assertEqual(ipv4status.lan_ipv4_dhcp_enable, True)
         self.assertEqual(ipv4status._lan_ipv4_netmask, IPv4Address('255.255.255.0'))
+
+    def test_get_status_with_ipv6(self) -> None:
+        """IPv6 on Status from a separate 45|1,0,0 probe (C24 capture from PR #197)."""
+        ipv6_blocks = {
+            RouterConstants.IPV6_WAN_REQUEST: [
+                'status 9',
+                'errorCode 0',
+                'getIpWithDhcp 1',
+                'globalIp 2401:0005:1000::48',
+                'gateway fe80::0001:0001:0001:3040',
+                'dns 0 2401:380:1::61',
+                'dns 1 2401:380:1::62',
+            ],
+        }
+
+        class Client(TplinkC80RouterTest):
+            def _return_data_block(self, request_text: str):
+                if request_text == RouterConstants.IPV6_WAN_REQUEST:
+                    return ipv6_blocks
+                return super()._return_data_block(request_text)
+
+        client = Client('', '')
+        client.authorize()
+        client.set_encrypted_response(STATUS_RESPONSE_TEXT)
+        status = client.get_status()
+
+        self.assertTrue(client._ipv6_support)
+        self.assertTrue(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '2401:5:1000::48')
+        self.assertIsInstance(status._wan_ipv6_addr, IPv6Address)
+
+    def test_get_status_ipv6_disabled(self) -> None:
+        ipv6_blocks = {
+            RouterConstants.IPV6_WAN_REQUEST: [
+                'status 0',
+                'globalIp ::',
+                'gateway ::',
+                'dns 0 ::',
+                'dns 1 ::',
+            ],
+        }
+
+        class Client(TplinkC80RouterTest):
+            def _return_data_block(self, request_text: str):
+                if request_text == RouterConstants.IPV6_WAN_REQUEST:
+                    return ipv6_blocks
+                return super()._return_data_block(request_text)
+
+        client = Client('', '')
+        client.authorize()
+        client.set_encrypted_response(STATUS_RESPONSE_TEXT)
+        status = client.get_status()
+
+        self.assertTrue(client._ipv6_support)
+        self.assertFalse(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '::')
+
+    def test_get_status_ipv6_unsupported_disables_flag(self) -> None:
+        """Missing WAN IPv6 block must not fake disabled; further probes stop."""
+        ipv6_calls = {'n': 0}
+
+        class Client(TplinkC80RouterTest):
+            def _return_data_block(self, request_text: str):
+                if request_text == RouterConstants.IPV6_WAN_REQUEST:
+                    ipv6_calls['n'] += 1
+                    # Non-empty response without 45|1,0,0 (same trap as shared test fixtures).
+                    return {'1|1,0,0': ['mac 0 00-00-00-00-00-00']}
+                return super()._return_data_block(request_text)
+
+        client = Client('', '')
+        client.authorize()
+        client.set_encrypted_response(STATUS_RESPONSE_TEXT)
+        status = client.get_status()
+
+        self.assertFalse(client._ipv6_support)
+        self.assertIsNone(status.wan_ipv6_enabled)
+        self.assertIsNone(status.wan_ipv6_addr)
+        self.assertEqual(ipv6_calls['n'], 1)
+
+        client.get_status()
+        self.assertEqual(ipv6_calls['n'], 1)
+
+    def test_get_status_ipv6_error_disables_flag(self) -> None:
+        ipv6_calls = {'n': 0}
+
+        class Client(TplinkC80RouterTest):
+            def _return_data_block(self, request_text: str):
+                if request_text == RouterConstants.IPV6_WAN_REQUEST:
+                    ipv6_calls['n'] += 1
+                    raise ClientException('IPv6 attrs not supported')
+                return super()._return_data_block(request_text)
+
+        client = Client('', '')
+        client.authorize()
+        client.set_encrypted_response(STATUS_RESPONSE_TEXT)
+        status = client.get_status()
+
+        self.assertFalse(client._ipv6_support)
+        self.assertIsNone(status.wan_ipv6_enabled)
+        self.assertEqual(ipv6_calls['n'], 1)
+
+        client.get_status()
+        self.assertEqual(ipv6_calls['n'], 1)
 
 
 if __name__ == '__main__':
