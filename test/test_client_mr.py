@@ -1188,6 +1188,185 @@ totalBytesTx=50000
         self.assertEqual(server.up_speed, 500)
         self.assertEqual(server.traffic_usage, 150000)
 
+    def test_get_status_with_ipv6(self) -> None:
+        """IPv6 fields on Status come from an auxiliary WAN_IP_CONN request.
+
+        Sample body shaped after the VR1600v capture attached to PR #195
+        (IPv6-responses-mr-style.txt); attrs limited to what get_status asks for.
+        """
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=100.0.0.73
+defaultGateway=100.0.0.1
+name=ipoe_0_d
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+        # From IPv6-responses-mr-style.txt (WAN_IP_CONN entries), as a single-act reply.
+        ipv6_response = '''[2,1,1,0,0,0]0
+enable=1
+X_TP_IPv6Enabled=1
+X_TP_ExternalIPv6Address=2401:0005:1000::48
+[3,1,1,0,0,0]0
+enable=0
+X_TP_IPv6Enabled=0
+X_TP_ExternalIPv6Address=::
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str and 'X_TP_IPv6Enabled' in data_str:
+                    return 200, ipv6_response
+                if data_str and 'STAT_ENTRY' in data_str:
+                    return 200, '[error]0\n'
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(client._ipv6_support)
+        self.assertTrue(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '2401:5:1000::48')
+        self.assertIsInstance(status._wan_ipv6_addr, IPv6Address)
+
+    def test_get_status_ipv6_skips_disabled_wan_entries(self) -> None:
+        """When several WAN_IP_CONN rows exist, disabled ones are skipped."""
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.1.1
+defaultGateway=192.168.1.254
+name=pppoe
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+        # Disabled USB/4G first, then enabled ipoe — mirrors the capture order reversed
+        # to prove the enable filter, not "last item wins".
+        ipv6_response = '''[3,1,1,0,0,0]0
+enable=0
+X_TP_IPv6Enabled=0
+X_TP_ExternalIPv6Address=::
+[2,1,1,0,0,0]0
+enable=1
+X_TP_IPv6Enabled=1
+X_TP_ExternalIPv6Address=2401:0005:1000::48
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str and 'X_TP_IPv6Enabled' in data_str:
+                    return 200, ipv6_response
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '2401:5:1000::48')
+
+    def test_get_status_ipv6_unsupported_disables_flag(self) -> None:
+        """A failing IPv6 probe must not break get_status; further probes stop."""
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.1.1
+defaultGateway=192.168.1.254
+name=pppoe
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+        ipv6_calls = {'n': 0}
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str and 'X_TP_IPv6Enabled' in data_str:
+                    ipv6_calls['n'] += 1
+                    raise ClientError('IPv6 attrs not supported')
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertFalse(client._ipv6_support)
+        self.assertIsNone(status.wan_ipv6_enabled)
+        self.assertIsNone(status.wan_ipv6_addr)
+        self.assertEqual(ipv6_calls['n'], 1)
+
+        client.get_status()
+        self.assertEqual(ipv6_calls['n'], 1)
+
+    def test_get_status_ipv6_tolerates_missing_enable(self) -> None:
+        """Missing enable must not permanently disable IPv6 via KeyError."""
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.1.1
+defaultGateway=192.168.1.254
+name=pppoe
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+        ipv6_response = '''[2,1,1,0,0,0]0
+X_TP_IPv6Enabled=1
+X_TP_ExternalIPv6Address=2401:0005:1000::48
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str and 'X_TP_IPv6Enabled' in data_str:
+                    return 200, ipv6_response
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(client._ipv6_support)
+        self.assertTrue(status.wan_ipv6_enabled)
+        self.assertEqual(status.wan_ipv6_addr, '2401:5:1000::48')
+
 
 if __name__ == '__main__':
     main()

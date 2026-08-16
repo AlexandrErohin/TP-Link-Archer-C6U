@@ -241,16 +241,22 @@ class TPLinkMRClientBase(AbstractRouter):
         except Exception:
             pass
 
-        # Auxiliary WAN requests, for routers with IPv6 support
-        wan_aux_values = None
+        # Separate WAN_IP_CONN request for IPv6 attrs: asking for them in the
+        # main status batch breaks some firmwares that lack IPv6 support, so we
+        # probe once and permanently disable further attempts on failure.
         if self._ipv6_support:
             try:
-                wan_aux_acts = [self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                        attrs=['enable', 'X_TP_IPv6Enabled', 'X_TP_ExternalIPv6Address'])]
+                wan_aux_acts = [
+                    self.ActItem(
+                        self.ActItem.GS,
+                        'WAN_IP_CONN',
+                        attrs=['enable', 'X_TP_IPv6Enabled', 'X_TP_ExternalIPv6Address'],
+                    ),
+                ]
                 _, wan_aux_values = self.req_act(wan_aux_acts)
                 if wan_aux_values:
                     for item in self._to_list(wan_aux_values):
-                        if int(item['enable']) == 0 and wan_aux_values.__class__ == list:
+                        if int(item.get('enable', '0')) == 0 and wan_aux_values.__class__ == list:
                             continue
                         status.wan_ipv6_enabled = bool(int(item.get('X_TP_IPv6Enabled', '0')))
                         status._wan_ipv6_addr = get_ipv6(item.get('X_TP_ExternalIPv6Address', '::'))
