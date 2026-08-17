@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 from logging import Logger
 
 from requests import Session
+from macaddress import EUI48
 
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import Firmware, IPv4Status, Status
@@ -43,6 +44,8 @@ class TPLinkSG108EClient(AbstractRouter):
         self._session = Session()
         self._logged = False
         self._headers = {"Referer": f"{self.host}/"}
+        self._lan_mac: EUI48 | None = None
+        self._lan_mac_resolved = False
 
     def supports(self) -> bool:
         try:
@@ -131,15 +134,20 @@ class TPLinkSG108EClient(AbstractRouter):
         status.wifi_clients_total = 0
         status.guest_clients_total = 0
         status.devices = []
-        # Best-effort LAN MAC so callers may identify the switch.
-        try:
-            mac = self.device_info().get("macStr")
-            if mac:
-                status._lan_macaddr = get_mac(mac)
-        except Exception:
-            pass
-        # Leave other fields unset.
+        status._lan_macaddr = self._resolve_lan_mac()
+
         return status
+
+    def _resolve_lan_mac(self) -> EUI48 | None:
+        if not self._lan_mac_resolved:
+            try:
+                mac = self.device_info().get("macStr")
+                if mac:
+                    self._lan_mac = get_mac(mac)
+            except Exception:
+                pass
+        self._lan_mac_resolved = True
+        return self._lan_mac
 
     def get_ipv4_status(self) -> IPv4Status:
         settings = self.ip_settings()

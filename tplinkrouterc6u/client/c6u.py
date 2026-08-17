@@ -744,7 +744,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         })
         self.request(self._url_ipv4_dhcps, payload)
 
- 
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
