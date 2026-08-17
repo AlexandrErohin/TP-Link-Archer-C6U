@@ -256,6 +256,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpn_client_enable = 'admin/vpn?form=enable'
         self._url_vpn_client_server = 'admin/vpn?form=server'
         self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
+        self._url_ipv4_dhcps = 'admin/dhcps?form=setting'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -385,6 +386,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.wan_ipv6_enabled = self._str2bool(data.get('wan_ipv6_enable', ''))
         status._wan_ipv6_addr = get_ipv6(data.get('wan_ipv6_ip6addr', '::').split('/')[0])
+        status.ipv4_dhcps = self._str2bool(data.get('lan_ipv4_dhcp_enable'))
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
         status.conn_type = data.get('conn_type')
@@ -727,6 +729,20 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         })
         self.request(self._url_vpn_client_user_list, payload)
 
+    def set_ipv4_dhcps(self, enable: bool) -> None:
+        data = self.request(self._url_ipv4_dhcps, 'operation=read')
+        payload = urlencode({
+            'operation': 'write',
+            'enable': 'on' if enable else 'off',
+            'leasetime': data.get('leasetime'),
+            'pri_dns': data.get('pri_dns'),
+            'snd_dns': data.get('snd_dns'),
+            'gateway': data.get('gateway'),
+            'ipaddr_start': data.get('ipaddr_start'),
+            'ipaddr_end': data.get('ipaddr_end'),
+        })
+        self.request(self._url_ipv4_dhcps, payload)
+    
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
