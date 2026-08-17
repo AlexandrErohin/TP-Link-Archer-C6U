@@ -129,7 +129,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation |   |
-| get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) | 
+| get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
+| set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | reboot |   | reboot router |
 | authorize |   | authorize for actions |
@@ -172,6 +173,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
 | wan_ipv6_enabled | Is WAN IPv6 enabled | bool, None |
 | wan_ipv6_addr | router wan ipv6 address | str, None |
+| lan_ipv4_dhcp_enable | Is LAN IPv4 DHCP server enabled | bool, None |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of host wifi clients | int |
 | guest_clients_total | Total amount of guest wifi clients | int |

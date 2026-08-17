@@ -282,6 +282,7 @@ class TestTPLinkClient(TestCase):
         self.assertIsInstance(status.wan_ipv4_address, IPv4Address)
         self.assertTrue(status.wan_ipv6_enabled)
         self.assertEqual(status.wan_ipv6_addr, '::')
+        self.assertEqual(status.lan_ipv4_dhcp_enable, False)
         self.assertEqual(status.wired_total, 2)
         self.assertEqual(status.wifi_clients_total, 3)
         self.assertEqual(status.guest_clients_total, 0)
@@ -1265,6 +1266,52 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(
             loads(body['new']),
             {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'})
+
+    def test_set_ipv4_dhcps(self) -> None:
+        """Read-modify-write of admin/dhcps?form=setting (AX55 capture from PR #199)."""
+        setting = {
+            'enable': 'on',
+            'leasetime': '120',
+            'pri_dns': '',
+            'snd_dns': '',
+            'gateway': '192.168.0.1',
+            'ipaddr_start': '192.168.0.2',
+            'domain': '',
+            'ipaddr_end': '192.168.0.253',
+        }
+        check_url = ''
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                if 'operation=read' in data:
+                    return dict(setting)
+                return None
+
+        client = TPLinkRouterTest('', '')
+        result = client.set_ipv4_dhcps(False)
+        self.assertIsNone(result)
+        self.assertEqual(check_url, 'admin/dhcps?form=setting')
+        body = dict(parse_qsl(check_data, keep_blank_values=True))
+        self.assertEqual(body['operation'], 'write')
+        self.assertEqual(body['enable'], 'off')
+        self.assertEqual(body['leasetime'], '120')
+        self.assertEqual(body['pri_dns'], '')
+        self.assertEqual(body['snd_dns'], '')
+        self.assertEqual(body['gateway'], '192.168.0.1')
+        self.assertEqual(body['ipaddr_start'], '192.168.0.2')
+        self.assertEqual(body['ipaddr_end'], '192.168.0.253')
+        self.assertEqual(body['domain'], '')
+
+        client.set_ipv4_dhcps(True)
+        body = dict(parse_qsl(check_data, keep_blank_values=True))
+        self.assertEqual(body['enable'], 'on')
+        self.assertEqual(body['domain'], '')
 
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'

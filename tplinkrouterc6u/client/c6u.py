@@ -386,7 +386,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
         status.wan_ipv6_enabled = self._str2bool(data.get('wan_ipv6_enable', ''))
         status._wan_ipv6_addr = get_ipv6(data.get('wan_ipv6_ip6addr', '::').split('/')[0])
-        status.ipv4_dhcps = self._str2bool(data.get('lan_ipv4_dhcp_enable'))
+        status.lan_ipv4_dhcp_enable = self._str2bool(data.get('lan_ipv4_dhcp_enable'))
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
         status.conn_type = data.get('conn_type')
@@ -734,15 +734,17 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         payload = urlencode({
             'operation': 'write',
             'enable': 'on' if enable else 'off',
-            'leasetime': data.get('leasetime'),
-            'pri_dns': data.get('pri_dns'),
-            'snd_dns': data.get('snd_dns'),
-            'gateway': data.get('gateway'),
-            'ipaddr_start': data.get('ipaddr_start'),
-            'ipaddr_end': data.get('ipaddr_end'),
+            'leasetime': data.get('leasetime', ''),
+            'pri_dns': data.get('pri_dns', ''),
+            'snd_dns': data.get('snd_dns', ''),
+            'gateway': data.get('gateway', ''),
+            'ipaddr_start': data.get('ipaddr_start', ''),
+            'ipaddr_end': data.get('ipaddr_end', ''),
+            'domain': data.get('domain', ''),
         })
         self.request(self._url_ipv4_dhcps, payload)
-    
+
+ 
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
