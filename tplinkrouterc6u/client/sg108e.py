@@ -53,7 +53,11 @@ class TPLinkSG108EClient(AbstractRouter):
                 return True
             info = vars.get("info_ds")
             if isinstance(info, dict):
-                descr = _flatten_dict(info).get("descriStr")
+                flat = _flatten_dict(info)
+                hardware = flat.get("hardwareStr")
+                if isinstance(hardware, str) and "TL-SG" in hardware:
+                    return True
+                descr = flat.get("descriStr")
                 return isinstance(descr, str) and "TL-SG" in descr
             return False
         except Exception:
@@ -127,6 +131,13 @@ class TPLinkSG108EClient(AbstractRouter):
         status.wifi_clients_total = 0
         status.guest_clients_total = 0
         status.devices = []
+        # Best-effort LAN MAC so callers may identify the switch.
+        try:
+            mac = self.device_info().get("macStr")
+            if mac:
+                status._lan_macaddr = get_mac(mac)
+        except Exception:
+            pass
         # Leave other fields unset.
         return status
 

@@ -69,6 +69,31 @@ class TestTPLinkSG108EClient(TestCase):
 
         self.assertTrue(client.supports())
 
+    def test_supports_by_hardware_str_with_custom_description(self) -> None:
+        # Device Description is user-editable, hardwareStr is not.
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        client._session.cookies = Mock()
+        client._session.cookies.clear = Mock()
+
+        root = Mock()
+        root.status_code = 200
+
+        sysinfo = Mock()
+        sysinfo.status_code = 200
+        sysinfo.text = """<html><script>
+        var info_ds = { descriStr:[\"TPLink-Main-Switch\"], macStr:[\"02:00:00:00:00:01\"],
+        firmwareStr:[\"1.0.0 Build 20230218 Rel.50633\"], hardwareStr:[\"TL-SG108E 6.0\"] };
+        </script></html>"""
+
+        login = Mock()
+        login.status_code = 200
+
+        client._session.get.side_effect = [root, sysinfo]
+        client._session.post.return_value = login
+
+        self.assertTrue(client.supports())
+
     def test_get_ipv4_status_from_ip_settings(self) -> None:
         client = TPLinkSG108EClient('http://192.168.0.23', 'password')
         client._session = Mock()
@@ -136,11 +161,30 @@ class TestTPLinkSG108EClient(TestCase):
                 'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
             },
         })
+        # The MAC lookup is best-effort and must not break the port counts.
+        client.device_info = Mock(side_effect=Exception('system info unavailable'))
 
         status = client.get_status()
         self.assertEqual(status.wired_total, 8)
         # 7 ports link-up (one is down), disabled port ignored.
         self.assertEqual(status.clients_total, 6)
+        self.assertIsNone(status.lan_macaddr)
+
+    def test_get_status_populates_lan_macaddr(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
+            },
+        })
+        client.device_info = Mock(return_value={'macStr': '02:00:00:00:00:01'})
+
+        status = client.get_status()
+        # EUI48 stringifies with hyphens in this project.
+        self.assertEqual(status.lan_macaddr.lower(), '02-00-00-00-00-01')
 
 
 if __name__ == '__main__':
