@@ -79,6 +79,56 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertIn('logout', check_payload['system'])
         self.assertEqual(check_payload['system']['logout'], None)
 
+    def test_pppoe_connect(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDRClientTest(TPLinkXDRClient):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDRClientTest('', '')
+        client.pppoe_connect()
+
+        self.assertEqual(check_payload['method'], 'do')
+        self.assertIn('network', check_payload)
+        self.assertIn('change_wan_status', check_payload['network'])
+        self.assertEqual(check_payload['network']['change_wan_status']['proto'], 'pppoe')
+        self.assertEqual(check_payload['network']['change_wan_status']['operate'], 'connect')
+
+    def test_pppoe_disconnect(self) -> None:
+        mock_data = json.loads('''{"error_code":0}''')
+        check_payload = {}
+
+        class TPLinkXDRClientTest(TPLinkXDRClient):
+            def _request(self, payload: dict) -> dict:
+                nonlocal check_payload
+                check_payload = payload
+                return mock_data
+
+        client = TPLinkXDRClientTest('', '')
+        client.pppoe_disconnect()
+
+        self.assertEqual(check_payload['method'], 'do')
+        self.assertIn('network', check_payload)
+        self.assertIn('change_wan_status', check_payload['network'])
+        self.assertEqual(check_payload['network']['change_wan_status']['proto'], 'pppoe')
+        self.assertEqual(check_payload['network']['change_wan_status']['operate'], 'disconnect')
+
+    def test_pppoe_connect_raises_on_error(self) -> None:
+        from tplinkrouterc6u.common.exception import ClientException
+        mock_data = json.loads('''{"error_code":-1}''')
+
+        class TPLinkXDRClientTest(TPLinkXDRClient):
+            def _request(self, payload: dict) -> dict:
+                return mock_data
+
+        client = TPLinkXDRClientTest('', '')
+        with self.assertRaises(ClientException):
+            client.pppoe_connect()
+
     def test_get_firmware(self) -> None:
         mock_data = json.loads('''
 {
