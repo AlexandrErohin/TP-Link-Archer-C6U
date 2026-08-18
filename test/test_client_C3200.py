@@ -1,6 +1,7 @@
 from ipaddress import IPv4Address
 from typing import List
 from unittest import main, TestCase
+from unittest.mock import patch
 
 from macaddress import EUI48
 
@@ -15,6 +16,37 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkC3200Router(TestCase):
+
+    def test_supports_disables_ssl_verification(self) -> None:
+        client = TplinkC3200Router(
+            "https://192.168.1.1",
+            "password",
+            verify_ssl=False,
+        )
+
+        with patch("tplinkrouterc6u.client.c3200.requests.get") as request:
+            request.return_value.status_code = 200
+            request.return_value.text = "Archer"
+
+            self.assertTrue(client.supports())
+
+        request.assert_called_once_with(
+            "https://192.168.1.1",
+            timeout=5,
+            verify=False,
+        )
+
+    def test_authorize_disables_ssl_verification(self) -> None:
+        client = TplinkC3200Router(
+            "https://192.168.1.1",
+            "password",
+            verify_ssl=False,
+        )
+
+        with patch("requests.Session.post"):
+            client.authorize()
+
+        self.assertFalse(client.SESSION.verify)
 
     # Testing the merge_response method
     def test_merge_response(self) -> None:

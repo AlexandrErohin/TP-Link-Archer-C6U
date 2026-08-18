@@ -35,7 +35,11 @@ class TplinkC3200Router(TPLinkMR200Client):
 
         try:
             # This method checks if we can recognize the router type.
-            welcome_page = requests.get(self.host, timeout=5)
+            welcome_page = requests.get(
+                self.host,
+                timeout=5,
+                verify=self._verify_ssl,
+            )
             if welcome_page and welcome_page.status_code == 200 and re.search("Archer", welcome_page.text):
                 return True
         except ClientException:
@@ -49,6 +53,7 @@ class TplinkC3200Router(TPLinkMR200Client):
         # Create the SESSION object and the authorization cookie
         # ———————————————————————————————————————————
         self.SESSION = requests.Session()
+        self.SESSION.verify = self._verify_ssl
 
         if self._logger:
             self._logger.debug("!")
