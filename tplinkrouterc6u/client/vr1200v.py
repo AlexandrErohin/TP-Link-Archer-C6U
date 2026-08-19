@@ -90,3 +90,39 @@ class TplinkVR1200vRouter(TPLinkEXClient):
             return r.status_code, r.text
         else:
             return r.status_code, r.text
+
+    def backup_config(self) -> bytes:
+        """Download the router configuration backup.
+
+        The backup endpoint is built from the firmware version strings and is
+        specific to this device family (VR1200v-class firmware). Returns the
+        raw backup file bytes.
+        """
+        firmware = self.get_firmware()
+
+        hw_parts = re.match(r'^(Archer VR1200[a-zA-Z0-9]+) ([vV][0-9]+)', firmware.hardware_version)
+        fw_parts = re.match(r'.* Build ([0-9]+) Rel\.([0-9a-zA-Z]+)', firmware.firmware_version)
+        if not hw_parts or not fw_parts:
+            raise ClientException(
+                'Unable to build backup path from firmware info: {} / {}'.format(
+                    firmware.hardware_version, firmware.firmware_version))
+
+        hw_prefix = hw_parts.group(1).replace(' ', '')
+        hw_version = hw_parts.group(2).upper()
+        fw_build = fw_parts.group(1)
+        fw_release = fw_parts.group(2).lower()
+
+        backup_path = '/cgi/{}{}{}{}.bin?'.format(hw_prefix, hw_version, fw_build, fw_release)
+
+        headers = self.HEADERS.copy()
+        headers['Referer'] = '{}/'.format(self.host)
+        if self._token is not None:
+            headers['TokenID'] = self._token
+
+        response = self.req.get(
+            '{}{}'.format(self.host, backup_path),
+            headers=headers, timeout=self.timeout, verify=self._verify_ssl)
+        if response.status_code != 200:
+            raise ClientException('Backup failed, status code: {}'.format(response.status_code))
+
+        return response.content
