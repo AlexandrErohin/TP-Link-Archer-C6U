@@ -5,10 +5,11 @@ from hashlib import md5
 from time import sleep
 from requests import Response
 from tplinkrouterc6u.client.ex import TPLinkEXClient
+from tplinkrouterc6u.common.backup import ConfigBackupMixin
 from tplinkrouterc6u.common.exception import ClientException
 
 
-class TplinkVR1200vRouter(TPLinkEXClient):
+class TplinkVR1200vRouter(ConfigBackupMixin, TPLinkEXClient):
     def authorize(self) -> None:
         if self._token is not None and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
             return
@@ -91,36 +92,15 @@ class TplinkVR1200vRouter(TPLinkEXClient):
         else:
             return r.status_code, r.text
 
-    def backup_config(self) -> bytes:
-        """Download the router configuration backup.
-
-        The backup endpoint is built from the firmware version strings and is
-        specific to this device family (VR1200v-class firmware). Returns the
-        raw backup file bytes.
-        """
-        firmware = self.get_firmware()
-
-        hw_parts = re.match(r'^(Archer VR1200[a-zA-Z0-9]+) ([vV][0-9]+)', firmware.hardware_version)
-        fw_parts = re.match(r'.* Build ([0-9]+) Rel\.([0-9a-zA-Z]+)', firmware.firmware_version)
-        if not hw_parts or not fw_parts:
-            raise ClientException(
-                'Unable to build backup path from firmware info: {} / {}'.format(
-                    firmware.hardware_version, firmware.firmware_version))
-
-        hw_prefix = hw_parts.group(1).replace(' ', '')
-        hw_version = hw_parts.group(2).upper()
-        fw_build = fw_parts.group(1)
-        fw_release = fw_parts.group(2).lower()
-
-        backup_path = '/cgi/{}{}{}{}.bin?'.format(hw_prefix, hw_version, fw_build, fw_release)
-
+    def _backup_get(self, path: str) -> bytes:
+        """Download the configuration backup using the VR1200v token auth."""
         headers = self.HEADERS.copy()
         headers['Referer'] = '{}/'.format(self.host)
         if self._token is not None:
             headers['TokenID'] = self._token
 
         response = self.req.get(
-            '{}{}'.format(self.host, backup_path),
+            '{}{}'.format(self.host, path),
             headers=headers, timeout=self.timeout, verify=self._verify_ssl)
         if response.status_code != 200:
             raise ClientException('Backup failed, status code: {}'.format(response.status_code))
