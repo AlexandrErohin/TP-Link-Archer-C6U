@@ -799,5 +799,24 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(ipv6_calls['n'], 1)
 
 
+class TestTplinkC80RouterSslContext(TestCase):
+
+    def test_ssl_context_enables_legacy_renegotiation(self) -> None:
+        import ssl
+
+        ctx = TplinkC80Router._build_ssl_context(True)
+        if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
+            self.assertTrue(ctx.options & ssl.OP_LEGACY_SERVER_CONNECT)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ctx.check_hostname)
+
+    def test_ssl_context_unverified_when_verify_off(self) -> None:
+        import ssl
+
+        ctx = TplinkC80Router._build_ssl_context(False)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
+        self.assertFalse(ctx.check_hostname)
+
+
 if __name__ == '__main__':
     main()
