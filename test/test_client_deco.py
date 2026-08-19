@@ -1,5 +1,5 @@
 from unittest import main, TestCase
-from json import loads
+from json import loads, dumps
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from tplinkrouterc6u import (
@@ -11,6 +11,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     LTEStatus,
 )
+from tplinkrouterc6u.common.exception import ClientError
 
 
 class TestTPLinkDecoClient(TestCase):
@@ -799,6 +800,68 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(result.lan_macaddr, '44-E1-52-8C-40-37')
         self.assertEqual(result.lan_ipv4_ipaddr, '192.168.68.1')
         self.assertEqual(result.lan_ipv4_netmask, '255.255.255.0')
+
+    def test_retry_request_retries_client_error_on_read(self) -> None:
+        client = TPLinkDecoClient('', '')
+        attempts = {'count': 0}
+
+        def flaky(*args):
+            attempts['count'] += 1
+            if attempts['count'] < 3:
+                raise ClientError('An unknown response - Bad Gateway')
+            return {'ok': True}
+
+        # Reads are sent as JSON: dumps({'operation': 'read', ...})
+        result = client._retry_request(
+            flaky, 'admin/client?form=client_list', dumps({'operation': 'read'}))
+
+        self.assertEqual(attempts['count'], 3)
+        self.assertEqual(result, {'ok': True})
+
+    def test_retry_request_does_not_retry_write(self) -> None:
+        client = TPLinkDecoClient('', '')
+        attempts = {'count': 0}
+
+        def flaky(*args):
+            attempts['count'] += 1
+            raise ClientError('An unknown response')
+
+        # set_wifi() sends dumps({'operation': 'write', ...})
+        with self.assertRaises(ClientError):
+            client._retry_request(
+                flaky, 'admin/wireless?form=wlan', dumps({'operation': 'write', 'params': {}}))
+
+        self.assertEqual(attempts['count'], 1)
+
+    def test_retry_request_does_not_retry_reboot(self) -> None:
+        client = TPLinkDecoClient('', '')
+        attempts = {'count': 0}
+
+        def flaky(*args):
+            attempts['count'] += 1
+            raise ClientError('An unknown response')
+
+        # reboot() sends dumps({'operation': 'reboot', ...})
+        with self.assertRaises(ClientError):
+            client._retry_request(
+                flaky, 'admin/device?form=system', dumps({'operation': 'reboot', 'params': {}}))
+
+        self.assertEqual(attempts['count'], 1)
+
+    def test_retry_request_does_not_retry_non_json(self) -> None:
+        # authorize() calls _retry_request with no data arg; a ClientError
+        # there must not be retried (conservative).
+        client = TPLinkDecoClient('', '')
+        attempts = {'count': 0}
+
+        def flaky(*args):
+            attempts['count'] += 1
+            raise ClientError('An unknown response')
+
+        with self.assertRaises(ClientError):
+            client._retry_request(flaky, 'some/path')
+
+        self.assertEqual(attempts['count'], 1)
 
 
 if __name__ == '__main__':

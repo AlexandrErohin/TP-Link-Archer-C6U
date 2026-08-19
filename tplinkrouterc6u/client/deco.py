@@ -1,11 +1,13 @@
 from base64 import b64decode
-from json import dumps
+from json import dumps, loads
+from time import sleep
 from requests.exceptions import ConnectTimeout
 from collections.abc import Callable
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus
+from tplinkrouterc6u.common.exception import ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 
@@ -213,6 +215,34 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 if retries > 2:
                     raise err
                 retries += 1
+            except ClientError as err:
+                if retries > 2:
+                    raise err
+                # Transient 5xx/Bad Gateway responses on reads (e.g. Deco
+                # X20/X50 'An unknown response' with a Bad Gateway body) are
+                # safe to retry. State-changing calls must never be retried,
+                # or a transient failure would double-apply the side effect.
+                if not self._is_read_request(args):
+                    raise err
+                retries += 1
+                sleep(1)
+
+    @staticmethod
+    def _is_read_request(args: tuple) -> bool:
+        """True only for a read operation. Deco writes are sent as JSON, e.g.
+        dumps({'operation': 'write'|'reboot'|'logout', ...}); reads use
+        operation 'read'/'load'. Non-JSON args (e.g. authorize) are treated as
+        non-retryable to stay conservative."""
+        if len(args) < 2:
+            return False
+        data = args[1]
+        if not isinstance(data, str):
+            return False
+        try:
+            operation = loads(data).get('operation')
+        except Exception:
+            return False
+        return operation in ('read', 'load')
 
     def _map_wire_type(self, data: dict) -> Connection:
         if data.get('wire_type') == 'wired':
