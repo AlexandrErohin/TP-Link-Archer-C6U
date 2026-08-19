@@ -29,7 +29,10 @@ class EncryptionWrapper:
         cipher = AES.new(self._key, AES.MODE_CBC, self._iv)
         decrypted = cipher.decrypt(enc)
         result = self._unpad(decrypted)
-        return result.decode()
+        # The decrypted payload may contain invalid UTF-8 bytes (e.g. garbage
+        # in a device nickname from the Deco app, see HA #374). Ignoring them
+        # lets the surrounding JSON parse instead of crashing the whole setup.
+        return result.decode('utf-8', errors='ignore')
 
     @staticmethod
     def rsa_encrypt(data: str, nn: str, ee: str) -> str:
