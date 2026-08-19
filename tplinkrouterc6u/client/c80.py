@@ -84,11 +84,24 @@ class TplinkC80Router(AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
-        if self._verify_ssl is False:
-            self._session.verify = False
+        self._session.verify = TplinkC80Router._build_ssl_context(self._verify_ssl)
         self._encryption = EncryptionState()
         self._wifi_request = None
         self._ipv6_support = True
+
+    @staticmethod
+    def _build_ssl_context(verify_ssl: bool):
+        import ssl
+
+        ctx = ssl.create_default_context()
+        # C80 routers use OpenSSL legacy renegotiation, disabled by default on
+        # Python 3.14+ (UNSAFE_LEGACY_RENEGOTIATION_DISABLED).
+        if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
+            ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        if verify_ssl is False:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        return ctx
 
     def supports(self) -> bool:
         try:
@@ -535,7 +548,7 @@ class TplinkC80Router(AbstractRouter):
         if use_token:
             url += f"&id={self._encryption.token}"
         try:
-            response = self._session.post(url, data=data, timeout=self.timeout, verify=self._verify_ssl)
+            response = self._session.post(url, data=data, timeout=self.timeout, verify=self._session.verify)
             # Raises exception for 4XX/5XX status codes for all requests except 1st in authorize
             if not (code == 2 and asyn == 1 and use_token is False and data is None):
                 response.raise_for_status()
