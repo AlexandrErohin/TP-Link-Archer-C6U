@@ -127,22 +127,42 @@ class TplinkEncryption(TplinkRequest):
             response = self._try_login()
 
         data = response.text
-        try:
-            data = response.json()
-            data = self._decrypt_response(data)
+        attempts = 0
+        while True:
+            try:
+                data = response.json()
+                data = self._decrypt_response(data)
 
-            self._stok = data[self._data_block]['stok']
-            regex_result = search(
-                'sysauth=(.*);', response.headers['set-cookie'])
-            self._sysauth = regex_result.group(1)
-            self._logged = True
-
-        except Exception as e:
-            error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
-                     .format(self.__class__.__name__, e, data))
-            if self._logger:
-                self._logger.debug(error)
-            raise ClientException(error)
+                self._stok = data[self._data_block]['stok']
+                regex_result = search(
+                    'sysauth=(.*);', response.headers['set-cookie'])
+                self._sysauth = regex_result.group(1)
+                self._logged = True
+                return
+            except Exception as e:
+                attempts += 1
+                if attempts >= 3:
+                    error = ("TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
+                             .format(self.__class__.__name__, e, data))
+                    if self._logger:
+                        self._logger.debug(error)
+                    raise ClientException(error)
+                # Only retry when the router returned an empty response (a
+                # transient WAN renegotiation hiccup, e.g. MR80X returning {}).
+                # Never retry a content-ful failure such as a wrong password,
+                # which would hammer the router's account lockout.
+                if data:
+                    raise ClientException(
+                        "TplinkRouter - {} - Cannot authorize! Error - {}; Response - {}"
+                        .format(self.__class__.__name__, e, data))
+                # The router sometimes returns an empty data block on login
+                # (e.g. intermittent KeyError 'data' on Mercusys MR80X);
+                # retry the full login sequence before giving up.
+                self._logged = False
+                self._request_pwd()
+                self._request_seq()
+                response = self._try_login()
+                data = response.text
 
     def _request_pwd(self) -> None:
         url = '{}/cgi-bin/luci/;stok=/login?form=keys'.format(self.host)
