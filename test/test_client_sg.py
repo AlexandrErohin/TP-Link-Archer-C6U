@@ -6,6 +6,7 @@ from unittest.mock import patch, Mock
 from tplinkrouterc6u import (
     TplinkRouterSG,
     ClientException,
+    ClientError,
     VpnClientServer,
     VpnClientServerProtocol,
 )
@@ -251,6 +252,32 @@ class TestTplinkRouterSGUnit(TestCase):
 
         # Hash should have been updated to SHA256 of the encrypted data
         self.assertNotEqual(client._hash, 'fakehash')
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_request_error_includes_decrypted_body(self, mock_post: Mock) -> None:
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._logged = True
+        client._stok = 'test_stok'
+        client._sysauth = 'test_sysauth'
+        client._hash = 'fakehash'
+        client._seq = 100
+
+        response = Mock()
+        response.text = 'raw_response'
+        response.json.return_value = {'data': 'encrypted'}
+        mock_post.return_value = response
+
+        with patch.object(client, '_aes_encrypt', return_value='encrypted_data_b64'), \
+             patch.object(
+                 client,
+                 '_aes_decrypt',
+                 return_value='dispatcher failure: attempt to index global mode',
+             ):
+            with self.assertRaises(ClientError) as ctx:
+                client.request('admin/wireless?form=wlan', 'operation=write')
+
+        self.assertIn('Decrypted response', str(ctx.exception))
+        self.assertIn('attempt to index global mode', str(ctx.exception))
 
     @patch('tplinkrouterc6u.client.sg.post')
     def test_request_write_dict_body(self, mock_post: Mock) -> None:

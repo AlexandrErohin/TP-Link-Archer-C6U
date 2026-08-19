@@ -418,6 +418,7 @@ Not all fields are filled by every client:
 - Archer AX50 v1.0
 - Archer AX53 (v1.0, v2)
 - Archer AX55 (v1.0, V1.60, v4.0)
+- Archer AX55 Pro v1.0
 - Archer AX58 v1.0
 - Archer AX6000 V1
 - Archer AX72 V1

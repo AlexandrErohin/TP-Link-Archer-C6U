@@ -8,7 +8,7 @@ from ipaddress import IPv4Address
 from macaddress import EUI48
 from requests.exceptions import ConnectTimeout
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
-from tplinkrouterc6u import Connection, ClientException
+from tplinkrouterc6u import Connection, ClientException, ClientError
 from tplinkrouterc6u.client.deco_e4r import TplinkDecoE4RRouter
 from tplinkrouterc6u.provider import TplinkRouterProvider
 
@@ -231,6 +231,26 @@ class TestTplinkDecoE4RRouter(TestCase):
 
         self.assertEqual(attempts['count'], 3)
         self.assertEqual(result['cpu_usage'], 0.1)
+
+    def test_request_error_includes_decrypted_body(self):
+        client = TplinkDecoE4RRouterTest('', 'pwd')
+        client.authorize()
+
+        class _Session:
+            def __init__(self, text):
+                self._text = text
+
+            def post(self, url, data=None, headers=None, timeout=None, verify=None):
+                return ResponseMock(self._text)
+
+        decrypted = 'dispatcher failure: attempt to index global mode'
+        client._session = _Session(client._encryption.aes_encrypt(decrypted))
+
+        with self.assertRaises(ClientError) as ctx:
+            client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+
+        self.assertIn('Decrypted response', str(ctx.exception))
+        self.assertIn('attempt to index global mode', str(ctx.exception))
 
     def test_logout(self):
         client = TplinkDecoE4RRouterTest('', 'pwd')

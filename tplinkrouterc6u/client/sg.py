@@ -323,9 +323,12 @@ class TplinkRouterSG(TplinkBaseRouter):
         if ignore_response:
             return None
 
+        resp = None
+        decrypted_text = None
         try:
             resp = response.json()
-            decrypted = json.loads(self._aes_decrypt(resp['data']))
+            decrypted_text = self._aes_decrypt(resp['data'])
+            decrypted = json.loads(decrypted_text)
 
             if self._is_valid_response(decrypted):
                 return decrypted.get(self._data_block, decrypted)
@@ -334,6 +337,13 @@ class TplinkRouterSG(TplinkBaseRouter):
         except Exception as e:
             error = ('TplinkRouterSG - Unknown response - {}; Request {} - Response {}'
                      .format(e, path, response.text[:200] if response.text else ''))
+            if decrypted_text:
+                error += ' Decrypted response - {}'.format(decrypted_text)
+            elif isinstance(resp, dict) and resp.get('data'):
+                try:
+                    error += ' Decrypted response - {}'.format(self._aes_decrypt(resp['data']))
+                except Exception:
+                    pass
             if self._logger:
                 self._logger.debug(error)
             raise ClientError(error)

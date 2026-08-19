@@ -127,6 +127,7 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
 
         error = ''
         parsed = None
+        decrypted = None
         try:
             decrypted = self._encryption.aes_decrypt(response.text)
             parsed = loads(decrypted)
@@ -137,6 +138,8 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
         except Exception as e:
             error = ('{} - An unknown response - {}; Request {} - Response {}'
                      .format(self.ROUTER_NAME, e, path, response.text))
+            if decrypted is not None:
+                error += ' Decrypted response - {}'.format(decrypted)
         if not error:
             error = ('{} - Response with error; Request {} - Response {}'
                      .format(self.ROUTER_NAME, path, parsed))
