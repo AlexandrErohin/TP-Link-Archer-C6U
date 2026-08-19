@@ -1845,6 +1845,32 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(_Stub()._decrypt_response({'data': ''}), {})
         self.assertEqual(_Stub()._decrypt_response({}), {})
 
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_error_includes_decrypted_body(self, mock_post) -> None:
+        """A non-JSON body that is still AES-encrypted (e.g. an HTTP 500 from a
+        Deco/BE-series Lua dispatcher) must surface the decrypted error instead
+        of a generic 'An unknown response' (see #158)."""
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        client._logged = True
+        client._stok = 'stok'
+        client._sysauth = 'sysauth'
+
+        response = Mock()
+        response.text = 'raw_ciphertext'
+        response.json.side_effect = ValueError('Expecting value: line 1 column 1')
+        mock_post.return_value = response
+
+        with patch.object(client, '_prepare_data', return_value='prepared'), \
+                patch.object(
+                    client._encryption, 'aes_decrypt',
+                    return_value='Failed to execute call dispatcher target: attempt to index global mode',
+                ):
+            with self.assertRaises(ClientError) as ctx:
+                client.request('admin/wireless?form=wlan', 'operation=write')
+
+        self.assertIn('Decrypted response', str(ctx.exception))
+        self.assertIn('attempt to index global mode', str(ctx.exception))
+
 
 class TestAuthMinimal(TestCase):
     def setUp(self):

@@ -61,6 +61,12 @@ class TplinkRequest:
         except Exception as e:
             error = ('TplinkRouter - {} - An unknown response - {}; Request {} - Response {}'
                      .format(self.__class__.__name__, e, path, data))
+            if getattr(self, '_encryption', None):
+                try:
+                    error += ' Decrypted response - {}'.format(
+                        self._encryption.aes_decrypt(response.text))
+                except Exception:
+                    pass
         error = ('TplinkRouter - {} - Response with error; Request {} - Response {}'
                  .format(self.__class__.__name__, path, data)) if not error else error
         if self._logger:
