@@ -1892,6 +1892,130 @@ class TestAuthMinimal(TestCase):
             self.client._prepare_data('data')
             self.assertFalse(mock_sign.call_args[0][1], "Should pass False when logged")
 
+    def test_authorize_retries_on_empty_data_block(self) -> None:
+        """The router intermittently returns an empty/partial data block on login
+        (e.g. KeyError 'data' on Mercusys MR80X). authorize() must retry the full
+        login sequence instead of failing on the first attempt."""
+        class Client(TplinkRouter):
+            def __init__(self):
+                super().__init__('http://192.168.0.1', 'password')
+                self.login_calls = 0
+
+            def _request_pwd(self) -> None:
+                self._pwdNN = '00'
+                self._pwdEE = '010001'
+
+            def _request_seq(self) -> None:
+                self._seq = '100'
+
+            def _try_login(self):
+                self.login_calls += 1
+
+                class Resp:
+                    headers = {'set-cookie': 'sysauth=test_sysauth_cookie; path=/'}
+                    status_code = 200
+
+                    def json(self):
+                        return {'success': True, 'data': 'encrypted'}
+
+                    @property
+                    def text(self):
+                        return 'login response'
+
+                return Resp()
+
+        client = Client()
+        # First login attempt: empty data block -> KeyError. Second: valid stok.
+        with patch.object(client, '_decrypt_response', side_effect=[
+                {}, {'data': {'stok': 'retried_stok'}}]):
+            client.authorize()
+
+        self.assertTrue(client._logged)
+        self.assertEqual(client._stok, 'retried_stok')
+        self.assertEqual(client._sysauth, 'test_sysauth_cookie')
+        self.assertEqual(client.login_calls, 2)
+
+    def test_authorize_raises_after_retries_on_empty_data_block(self) -> None:
+        class Client(TplinkRouter):
+            def __init__(self):
+                super().__init__('http://192.168.0.1', 'password')
+                self.login_calls = 0
+
+            def _request_pwd(self) -> None:
+                self._pwdNN = '00'
+                self._pwdEE = '010001'
+
+            def _request_seq(self) -> None:
+                self._seq = '100'
+
+            def _try_login(self):
+                self.login_calls += 1
+
+                class Resp:
+                    headers = {'set-cookie': 'sysauth=test_sysauth_cookie; path=/'}
+                    status_code = 200
+
+                    def json(self):
+                        return {'success': True, 'data': 'encrypted'}
+
+                    @property
+                    def text(self):
+                        return 'login response'
+
+                return Resp()
+
+        client = Client()
+        with patch.object(client, '_decrypt_response', return_value={}):
+            with self.assertRaises(ClientException) as ctx:
+                client.authorize()
+
+        self.assertIn('Cannot authorize', str(ctx.exception))
+        self.assertFalse(client._logged)
+        self.assertEqual(client.login_calls, 3)
+
+    def test_authorize_does_not_retry_content_full_failure(self) -> None:
+        """A content-ful failure (e.g. wrong password with an errorcode in the
+        data block) must NOT be retried — that would hammer the router's
+        account lockout. Only an empty/partial response is retried."""
+        class Client(TplinkRouter):
+            def __init__(self):
+                super().__init__('http://192.168.0.1', 'wrongpassword')
+                self.login_calls = 0
+
+            def _request_pwd(self) -> None:
+                self._pwdNN = '00'
+                self._pwdEE = '010001'
+
+            def _request_seq(self) -> None:
+                self._seq = '100'
+
+            def _try_login(self):
+                self.login_calls += 1
+
+                class Resp:
+                    headers = {'set-cookie': 'sysauth=x; path=/'}
+                    status_code = 200
+
+                    def json(self):
+                        return {'success': True, 'data': 'encrypted'}
+
+                    @property
+                    def text(self):
+                        return 'login response'
+
+                return Resp()
+
+        client = Client()
+        # data block present but no stok (e.g. {'errorcode': 'invalid password'})
+        with patch.object(client, '_decrypt_response', return_value={
+                'errorcode': 'invalid password'}):
+            with self.assertRaises(ClientException) as ctx:
+                client.authorize()
+
+        self.assertIn('Cannot authorize', str(ctx.exception))
+        self.assertFalse(client._logged)
+        self.assertEqual(client.login_calls, 1)
+
 
 class TestWifiGeneric(TestCase):
     def setUp(self):
