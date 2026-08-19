@@ -355,7 +355,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.psk_key = get_v('psk_key')
         status.portal_enable = self._str2bool(get_v('portal_enable'))
         status.portal_password = get_v('portal_password')
-        status.channel = int(get_v('channel')) if get_v('channel') else None
+        try:
+            status.channel = int(get_v('channel'))
+        except (TypeError, ValueError):
+            status.channel = None
 
         return status
 

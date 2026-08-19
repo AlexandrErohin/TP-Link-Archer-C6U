@@ -1908,6 +1908,22 @@ class TestWifiGeneric(TestCase):
         self.assertEqual(info.ssid, 'Host_2G')
 
     @patch('tplinkrouterc6u.client.c6u.post')
+    def test_get_wifi_channel_auto(self, mock_post):
+        # Firmware returns channel 'auto' for auto-selected channels; must map to None
+        mock_data = {
+            'wireless_2g_enable': 'on',
+            'wireless_2g_ssid': 'Host_2G',
+            'wireless_2g_channel': 'auto'
+        }
+
+        with patch.object(self.client, 'request', return_value=mock_data):
+            info = self.client.get_wifi(Connection.HOST_2G)
+
+        self.assertTrue(info.enable)
+        self.assertEqual(info.ssid, 'Host_2G')
+        self.assertIsNone(info.channel)
+
+    @patch('tplinkrouterc6u.client.c6u.post')
     def test_set_wifi_enhanced(self, mock_post):
         # Verify set_wifi still builds correct data strings
         with patch.object(self.client, 'request') as mock_request:
