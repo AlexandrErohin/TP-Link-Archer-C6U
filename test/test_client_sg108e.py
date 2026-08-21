@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 from unittest.mock import Mock
 
-from tplinkrouterc6u import TPLinkSG108EClient
+from tplinkrouterc6u import PortStatus, TPLinkSG108EClient
 from tplinkrouterc6u.client.sg108e import parse_script_variables
 
 
@@ -185,6 +185,215 @@ class TestTPLinkSG108EClient(TestCase):
         status = client.get_status()
         # EUI48 stringifies with hyphens in this project.
         self.assertEqual(status.lan_macaddr.lower(), '02-00-00-00-00-01')
+
+    def test_get_port_status_maps_live_tl_sg108e_v6_payloads(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'port_middle_num': 16,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                'link_status': [6, 6, 6, 6, 5, 0, 0, 0, 0, 0],
+                'pkts': [
+                    6790692, 0, 5572836, 1444,
+                    1090232, 0, 4646114, 1443,
+                    4990331, 0, 690965, 1443,
+                    4147068, 0, 5933003, 1443,
+                    87616, 0, 0, 1443,
+                    0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0, 0,
+                ],
+            },
+            'state_info': ['Disabled', 'Enabled'],
+            'link_info': [
+                'Link Down', 'Auto', '10Half', '10Full',
+                '100Half', '100Full', '1000Full', '',
+            ],
+        })
+        client.port_settings = Mock(return_value={
+            'max_port_num': 8,
+            'port_middle_num': 16,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                'trunk_info': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                'spd_cfg': [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                'spd_act': [6, 6, 6, 6, 5, 0, 0, 0, 0, 0],
+                'fc_cfg': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                'fc_act': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            },
+            'trunk_info': [
+                '', ' (LAG1)', ' (LAG2)', ' (LAG3)', ' (LAG4)',
+                ' (LAG5)', ' (LAG6)', ' (LAG7)', ' (LAG8)',
+            ],
+            'state_info': ['Disabled', 'Enabled'],
+            'speed_info': [
+                'Link Down', 'Auto', '10MH', '10MF',
+                '100MH', '100MF', '1000MF', '',
+            ],
+            'flow_info': ['Off', 'On'],
+        })
+
+        ports = client.get_port_status()
+        self.assertEqual(len(ports), 8)
+        self.assertEqual([p.port for p in ports], [1, 2, 3, 4, 5, 6, 7, 8])
+        self.assertTrue(all(isinstance(p, PortStatus) for p in ports))
+
+        port1 = ports[0]
+        self.assertTrue(port1.enabled)
+        self.assertTrue(port1.link_up)
+        self.assertTrue(port1.auto_negotiation)
+        self.assertIsNone(port1.configured_speed)
+        self.assertIsNone(port1.configured_duplex)
+        self.assertEqual(port1.negotiated_speed, 1000)
+        self.assertEqual(port1.negotiated_duplex, 'full')
+        self.assertFalse(port1.flow_control_enabled)
+        self.assertFalse(port1.flow_control_active)
+        self.assertIsNone(port1.lag)
+        self.assertEqual(port1.tx_good_packets, 6790692)
+        self.assertEqual(port1.tx_bad_packets, 0)
+        self.assertEqual(port1.rx_good_packets, 5572836)
+        self.assertEqual(port1.rx_bad_packets, 1444)
+
+        port5 = ports[4]
+        self.assertEqual(port5.negotiated_speed, 100)
+        self.assertEqual(port5.negotiated_duplex, 'full')
+        self.assertEqual(port5.tx_good_packets, 87616)
+        self.assertEqual(port5.tx_bad_packets, 0)
+        self.assertEqual(port5.rx_good_packets, 0)
+        self.assertEqual(port5.rx_bad_packets, 1443)
+
+        port6 = ports[5]
+        self.assertTrue(port6.enabled)
+        self.assertFalse(port6.link_up)
+        self.assertIsNone(port6.negotiated_speed)
+        self.assertIsNone(port6.negotiated_duplex)
+        self.assertEqual(port6.tx_good_packets, 0)
+        self.assertEqual(port6.tx_bad_packets, 0)
+        self.assertEqual(port6.rx_good_packets, 0)
+        self.assertEqual(port6.rx_bad_packets, 0)
+
+        client.port_stats.assert_called_once()
+        client.port_settings.assert_called_once()
+
+    def test_get_port_status_fixed_mode_disabled_and_lag(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client.port_stats = Mock(return_value={
+            'max_port_num': 4,
+            'all_info': {
+                'state': [1, 0, 1, 1],
+                'link_status': [6, 0, 2, 3],
+                'pkts': [
+                    10, 0, 20, 1,
+                    0, 0, 0, 0,
+                    30, 2, 40, 3,
+                    50, 0, 60, 0,
+                ],
+            },
+        })
+        client.port_settings = Mock(return_value={
+            'max_port_num': 4,
+            'all_info': {
+                'state': [1, 0, 1, 1],
+                'trunk_info': [0, 0, 1, 0],
+                'spd_cfg': [1, 1, 4, 6],
+                'spd_act': [6, 0, 2, 6],
+                'fc_cfg': [0, 0, 1, 0],
+                'fc_act': [0, 0, 1, 0],
+            },
+        })
+
+        ports = client.get_port_status()
+        self.assertEqual(len(ports), 4)
+
+        disabled = ports[1]
+        self.assertFalse(disabled.enabled)
+        self.assertFalse(disabled.link_up)
+        self.assertTrue(disabled.auto_negotiation)
+        self.assertIsNone(disabled.configured_speed)
+        self.assertIsNone(disabled.configured_duplex)
+        self.assertIsNone(disabled.lag)
+
+        fixed_half = ports[2]
+        self.assertTrue(fixed_half.enabled)
+        self.assertTrue(fixed_half.link_up)
+        self.assertFalse(fixed_half.auto_negotiation)
+        self.assertEqual(fixed_half.configured_speed, 100)
+        self.assertEqual(fixed_half.configured_duplex, 'half')
+        self.assertEqual(fixed_half.negotiated_speed, 10)
+        self.assertEqual(fixed_half.negotiated_duplex, 'half')
+        self.assertTrue(fixed_half.flow_control_enabled)
+        self.assertTrue(fixed_half.flow_control_active)
+        self.assertEqual(fixed_half.lag, 1)
+
+        fixed_full = ports[3]
+        self.assertFalse(fixed_full.auto_negotiation)
+        self.assertEqual(fixed_full.configured_speed, 1000)
+        self.assertEqual(fixed_full.configured_duplex, 'full')
+        self.assertEqual(fixed_full.negotiated_speed, 1000)
+        self.assertEqual(fixed_full.negotiated_duplex, 'full')
+        self.assertFalse(fixed_full.flow_control_enabled)
+        self.assertFalse(fixed_full.flow_control_active)
+        self.assertIsNone(fixed_full.lag)
+
+    def test_get_port_status_short_and_malformed_arrays(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client.port_stats = Mock(return_value={
+            'max_port_num': 0,
+            'all_info': {
+                'state': [1],
+                'link_status': [6],
+                'pkts': [0, 5],
+            },
+        })
+        client.port_settings = Mock(return_value={
+            'max_port_num': 3,
+            'all_info': {
+                'state': [1],
+                'trunk_info': ['bad'],
+                'spd_cfg': [2],
+                'spd_act': [3],
+                'fc_cfg': [1],
+                'fc_act': ['x'],
+            },
+        })
+
+        ports = client.get_port_status()
+        self.assertEqual(len(ports), 3)
+        self.assertEqual([p.port for p in ports], [1, 2, 3])
+
+        port1 = ports[0]
+        self.assertTrue(port1.enabled)
+        self.assertTrue(port1.link_up)
+        self.assertFalse(port1.auto_negotiation)
+        self.assertEqual(port1.configured_speed, 10)
+        self.assertEqual(port1.configured_duplex, 'half')
+        self.assertEqual(port1.negotiated_speed, 10)
+        self.assertEqual(port1.negotiated_duplex, 'full')
+        self.assertTrue(port1.flow_control_enabled)
+        self.assertIsNone(port1.flow_control_active)
+        self.assertIsNone(port1.lag)
+        self.assertEqual(port1.tx_good_packets, 0)
+        self.assertEqual(port1.tx_bad_packets, 5)
+        self.assertIsNone(port1.rx_good_packets)
+        self.assertIsNone(port1.rx_bad_packets)
+
+        for port in ports[1:]:
+            self.assertIsNone(port.enabled)
+            self.assertIsNone(port.link_up)
+            self.assertIsNone(port.auto_negotiation)
+            self.assertIsNone(port.configured_speed)
+            self.assertIsNone(port.configured_duplex)
+            self.assertIsNone(port.negotiated_speed)
+            self.assertIsNone(port.negotiated_duplex)
+            self.assertIsNone(port.flow_control_enabled)
+            self.assertIsNone(port.flow_control_active)
+            self.assertIsNone(port.lag)
+            self.assertIsNone(port.tx_good_packets)
+            self.assertIsNone(port.tx_bad_packets)
+            self.assertIsNone(port.rx_good_packets)
+            self.assertIsNone(port.rx_bad_packets)
 
 
 if __name__ == '__main__':
