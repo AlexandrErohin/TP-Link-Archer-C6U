@@ -100,13 +100,13 @@ class TPLinkMR200Client(TPLinkMRClient):
             self.ActItem(self.ActItem.GET, 'LTE_WAN_CFG', '2,1,0,0,0,0'),
         ]
         _, values = self.req_act(acts)
-        
+
         status.enable = int(values['0'].get('enable', 0))
         status.connect_status = int(values['0'].get('connectStatus', 0))
         status.network_type = int(values['0'].get('networkType', 0))
         status.sim_status = int(values['0'].get('simStatus', 0))
         status.sig_level = int(values['0'].get('signalStrength', 0))
-        
+
         status.total_statistics = int(float(values['1'].get('totalStatistics', 0)))
         status.cur_rx_speed = int(values['1'].get('curRxSpeed', 0))
         status.cur_tx_speed = int(values['1'].get('curTxSpeed', 0))
