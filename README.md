@@ -166,6 +166,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | delete_sms | sms: [SMS](#sms) | Delete sms message from the first page for LTE routers |   |
 | get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
+| get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR family; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
 | get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
@@ -428,6 +429,23 @@ Not all fields are filled by every client:
 | resource_blocks | Number of resource blocks allocated in the NR cell | int |
 | rsrp | dBm | int |
 | rsrq | dBm | int |
+
+### <a id="dsl_status">DSLStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| status | DSL line status as reported by the device. Example: Up | str, None |
+| is_up | is the line up | bool |
+| modulation | Example: VDSL2 | str, None |
+| annex | Example: Annex auto | str, None |
+| upstream_curr_rate | current upstream sync rate in kbps | int, None |
+| downstream_curr_rate | current downstream sync rate in kbps | int, None |
+| upstream_max_rate | maximum attainable upstream rate in kbps | int, None |
+| downstream_max_rate | maximum attainable downstream rate in kbps | int, None |
+| upstream_noise_margin | upstream SNR margin in dB | float, None |
+| downstream_noise_margin | downstream SNR margin in dB | float, None |
+| upstream_attenuation | upstream line attenuation in dB | float, None |
+| downstream_attenuation | downstream line attenuation in dB | float, None |
+| uptime | line uptime as reported by the device (`X_TP_UpTime`) | int, None |
 
 ### <a id="WifiStatus">WifiStatus</a>
 | Field | Description | Type |
