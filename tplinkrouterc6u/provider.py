@@ -38,6 +38,7 @@ class TplinkRouterProvider:
                 continue
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
+                logger.info('TplinkRouterProvider: supports() returned True for %s, client chosen: %s', host, client.__name__)
                 return router
             elif logger is not None:
                 logger.debug('TplinkRouterProvider: supports() failed for %s (%s)', host, client.__name__)
