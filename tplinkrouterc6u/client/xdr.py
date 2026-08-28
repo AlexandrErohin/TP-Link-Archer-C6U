@@ -100,6 +100,34 @@ class TPLinkXDRClient(AbstractRouter):
                                   format(self.__class__, data['error_code']))
         self._stok = ''
 
+    def pppoe_connect(self) -> None:
+        data = self._request({
+            'method': 'do',
+            'network': {
+                'change_wan_status': {
+                    'proto': 'pppoe',
+                    'operate': 'connect',
+                },
+            },
+        })
+        if data['error_code'] != 0:
+            raise ClientException('TplinkRouter - {} - pppoe connect failed, code - {}'.
+                                  format(self.__class__, data['error_code']))
+
+    def pppoe_disconnect(self) -> None:
+        data = self._request({
+            'method': 'do',
+            'network': {
+                'change_wan_status': {
+                    'proto': 'pppoe',
+                    'operate': 'disconnect',
+                },
+            },
+        })
+        if data['error_code'] != 0:
+            raise ClientException('TplinkRouter - {} - pppoe disconnect failed, code - {}'.
+                                  format(self.__class__, data['error_code']))
+
     def get_firmware(self) -> Firmware:
         data = self._request({
             'method': 'get',
