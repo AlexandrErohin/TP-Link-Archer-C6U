@@ -440,3 +440,22 @@ class WifiStatus:
     portal_enable: bool | None = None
     portal_password: str | None = None
     channel: int | None = None
+
+
+@dataclass
+class PortStatus:
+    port: int
+    enabled: bool | None = None
+    link_up: bool | None = None
+    auto_negotiation: bool | None = None
+    configured_speed: int | None = None
+    configured_duplex: str | None = None
+    negotiated_speed: int | None = None
+    negotiated_duplex: str | None = None
+    flow_control_enabled: bool | None = None
+    flow_control_active: bool | None = None
+    lag: int | None = None
+    tx_good_packets: int | None = None
+    tx_bad_packets: int | None = None
+    rx_good_packets: int | None = None
+    rx_bad_packets: int | None = None
