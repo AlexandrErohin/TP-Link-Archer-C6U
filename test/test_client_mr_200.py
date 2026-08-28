@@ -48,7 +48,7 @@ class TestTPLinkMR200Client(TestCase):
                 'signalStrength': '4',
             },
             '1': {
-                'totalStatistics': '81234567',
+                'totalStatistics': '81234567.0000',
                 'curRxSpeed': '45120',
                 'curTxSpeed': '9310',
             },
@@ -68,6 +68,7 @@ class TestTPLinkMR200Client(TestCase):
         self.assertEqual(status.cur_rx_speed, 45120)
         self.assertEqual(status.cur_tx_speed, 9310)
         self.assertEqual(status.isp_name, 'Carrier')
+        self.assertEqual(status.sms_unread_count, 0)
         self.assertEqual(status.network_type_info, '4G LTE')
         self.assertEqual(status.sim_status_info, 'SIM unlocked. Authentication succeeded.')
 
