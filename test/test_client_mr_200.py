@@ -38,6 +38,39 @@ class TestTPLinkMR200Client(TestCase):
 
         self.assertEqual(result, True)
 
+    def test_get_lte_status(self):
+        values = {
+            '0': {
+                'enable': '1',
+                'connectStatus': '5',
+                'networkType': '3',
+                'simStatus': '5',
+                'signalStrength': '4',
+            },
+            '1': {
+                'totalStatistics': '81234567',
+                'curRxSpeed': '45120',
+                'curTxSpeed': '9310',
+            },
+            '2': {'profileName': 'Carrier'},
+        }
+
+        with patch.object(TPLinkMR200Client, 'req_act', return_value=(0, values)), \
+                patch.object(TPLinkMR200Client, 'get_sms', return_value=[]):
+            status = self.obj.get_lte_status()
+
+        self.assertEqual(status.enable, 1)
+        self.assertEqual(status.connect_status, 5)
+        self.assertEqual(status.network_type, 3)
+        self.assertEqual(status.sim_status, 5)
+        self.assertEqual(status.sig_level, 4)
+        self.assertEqual(status.total_statistics, 81234567)
+        self.assertEqual(status.cur_rx_speed, 45120)
+        self.assertEqual(status.cur_tx_speed, 9310)
+        self.assertEqual(status.isp_name, 'Carrier')
+        self.assertEqual(status.network_type_info, '4G LTE')
+        self.assertEqual(status.sim_status_info, 'SIM unlocked. Authentication succeeded.')
+
 
 if __name__ == '__main__':
     main()
