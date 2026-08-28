@@ -152,6 +152,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
+| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -374,6 +375,25 @@ Not all fields are filled by every client:
 | portal_enable | portal_enable | bool |
 | portal_password | portal_password | str |
 | channel | channel | int |
+
+### <a id="port_status">PortStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| port | Physical port number (1-based) | int |
+| enabled | Port administratively enabled | bool, None |
+| link_up | Link is up | bool, None |
+| auto_negotiation | Auto-negotiation configured | bool, None |
+| configured_speed | Configured speed in Mbps (fixed mode) | int, None |
+| configured_duplex | Configured duplex (`half` / `full`) | str, None |
+| negotiated_speed | Negotiated speed in Mbps | int, None |
+| negotiated_duplex | Negotiated duplex (`half` / `full`) | str, None |
+| flow_control_enabled | Flow control configured | bool, None |
+| flow_control_active | Flow control active | bool, None |
+| lag | LAG group number, if any | int, None |
+| tx_good_packets | Transmitted good packets (not bytes; may reset) | int, None |
+| tx_bad_packets | Transmitted bad packets | int, None |
+| rx_good_packets | Received good packets | int, None |
+| rx_bad_packets | Received bad packets | int, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

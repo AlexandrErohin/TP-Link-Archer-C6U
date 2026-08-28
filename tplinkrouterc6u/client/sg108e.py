@@ -162,6 +162,11 @@ class TPLinkSG108EClient(AbstractRouter):
         return ipv4
 
     def get_port_status(self) -> list[PortStatus]:
+        """Return per-port status for TL-SG108E (tested on v6.0).
+
+        Requires authorize(). Performs two HTTP requests (port_stats and port_settings).
+        Packet counters are packet counts, not bytes, and may be reset by the switch.
+        """
         stats = self.port_stats()
         settings = self.port_settings()
         count = _physical_port_count(stats, settings)
