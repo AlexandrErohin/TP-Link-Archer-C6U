@@ -13,6 +13,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     IPv6Status,
     ClientError,
+    ClientException,
     SMS,
     LTEStatus,
     VPNStatus,
@@ -762,6 +763,52 @@ X_TP_SitePrefixLength=64
         self.assertIn('http:///cgi_gdpr?_=', check_url)
         self.assertEqual(check_data, ('2\r\n[LTE_SMS_SENDNEWMSG#0,0,0,0,0,0#0,0,0,0,0,0]0,3\r\nindex=1\r\n'
                                       'to=534324724234\r\ntextContent=test sms\r\n'))
+
+    def test_send_sms_multiline(self) -> None:
+        response = '''
+[error]0
+
+'''
+
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                nonlocal check_data
+                check_data = data_str
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        client.send_sms('534324724234', 'Line one\nLine two')
+
+        self.assertEqual(check_data, ('2\r\n[LTE_SMS_SENDNEWMSG#0,0,0,0,0,0#0,0,0,0,0,0]0,3\r\nindex=1\r\n'
+                                      'to=534324724234\r\ntextContent=Line one\x12Line two\r\n'))
+
+    def test_send_sms_invalid_phone_number(self) -> None:
+        client = TPLinkMRClient('', '')
+
+        with self.assertRaises(ClientException):
+            client.send_sms('534324724234\n', 'test sms')
+
+    def test_get_sms_multiline_content(self) -> None:
+        response = '''[1,0,0,0,0,0]1
+index=1
+from=sender1
+content=Line one\x12Line two
+receivedTime=2024-11-15 22:28:09
+unread=0
+[error]0
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].content, 'Line one\nLine two')
 
     def test_send_ussd(self) -> None:
         responses = ['''[error]0

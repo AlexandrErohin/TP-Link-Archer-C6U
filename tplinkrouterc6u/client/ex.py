@@ -1,5 +1,5 @@
 from base64 import b64encode
-from json import loads
+from json import loads, dumps
 from datetime import timedelta, datetime
 from typing import List
 from logging import Logger
@@ -303,12 +303,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
         return status
 
     def send_sms(self, phone_number: str, message: str) -> None:
+        if '\r' in phone_number or '\n' in phone_number:
+            raise ClientException('phone_number must not contain newline characters')
+
         acts = [
             self.ActItem(
                 self.ActItem.SET, 'DEV2_LTE_SMS_SENDNEWMSG', attrs=[
                     '"index":"1"',
-                    f'"to":"{phone_number}"',
-                    f'"textContent":"{message}"',
+                    f'"to":{dumps(phone_number)}',
+                    f'"textContent":{dumps(message)}',
                 ]),
         ]
         self.req_act(acts)

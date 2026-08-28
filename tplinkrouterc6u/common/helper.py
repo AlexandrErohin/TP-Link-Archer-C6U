@@ -32,3 +32,11 @@ def get_value(dictionary, keys: list, default=None):
         except (KeyError, TypeError, IndexError):
             return default
     return nested_dict
+
+
+def escape_act_attr_value(value: str) -> str:
+    return value.replace('\r', '\x11').replace('\n', '\x12')
+
+
+def unescape_act_attr_value(value: str) -> str:
+    return value.replace('\x11', '\r').replace('\x12', '\n')

@@ -958,6 +958,22 @@ class TestTPLinkEXClient(TestCase):
                                       '"to":"534324724234", "textContent":"test sms"},"operation":"so",'
                                       '"oid":"DEV2_LTE_SMS_SENDNEWMSG"}'))
 
+    def test_send_sms_multiline(self) -> None:
+        check_data = ''
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                nonlocal check_data
+                check_data = data_str
+                return 200, '{}'
+
+        client = TPLinkEXClientTest('', '')
+        client.send_sms('534324724234', 'Line one\nLine two')
+
+        self.assertEqual(check_data, ('{"data":{"stack":"0,0,0,0,0,0","pstack":"0,0,0,0,0,0","index":"1", '
+                                      '"to":"534324724234", "textContent":"Line one\\nLine two"},"operation":"so",'
+                                      '"oid":"DEV2_LTE_SMS_SENDNEWMSG"}'))
+
     def test_get_sms(self) -> None:
         DEV2_LTE_SMS_RECVMSGBOX = ('{"data":{"totalNumber":"2","unreadNumber":"0","pageNumber":"0",'
                                    '"amountPerPage":"0","stack":"0,0,0,0,0,0"},"operation":"go",'

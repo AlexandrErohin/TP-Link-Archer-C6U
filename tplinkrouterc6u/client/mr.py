@@ -5,7 +5,9 @@ from urllib.parse import quote
 from requests import Session, Response
 from datetime import timedelta, datetime
 from logging import Logger
-from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac, get_value
+from tplinkrouterc6u.common.helper import (
+    get_ip, get_ipv6, get_mac, get_value, escape_act_attr_value, unescape_act_attr_value,
+)
 from tplinkrouterc6u.common.encryption import EncryptionWrapperMR, EncryptionWrapperMRGCM, EncryptionWrapperMRECC
 from json import loads as json_loads
 from tplinkrouterc6u.common.package_enum import Connection, VPN
@@ -766,12 +768,15 @@ class TPLinkMRClient(TPLinkMRClientBase):
             self._token = None
 
     def send_sms(self, phone_number: str, message: str) -> None:
+        if '\r' in phone_number or '\n' in phone_number:
+            raise ClientException('phone_number must not contain newline characters')
+
         acts = [
             self.ActItem(
                 self.ActItem.SET, 'LTE_SMS_SENDNEWMSG', attrs=[
                     'index=1',
                     'to={}'.format(phone_number),
-                    'textContent={}'.format(message),
+                    'textContent={}'.format(escape_act_attr_value(message)),
                 ]),
         ]
         self.req_act(acts)
@@ -792,7 +797,8 @@ class TPLinkMRClient(TPLinkMRClientBase):
             for item in self._to_list(values.get('1')):
                 messages.append(
                     SMS(
-                        i, item['from'], item['content'], datetime.fromisoformat(item['receivedTime']),
+                        i, item['from'], unescape_act_attr_value(item['content']),
+                        datetime.fromisoformat(item['receivedTime']),
                         item['unread'] == '1'
                     )
                 )
@@ -819,7 +825,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
             self.ActItem(
                 self.ActItem.SET, 'LTE_USSD', attrs=[
                     'action=1',
-                    f"reqContent={command}",
+                    f"reqContent={escape_act_attr_value(command)}",
                 ]),
         ]
         self.req_act(acts)
@@ -836,7 +842,7 @@ class TPLinkMRClient(TPLinkMRClientBase):
             status = values.get('ussdStatus', '2')
 
             if status == '1':
-                return values.get('response')
+                return unescape_act_attr_value(values.get('response'))
             elif status == '2':
                 raise ClientError('Cannot send USSD!')
 
