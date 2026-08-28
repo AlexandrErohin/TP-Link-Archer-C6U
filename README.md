@@ -133,6 +133,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | reboot |   | reboot router |
+| pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
+| pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | authorize |   | authorize for actions |
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
@@ -514,6 +516,7 @@ Not all fields are filled by every client:
 - TL-WDR3600 V1
 - TL-XDR3010 V2
 - TL-XDR5410 1.0
+- TL-XDR6010
 - TL-XDR6088 v1.0.30
 - VX420-G2h v1.1
 - VX800v v1

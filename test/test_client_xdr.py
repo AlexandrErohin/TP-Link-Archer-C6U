@@ -8,6 +8,7 @@ from tplinkrouterc6u import IPv4Status
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.common.dataclass import (Device, Firmware, IPv4DHCPLease,
                                               IPv4Reservation, Status)
+from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 
@@ -118,7 +119,6 @@ maximum-scale=2.0, user-scalable=yes" />
         self.assertEqual(check_payload['network']['change_wan_status']['operate'], 'disconnect')
 
     def test_pppoe_connect_raises_on_error(self) -> None:
-        from tplinkrouterc6u.common.exception import ClientException
         mock_data = json.loads('''{"error_code":-1}''')
 
         class TPLinkXDRClientTest(TPLinkXDRClient):
@@ -128,6 +128,17 @@ maximum-scale=2.0, user-scalable=yes" />
         client = TPLinkXDRClientTest('', '')
         with self.assertRaises(ClientException):
             client.pppoe_connect()
+
+    def test_pppoe_disconnect_raises_on_error(self) -> None:
+        mock_data = json.loads('''{"error_code":-1}''')
+
+        class TPLinkXDRClientTest(TPLinkXDRClient):
+            def _request(self, payload: dict) -> dict:
+                return mock_data
+
+        client = TPLinkXDRClientTest('', '')
+        with self.assertRaises(ClientException):
+            client.pppoe_disconnect()
 
     def test_get_firmware(self) -> None:
         mock_data = json.loads('''
