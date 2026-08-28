@@ -41,6 +41,18 @@ class TestTplinkVR1200vBackup(TestCase):
         with self.assertRaises(ClientException):
             client.backup_config()
 
+    def test_backup_config_raises_when_not_authorized(self) -> None:
+        firmware = Firmware('Archer VR1200v V1', 'VR1200v', '1.0.0 Build 200714 Rel.2239n')
+
+        class TplinkVR1200vRouterTest(TplinkVR1200vRouter):
+            def get_firmware(self) -> Firmware:
+                return firmware
+
+        client = TplinkVR1200vRouterTest('http://192.168.1.1', 'password')
+
+        with self.assertRaises(ClientException):
+            client.backup_config()
+
     def test_backup_config_raises_on_http_error(self) -> None:
         client = self._client(Firmware('Archer VR1200v V1', 'VR1200v', '1.0.0 Build 200714 Rel.2239n'))
 

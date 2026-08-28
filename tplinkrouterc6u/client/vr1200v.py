@@ -94,10 +94,12 @@ class TplinkVR1200vRouter(ConfigBackupMixin, TPLinkEXClient):
 
     def _backup_get(self, path: str) -> bytes:
         """Download the configuration backup using the VR1200v token auth."""
+        if self._token is None:
+            raise ClientException('Not authorized')
+
         headers = self.HEADERS.copy()
         headers['Referer'] = '{}/'.format(self.host)
-        if self._token is not None:
-            headers['TokenID'] = self._token
+        headers['TokenID'] = self._token
 
         response = self.req.get(
             '{}{}'.format(self.host, path),

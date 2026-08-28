@@ -151,6 +151,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
+| backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
