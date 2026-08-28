@@ -5,10 +5,11 @@ from hashlib import md5
 from time import sleep
 from requests import Response
 from tplinkrouterc6u.client.ex import TPLinkEXClient
+from tplinkrouterc6u.common.backup import ConfigBackupMixin
 from tplinkrouterc6u.common.exception import ClientException
 
 
-class TplinkVR1200vRouter(TPLinkEXClient):
+class TplinkVR1200vRouter(ConfigBackupMixin, TPLinkEXClient):
     def authorize(self) -> None:
         if self._token is not None and self._authorized_at >= (datetime.now() - timedelta(seconds=3)):
             return
@@ -90,3 +91,18 @@ class TplinkVR1200vRouter(TPLinkEXClient):
             return r.status_code, r.text
         else:
             return r.status_code, r.text
+
+    def _backup_get(self, path: str) -> bytes:
+        """Download the configuration backup using the VR1200v token auth."""
+        headers = self.HEADERS.copy()
+        headers['Referer'] = '{}/'.format(self.host)
+        if self._token is not None:
+            headers['TokenID'] = self._token
+
+        response = self.req.get(
+            '{}{}'.format(self.host, path),
+            headers=headers, timeout=self.timeout, verify=self._verify_ssl)
+        if response.status_code != 200:
+            raise ClientException('Backup failed, status code: {}'.format(response.status_code))
+
+        return response.content
