@@ -84,7 +84,14 @@ class TplinkC80Router(AbstractRouter):
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self._session = Session()
-        self._session.verify = TplinkC80Router._build_ssl_context(self._verify_ssl)
+        # Only HTTPS needs a custom SSL context (legacy renegotiation). Building it
+        # via create_default_context does blocking CA disk I/O that Home Assistant
+        # flags when the client is constructed on the event loop (#217). HTTP hosts
+        # never need that work.
+        if self.host.startswith('https://'):
+            self._session.verify = TplinkC80Router._build_ssl_context(self._verify_ssl)
+        elif self._verify_ssl is False:
+            self._session.verify = False
         self._encryption = EncryptionState()
         self._wifi_request = None
         self._ipv6_support = True
@@ -93,7 +100,11 @@ class TplinkC80Router(AbstractRouter):
     def _build_ssl_context(verify_ssl: bool):
         import ssl
 
-        ctx = ssl.create_default_context()
+        # Build manually instead of create_default_context(): that helper always
+        # loads system CAs from disk (load_default_certs / set_default_verify_paths),
+        # which HA detects as a blocking call on the event loop (#217). Load CAs
+        # only when certificate verification is enabled.
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         # C80 routers use OpenSSL legacy renegotiation, disabled by default on
         # Python 3.14+ (UNSAFE_LEGACY_RENEGOTIATION_DISABLED).
         if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
@@ -101,6 +112,10 @@ class TplinkC80Router(AbstractRouter):
         if verify_ssl is False:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
+        else:
+            ctx.check_hostname = True
+            ctx.verify_mode = ssl.CERT_REQUIRED
+            ctx.load_default_certs()
         return ctx
 
     def supports(self) -> bool:

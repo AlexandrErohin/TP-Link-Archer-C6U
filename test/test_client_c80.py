@@ -1,4 +1,5 @@
 from unittest import main, TestCase
+from unittest.mock import patch
 from ipaddress import IPv4Address, IPv6Address
 from macaddress import EUI48
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
@@ -816,6 +817,34 @@ class TestTplinkC80RouterSslContext(TestCase):
         ctx = TplinkC80Router._build_ssl_context(False)
         self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
         self.assertFalse(ctx.check_hostname)
+
+    def test_ssl_context_skips_loading_certs_when_verify_off(self) -> None:
+        import ssl
+
+        with patch.object(ssl.SSLContext, 'load_default_certs') as load_certs:
+            TplinkC80Router._build_ssl_context(False)
+        load_certs.assert_not_called()
+
+    def test_http_host_does_not_build_ssl_context(self) -> None:
+        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
+            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=True)
+        build_ctx.assert_not_called()
+        self.assertIs(client._session.verify, True)
+
+    def test_http_host_respects_verify_ssl_false(self) -> None:
+        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
+            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=False)
+        build_ctx.assert_not_called()
+        self.assertIs(client._session.verify, False)
+
+    def test_https_host_uses_ssl_context(self) -> None:
+        import ssl
+
+        sentinel = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        with patch.object(TplinkC80Router, '_build_ssl_context', return_value=sentinel) as build_ctx:
+            client = TplinkC80Router('https://192.168.0.1', 'password', verify_ssl=True)
+        build_ctx.assert_called_once_with(True)
+        self.assertIs(client._session.verify, sentinel)
 
 
 if __name__ == '__main__':
