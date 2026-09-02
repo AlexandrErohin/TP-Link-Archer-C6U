@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.32.1] - 2026-09-02
+
+### Fixed
+
+- **C6U / IPv4 reservations:** `get_ipv4_reservations()` treats an empty decrypted object `{}` as no reservations instead of raising `ClientError` (Archer AX73 v2 fw 1.3.1) ([#216](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/216)).
+- **C80 / SSL:** do not build an SSL context for HTTP hosts; build HTTPS contexts without `create_default_context()` so Home Assistant no longer logs blocking `load_default_certs` / `set_default_verify_paths` on client construction ([#217](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/217)).
+
 ## [5.32.0] - 2026-08-29
 
 ### Added
