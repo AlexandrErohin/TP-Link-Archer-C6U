@@ -577,10 +577,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         these payloads are model- and firmware-specific, and swapping the
         assumption would simply move the failure to whichever routers answer the
         other way.
+
+        An empty object ``{}`` is also accepted and treated as an empty list:
+        Archer AX73 v2.0 fw 1.3.1 answers the reservation load this way when no
+        reservations are configured (see issue #216).
         """
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
+            if not data:
+                return []
             value = data.get(envelope_key)
             if isinstance(value, list):
                 return value

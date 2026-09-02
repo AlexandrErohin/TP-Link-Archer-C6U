@@ -2000,6 +2000,13 @@ class TestIPv4ListEnvelope(TestCase):
         self.assertEqual(str(result[0].macaddr), '02-00-00-00-00-02')
 
     @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
+    def test_reservations_accept_empty_object(self, mock_request: Mock) -> None:
+        # AX73 v2 fw 1.3.1 returns {} when no reservations are configured (#216).
+        mock_request.return_value = {}
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        self.assertEqual(client.get_ipv4_reservations(), [])
+
+    @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
     def test_reservations_reject_unknown_shape(self, mock_request: Mock) -> None:
         # A clear error beats TypeError from three frames deeper: the message
         # names the keys actually received, which is what a bug report needs.
