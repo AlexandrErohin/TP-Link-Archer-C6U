@@ -128,6 +128,59 @@ class Status:
 
 
 @dataclass
+class MeshDevice:
+    """A node of an EasyMesh network, as reported by the main router.
+
+    The main router is the entry whose role is 'main_router'; every other entry
+    is a satellite whose parent_macaddr points at the node it uplinks through,
+    which may itself be a satellite in a multi-hop mesh.
+    """
+    _macaddr: EUI48 | None = None
+    _ipaddr: IPv4Address | None = None
+    _parent_macaddr: EUI48 | None = None
+    name: str | None = None
+    model: str | None = None
+    role: str | None = None
+    status: str | None = None
+    device_type: str | None = None
+    vendor: str | None = None
+    location: str | None = None
+    connect_type: str | None = None
+    mesh_type: str | None = None
+    client_num: int | None = None
+    signal_strength: int | None = None
+    support_reboot: bool | None = None
+
+    @property
+    def macaddr(self) -> str | None:
+        return str(self._macaddr) if self._macaddr is not None else None
+
+    @property
+    def macaddress(self) -> EUI48 | None:
+        return self._macaddr
+
+    @property
+    def ipaddr(self) -> str | None:
+        return str(self._ipaddr) if self._ipaddr is not None else None
+
+    @property
+    def ipaddress(self) -> IPv4Address | None:
+        return self._ipaddr
+
+    @property
+    def parent_macaddr(self) -> str | None:
+        return str(self._parent_macaddr) if self._parent_macaddr is not None else None
+
+    @property
+    def parent_macaddress(self) -> EUI48 | None:
+        return self._parent_macaddr
+
+    @property
+    def is_main_router(self) -> bool:
+        return self.role == 'main_router'
+
+
+@dataclass
 class IPv4Reservation:
     _macaddr: EUI48 | None = None
     _ipaddr: IPv4Address | None = None
