@@ -13,6 +13,7 @@ from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
     Device,
+    MeshDevice,
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
@@ -527,6 +528,46 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                                 + (status.iot_clients_total or 0))
 
         return status
+
+    def get_mesh_devices(self) -> list[MeshDevice]:
+        """Return the EasyMesh nodes reported by the main router.
+
+        Returns an empty list on routers that do not run EasyMesh: they answer
+        the form with an error, which is the same signal get_status() already
+        uses to stop enriching clients with ap_name.
+        """
+        if not self._easymesh:
+            return []
+
+        try:
+            data = self.request(self._url_easymesh_device_list, 'operation=read')
+        except Exception:
+            self._easymesh = False
+            return []
+
+        mesh_devices = []
+        for item in data or []:
+            mesh_device = MeshDevice()
+            mesh_device._macaddr = get_mac(item['mac']) if item.get('mac') else None
+            mesh_device._ipaddr = get_ip(item['ip']) if item.get('ip') else None
+            mesh_device._parent_macaddr = get_mac(item['parent_mac']) if item.get('parent_mac') else None
+            mesh_device.name = item.get('name')
+            mesh_device.model = item.get('model')
+            mesh_device.role = item.get('role')
+            mesh_device.status = item.get('status')
+            mesh_device.device_type = item.get('device_type')
+            mesh_device.vendor = item.get('vendor')
+            mesh_device.location = item.get('location')
+            mesh_device.connect_type = item.get('connect_type')
+            mesh_device.mesh_type = item.get('mesh_type')
+            mesh_device.client_num = int(item['client_num']) if item.get('client_num') is not None else None
+            # 1..3 bar level of the uplink, not a dBm value. Absent on the main router.
+            mesh_device.signal_strength = (
+                int(item['signal_strength']) if item.get('signal_strength') is not None else None)
+            mesh_device.support_reboot = item.get('support_reboot')
+            mesh_devices.append(mesh_device)
+
+        return mesh_devices
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
