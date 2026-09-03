@@ -16,6 +16,62 @@ class Firmware:
 
 
 @dataclass
+class MeshNode:
+    """One unit of a mesh system (e.g. a TP-Link Deco).
+
+    The master is the unit the client talks to; every other unit is a slave
+    reached over the backhaul. Signal and rate fields describe that backhaul
+    link and are therefore ``None`` on the master, which has no uplink.
+    """
+
+    _macaddr: EUI48
+    nickname: str
+    role: str
+    model: str
+    _ipaddr: IPv4Address | None = None
+    hardware_version: str | None = None
+    firmware_version: str | None = None
+    internet_status: str | None = None
+    group_status: str | None = None
+    signal_2g: int | None = None
+    signal_5g: int | None = None
+    rx_rate_2g: int | None = None
+    rx_rate_5g: int | None = None
+    tx_rate_2g: int | None = None
+    tx_rate_5g: int | None = None
+    _parent_macaddr: EUI48 | None = None
+    wired_ports: int | None = None
+
+    @property
+    def is_master(self) -> bool:
+        return self.role == 'master'
+
+    @property
+    def macaddr(self) -> str:
+        return str(self._macaddr)
+
+    @property
+    def macaddress(self) -> EUI48:
+        return self._macaddr
+
+    @property
+    def ipaddr(self) -> str | None:
+        return str(self._ipaddr) if self._ipaddr is not None else None
+
+    @property
+    def ipaddress(self) -> IPv4Address | None:
+        return self._ipaddr
+
+    @property
+    def parent_macaddr(self) -> str | None:
+        return str(self._parent_macaddr) if self._parent_macaddr is not None else None
+
+    @property
+    def parent_macaddress(self) -> EUI48 | None:
+        return self._parent_macaddr
+
+
+@dataclass
 class Device:
     type: Connection
     _macaddr: EUI48
