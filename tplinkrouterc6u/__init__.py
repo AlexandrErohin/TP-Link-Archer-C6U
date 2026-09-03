@@ -28,6 +28,7 @@ from tplinkrouterc6u.provider import TplinkRouterProvider
 from tplinkrouterc6u.common.package_enum import Connection, VPN, VpnClientServerProtocol
 from tplinkrouterc6u.common.dataclass import (
     Firmware,
+    MeshNode,
     Status,
     Device,
     IPv4Reservation,
