@@ -1120,7 +1120,7 @@ class TestTPLinkClient(TestCase):
         client.get_status()
         self.assertFalse(any('easymesh_network' in path for path in requested))
 
-    def test_get_mesh_devices(self) -> None:
+    def test_get_mesh_nodes(self) -> None:
         """EasyMesh node list on BE-series firmware: adds signal_strength and support_reboot."""
         response = """
 {
@@ -1202,11 +1202,11 @@ class TestTPLinkClient(TestCase):
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
-        mesh_devices = client.get_mesh_devices()
+        mesh_nodes = client.get_mesh_nodes()
 
-        self.assertEqual(len(mesh_devices), 4)
+        self.assertEqual(len(mesh_nodes), 4)
 
-        main_router = mesh_devices[0]
+        main_router = mesh_nodes[0]
         self.assertTrue(main_router.is_main_router)
         self.assertEqual(main_router.role, 'main_router')
         self.assertEqual(main_router.macaddr, '24-00-00-00-00-01')
@@ -1225,33 +1225,33 @@ class TestTPLinkClient(TestCase):
         self.assertIsNone(main_router.parent_macaddress)
         self.assertIsNone(main_router.connect_type)
         self.assertIsNone(main_router.mesh_type)
-        self.assertIsNone(main_router.signal_strength)
+        self.assertIsNone(main_router.signal_level)
         self.assertIsNone(main_router.support_reboot)
 
-        satellite = mesh_devices[1]
+        satellite = mesh_nodes[1]
         self.assertFalse(satellite.is_main_router)
         self.assertEqual(satellite.role, 'satellite_router')
         self.assertEqual(satellite.parent_macaddr, '24-00-00-00-00-01')
         self.assertIsInstance(satellite.parent_macaddress, EUI48)
         self.assertEqual(satellite.connect_type, 'wireless')
         self.assertEqual(satellite.mesh_type, 'easymesh')
-        self.assertEqual(satellite.signal_strength, 2)
+        self.assertEqual(satellite.signal_level, 2)
         self.assertTrue(satellite.support_reboot)
         self.assertEqual(satellite.client_num, 8)
         self.assertEqual(satellite.device_type, 'WirelessRouter')
 
         # Multi-hop: this node uplinks through another satellite, not the main router
-        self.assertEqual(mesh_devices[2].parent_macaddr, '24-00-00-00-00-02')
-        self.assertEqual(mesh_devices[2].device_type, 'RangeExtender')
+        self.assertEqual(mesh_nodes[2].parent_macaddr, '24-00-00-00-00-02')
+        self.assertEqual(mesh_nodes[2].device_type, 'RangeExtender')
 
-        wired = mesh_devices[3]
+        wired = mesh_nodes[3]
         self.assertEqual(wired.connect_type, 'wire')
         self.assertEqual(wired.status, 'disconnected')
         self.assertFalse(wired.support_reboot)
         # location is optional and absent for this node
         self.assertIsNone(wired.location)
 
-    def test_get_mesh_devices_returns_empty_when_unsupported(self) -> None:
+    def test_get_mesh_nodes_returns_empty_when_unsupported(self) -> None:
         router_class = self.router_class
 
         class TPLinkRouterTest(router_class):
@@ -1261,12 +1261,12 @@ class TestTPLinkClient(TestCase):
 
         client = TPLinkRouterTest('', '')
 
-        self.assertEqual(client.get_mesh_devices(), [])
+        self.assertEqual(client.get_mesh_nodes(), [])
         self.assertFalse(client._easymesh)
         # Once the flag is cleared the form is not requested again
-        self.assertEqual(client.get_mesh_devices(), [])
+        self.assertEqual(client.get_mesh_nodes(), [])
 
-    def test_get_mesh_devices_empty_response(self) -> None:
+    def test_get_mesh_nodes_empty_response(self) -> None:
         router_class = self.router_class
         easymesh_device_list_path = self.easymesh_device_list_path
 
@@ -1279,7 +1279,7 @@ class TestTPLinkClient(TestCase):
 
         client = TPLinkRouterTest('', '')
 
-        self.assertEqual(client.get_mesh_devices(), [])
+        self.assertEqual(client.get_mesh_nodes(), [])
         self.assertTrue(client._easymesh)
 
     def test_get_status_with_perf_request(self) -> None:

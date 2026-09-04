@@ -128,7 +128,7 @@ class Status:
 
 
 @dataclass
-class MeshDevice:
+class MeshNode:
     """A node of an EasyMesh network, as reported by the main router.
 
     The main router is the entry whose role is 'main_router'; every other entry
@@ -148,7 +148,7 @@ class MeshDevice:
     connect_type: str | None = None
     mesh_type: str | None = None
     client_num: int | None = None
-    signal_strength: int | None = None
+    signal_level: int | None = None
     support_reboot: bool | None = None
 
     @property

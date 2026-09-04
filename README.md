@@ -85,7 +85,7 @@ try:
 
     # Get EasyMesh nodes (empty list when the router runs no mesh)
     try:
-        for node in router.get_mesh_devices():
+        for node in router.get_mesh_nodes():
             print(f"{node.name:24} {node.model:16} {node.macaddr} {node.ipaddr:16s} "
                   f"{node.role:16} clients={node.client_num}")
     except NotImplementedError:
@@ -135,7 +135,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_status |   | Gets status about the router info including wifi statuses and connected devices info | [Status](#status) |
 | get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
-| get_mesh_devices |   | Gets the EasyMesh nodes reported by the main router. Returns an empty list on routers without EasyMesh; clients that do not implement it raise `NotImplementedError` | [[MeshDevice]](#MeshDevice) |
+| get_mesh_nodes |   | Gets the EasyMesh nodes reported by the main router. Returns an empty list on routers without EasyMesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
@@ -230,12 +230,16 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | ssid | ssid | str |
 | frequency | frequency | str |
 
-### <a id="MeshDevice">MeshDevice</a>
+### <a id="MeshNode">MeshNode</a>
 One node of an EasyMesh network. The node whose `role` is `main_router` is the router itself; every
 other node is a satellite whose `parent_macaddr` points at the node it uplinks through - that parent
 may be another satellite in a multi-hop mesh. Fields absent from the router's answer stay `None`:
-the main router reports no uplink, and `signal_strength` / `support_reboot` are only sent by newer
+the main router reports no uplink, and the bar level / `support_reboot` are only sent by newer
 firmware (seen on BE series, absent on AX series).
+
+`signal_level` carries the 1 to 3 bar level of the uplink. Quality expressed in dBm belongs in
+`signal_strength`, which this form does not report, so a caller never has to guess which unit a
+field holds.
 
 | Field | Description | Type |
 |---|---|---|
@@ -256,7 +260,7 @@ firmware (seen on BE series, absent on AX series).
 | connect_type | uplink type - `wire` or `wireless` | str, None |
 | mesh_type | mesh flavour, like - easymesh | str, None |
 | client_num | amount of clients connected to this node | int, None |
-| signal_strength | uplink quality as a 1 to 3 bar level, not a dBm value | int, None |
+| signal_level | uplink quality as a 1 to 3 bar level, not a dBm value | int, None |
 | support_reboot | Can this node be rebooted from the main router | bool, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
