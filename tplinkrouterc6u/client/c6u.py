@@ -13,7 +13,7 @@ from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
     Device,
-    MeshDevice,
+    MeshNode,
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
@@ -529,7 +529,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return status
 
-    def get_mesh_devices(self) -> list[MeshDevice]:
+    def get_mesh_nodes(self) -> list[MeshNode]:
         """Return the EasyMesh nodes reported by the main router.
 
         Returns an empty list on routers that do not run EasyMesh: they answer
@@ -545,29 +545,31 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             self._easymesh = False
             return []
 
-        mesh_devices = []
+        mesh_nodes = []
         for item in data or []:
-            mesh_device = MeshDevice()
-            mesh_device._macaddr = get_mac(item['mac']) if item.get('mac') else None
-            mesh_device._ipaddr = get_ip(item['ip']) if item.get('ip') else None
-            mesh_device._parent_macaddr = get_mac(item['parent_mac']) if item.get('parent_mac') else None
-            mesh_device.name = item.get('name')
-            mesh_device.model = item.get('model')
-            mesh_device.role = item.get('role')
-            mesh_device.status = item.get('status')
-            mesh_device.device_type = item.get('device_type')
-            mesh_device.vendor = item.get('vendor')
-            mesh_device.location = item.get('location')
-            mesh_device.connect_type = item.get('connect_type')
-            mesh_device.mesh_type = item.get('mesh_type')
-            mesh_device.client_num = int(item['client_num']) if item.get('client_num') is not None else None
-            # 1..3 bar level of the uplink, not a dBm value. Absent on the main router.
-            mesh_device.signal_strength = (
+            mesh_node = MeshNode()
+            mesh_node._macaddr = get_mac(item['mac']) if item.get('mac') else None
+            mesh_node._ipaddr = get_ip(item['ip']) if item.get('ip') else None
+            mesh_node._parent_macaddr = get_mac(item['parent_mac']) if item.get('parent_mac') else None
+            mesh_node.name = item.get('name')
+            mesh_node.model = item.get('model')
+            mesh_node.role = item.get('role')
+            mesh_node.status = item.get('status')
+            mesh_node.device_type = item.get('device_type')
+            mesh_node.vendor = item.get('vendor')
+            mesh_node.location = item.get('location')
+            mesh_node.connect_type = item.get('connect_type')
+            mesh_node.mesh_type = item.get('mesh_type')
+            mesh_node.client_num = int(item['client_num']) if item.get('client_num') is not None else None
+            # The payload key is signal_strength but the value is a 1..3 bar level, so it
+            # lands in signal_level; signal_strength stays reserved for dBm. Absent on the
+            # main router, which has no uplink of its own.
+            mesh_node.signal_level = (
                 int(item['signal_strength']) if item.get('signal_strength') is not None else None)
-            mesh_device.support_reboot = item.get('support_reboot')
-            mesh_devices.append(mesh_device)
+            mesh_node.support_reboot = item.get('support_reboot')
+            mesh_nodes.append(mesh_node)
 
-        return mesh_devices
+        return mesh_nodes
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()

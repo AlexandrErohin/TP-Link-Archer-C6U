@@ -1,7 +1,7 @@
 from requests.packages import urllib3
 from logging import Logger
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, MeshDevice
+from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, MeshNode
 from abc import ABC, abstractmethod
 
 
@@ -47,9 +47,9 @@ class AbstractRouter(ABC):
         raise NotImplementedError(
             '{} does not support get_ipv6_status'.format(type(self).__name__))
 
-    def get_mesh_devices(self) -> list[MeshDevice]:
+    def get_mesh_nodes(self) -> list[MeshNode]:
         raise NotImplementedError(
-            '{} does not support get_mesh_devices'.format(type(self).__name__))
+            '{} does not support get_mesh_nodes'.format(type(self).__name__))
 
     @abstractmethod
     def reboot(self) -> None:
