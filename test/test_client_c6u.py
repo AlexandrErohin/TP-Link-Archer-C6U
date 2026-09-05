@@ -12,6 +12,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     IPv6Status,
     Device,
+    MeshNode,
     ClientException,
     VPN,
     WifiStatus,
@@ -1250,6 +1251,13 @@ class TestTPLinkClient(TestCase):
         self.assertFalse(wired.support_reboot)
         # location is optional and absent for this node
         self.assertIsNone(wired.location)
+
+    def test_mesh_node_is_main_router_accepts_both_role_vocabularies(self) -> None:
+        """One predicate serves every family: EasyMesh says main_router, Deco says master."""
+        self.assertTrue(MeshNode(role='main_router').is_main_router)
+        self.assertTrue(MeshNode(role='master').is_main_router)
+        self.assertFalse(MeshNode(role='satellite_router').is_main_router)
+        self.assertFalse(MeshNode().is_main_router)
 
     def test_get_mesh_nodes_returns_empty_when_unsupported(self) -> None:
         router_class = self.router_class

@@ -177,7 +177,9 @@ class MeshNode:
 
     @property
     def is_main_router(self) -> bool:
-        return self.role == 'main_router'
+        # Both role vocabularies are accepted so one predicate serves every mesh
+        # family: EasyMesh names the head node 'main_router', Deco 'master'.
+        return self.role in ('main_router', 'master')
 
 
 @dataclass
