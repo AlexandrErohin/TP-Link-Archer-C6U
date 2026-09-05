@@ -129,6 +129,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation |   |
+| delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
