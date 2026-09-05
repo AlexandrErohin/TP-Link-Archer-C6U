@@ -622,6 +622,25 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         })
         self.request(path, urlencode({'operation': 'insert', 'new': new}))
 
+    def delete_ipv4_reservation(self, macaddr: str) -> None:
+        """Delete an IPv4 DHCP address reservation.
+
+        macaddr may be given in any common format (colon/dash, upper/lower);
+        it is normalised to the dash-uppercase form the router stores.
+        """
+        raw = self.request(self._url_ipv4_reservations, 'operation=load')
+        items = self._as_list(raw, 'list', 'IPv4 reservation')
+        normalized_mac = str(get_mac(macaddr))
+        target_idx = next(
+            (i for i, item in enumerate(items) if str(get_mac(item.get('mac', ''))) == normalized_mac),
+            None,
+        )
+        if target_idx is None:
+            raise ClientException('Reservation not found for MAC: {}'.format(macaddr))
+
+        path = self._url_ipv4_reservations.split('&operation=')[0]
+        self.request(path, urlencode({'operation': 'remove', 'key': normalized_mac, 'index': target_idx}))
+
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []
         data = self.request(self._url_ipv4_dhcp_leases, 'operation=load')
