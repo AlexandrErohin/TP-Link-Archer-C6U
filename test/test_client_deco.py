@@ -800,6 +800,14 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(result.lan_ipv4_ipaddr, '192.168.68.1')
         self.assertEqual(result.lan_ipv4_netmask, '255.255.255.0')
 
+    def test_get_mesh_nodes_not_supported(self) -> None:
+        client = TPLinkDecoClient('', '')
+
+        with self.assertRaises(NotImplementedError) as context:
+            client.get_mesh_nodes()
+
+        self.assertIn('does not support get_mesh_nodes', str(context.exception))
+
 
 if __name__ == '__main__':
     main()
