@@ -3,6 +3,7 @@ from urllib import parse
 from collections import defaultdict
 import re
 import requests
+from base64 import b64decode
 from urllib.parse import urlparse
 from requests import Session
 from tplinkrouterc6u.common.helper import get_ip, get_ipv6, get_mac
@@ -516,8 +517,26 @@ class TplinkC80Router(AbstractRouter):
         sign = self._get_signature(len(data))
         return f'sign={sign}\r\ndata={data}'
 
+    @staticmethod
+    def _is_valid_base64(s: str) -> bool:
+        if len(s) % 4 != 0:
+            return False
+        if re.fullmatch(r'[A-Za-z0-9+/]*={0,2}', s) is None:
+            return False
+        try:
+            b64decode(s, validate=True)
+            return True
+        except Exception:
+            return False
+
     def _decrypt_data(self, encrypted_text: str) -> str:
         if isinstance(encrypted_text, str) and encrypted_text.startswith('00000\r\n'):
+            return encrypted_text
+        # A plain-text reply that starts with the OK marker but carries no
+        # base64 payload (e.g. a bare "00000") must not be fed to b64decode
+        # (observed on TL-WR844N, issue #59).
+        if (isinstance(encrypted_text, str) and encrypted_text.startswith('00000')
+                and not self._is_valid_base64(encrypted_text)):
             return encrypted_text
         return self._encryption.aes.aes_decrypt(encrypted_text)
 

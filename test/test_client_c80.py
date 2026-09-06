@@ -847,5 +847,24 @@ class TestTplinkC80RouterSslContext(TestCase):
         self.assertIs(client._session.verify, sentinel)
 
 
+class TestTplinkC80RouterDecryptData(TestCase):
+
+    def test_plain_text_with_crlf_is_returned(self) -> None:
+        client = TplinkC80Router('http://192.168.0.1', 'password')
+        text = '00000\r\nid 0|1,0,0\r\nmodelName TL-WR844N'
+        self.assertEqual(client._decrypt_data(text), text)
+
+    def test_bare_ok_marker_is_not_fed_to_base64(self) -> None:
+        """TL-WR844N can answer with a bare '00000' (no CRLF, not base64);
+        it must be returned as-is instead of crashing on b64decode (#59)."""
+        client = TplinkC80Router('http://192.168.0.1', 'password')
+        self.assertEqual(client._decrypt_data('00000'), '00000')
+
+    def test_valid_base64_is_still_decrypted(self) -> None:
+        client = TplinkC80Router('http://192.168.0.1', 'password')
+        encrypted = client._encryption.aes.aes_encrypt('hello world')
+        self.assertEqual(client._decrypt_data(encrypted), 'hello world')
+
+
 if __name__ == '__main__':
     main()
