@@ -101,6 +101,7 @@ class TPLinkMRClientBase(AbstractRouter):
         self._ee = None
         self._seq = None
         self._ipv6_support = True
+        self._wan_eth_support = True
         self._url_rsa_key = 'cgi/getParm'
 
         self._encryption = EncryptionWrapperMR()
@@ -267,6 +268,26 @@ class TPLinkMRClientBase(AbstractRouter):
             except Exception:
                 self._ipv6_support = False
 
+        # E-WAN connect status (for DHCP release/renew)
+        # Probe once and disable if not supported by router.
+        if self._wan_eth_support:
+            try:
+                wan_eth_acts = [
+                    self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
+                        attrs=['enable', 'connectionStatus', 'X_TP_IfName'])
+                ]
+                _, wan_eth_values = self.req_act(wan_eth_acts)
+                if wan_eth_values:
+                    for item in self._to_list(wan_eth_values):
+                        if not bool(int(item.get('enable'))) and wan_eth_values.__class__ == list:
+                            continue
+                        if 'eth' in item.get('X_TP_IfName', ''):
+                            status.ewan_connected = item.get('connectionStatus') == 'Connected'
+                else:
+                    self._wan_eth_support = False
+            except Exception:
+                self._wan_eth_support = False
+        
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
@@ -404,6 +425,23 @@ class TPLinkMRClientBase(AbstractRouter):
             self.ActItem(self.ActItem.SET, vpn.value, attrs=['enable={}'.format(int(enable))])
         ]
 
+        self.req_act(acts)
+
+    def set_ewan_connect(self, enable: bool) -> None:
+        # Find interface number of Ethernet uplink
+        acts = [
+            self.ActItem(self.ActItem.GL, 'WAN_COMMON_INTF_CFG', attrs=['WANAccessType'])
+        ]
+        _, values = self.req_act(acts)
+        i = 0
+        for intf in self._to_list(values):
+            i += 1
+            if intf.get('WANAccessType').lower() == 'ethernet':
+                break
+        dhcp_command = 'ACT_DHCP_RENEW' if enable else 'ACT_DHCP_RELEASE'
+        acts = [
+            self.ActItem(self.ActItem.OP, dhcp_command, '{},1,1,0,0,0'.format(i))
+        ]
         self.req_act(acts)
 
     @staticmethod
