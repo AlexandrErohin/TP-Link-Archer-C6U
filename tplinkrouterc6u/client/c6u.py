@@ -626,20 +626,35 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         """Delete an IPv4 DHCP address reservation.
 
         macaddr may be given in any common format (colon/dash, upper/lower);
-        it is normalised to the dash-uppercase form the router stores.
+        matching is done after normalising to dash-uppercase. The remove
+        payload uses the MAC string and list index returned by the router
+        (LuCI expects both ``key`` and ``index``).
+
+        The list is loaded then removed in two requests; if the reservation
+        table changes between them, the wrong row could be targeted.
         """
         raw = self.request(self._url_ipv4_reservations, 'operation=load')
         items = self._as_list(raw, 'list', 'IPv4 reservation')
         normalized_mac = str(get_mac(macaddr))
-        target_idx = next(
-            (i for i, item in enumerate(items) if str(get_mac(item.get('mac', ''))) == normalized_mac),
-            None,
-        )
+        target_idx = None
+        target_mac = None
+        for i, item in enumerate(items):
+            mac = item.get('mac')
+            if not mac:
+                continue
+            if str(get_mac(mac)) == normalized_mac:
+                target_idx = i
+                target_mac = mac
+                break
         if target_idx is None:
             raise ClientException('Reservation not found for MAC: {}'.format(macaddr))
 
         path = self._url_ipv4_reservations.split('&operation=')[0]
-        self.request(path, urlencode({'operation': 'remove', 'key': normalized_mac, 'index': target_idx}))
+        self.request(path, urlencode({
+            'operation': 'remove',
+            'key': target_mac,
+            'index': target_idx,
+        }))
 
     def get_ipv4_dhcp_leases(self) -> [IPv4DHCPLease]:
         dhcp_leases = []

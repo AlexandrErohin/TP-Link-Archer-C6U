@@ -1278,12 +1278,13 @@ class TestTPLinkClient(TestCase):
                 if 'operation=load' in path or (data and 'operation=load' in data):
                     return [
                         {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
-                        {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+                        # Router may store a non-dash form; remove key must echo that string.
+                        {'mac': 'aa:bb:cc:dd:ee:ff', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
                     ]
                 return None
 
         client = TPLinkRouterTest('', '')
-        client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff')
+        client.delete_ipv4_reservation('AA-BB-CC-DD-EE-FF')
 
         self.assertEqual(len(calls), 2)
         load_path, load_data = calls[0]
@@ -1292,6 +1293,33 @@ class TestTPLinkClient(TestCase):
         del_path, del_data = calls[1]
         self.assertEqual(del_path, 'admin/dhcps?form=reservation')
         body = dict(parse_qsl(del_data))
+        self.assertEqual(body['operation'], 'remove')
+        self.assertEqual(body['key'], 'aa:bb:cc:dd:ee:ff')
+        self.assertEqual(body['index'], '1')
+
+    def test_delete_ipv4_reservation_list_envelope(self) -> None:
+        """Some firmwares wrap the reservation load as {"list": [...]} (BE805)."""
+        calls = []
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                calls.append((path, data))
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return {
+                        'list': [
+                            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
+                            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+                        ]
+                    }
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff')
+
+        self.assertEqual(len(calls), 2)
+        body = dict(parse_qsl(calls[1][1]))
         self.assertEqual(body['operation'], 'remove')
         self.assertEqual(body['key'], 'AA-BB-CC-DD-EE-FF')
         self.assertEqual(body['index'], '1')
