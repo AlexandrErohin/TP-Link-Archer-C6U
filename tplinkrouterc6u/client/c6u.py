@@ -262,7 +262,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpn_client_enable = 'admin/vpn?form=enable'
         self._url_vpn_client_server = 'admin/vpn?form=server'
         self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
-        self._url_ipv4_dhcps = 'admin/dhcps?form=setting'
+        self._url_ipv4_dhcps = 'admin/dhcps?form=setting&operation=read'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -864,6 +864,7 @@ class TplinkRouter(TplinkEncryption, TplinkRouterJson):
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
+        self._url_ipv4_dhcps = 'admin/dhcps?form=setting'
 
 
 class TplinkRouterV1_11(TplinkRouterJson):
