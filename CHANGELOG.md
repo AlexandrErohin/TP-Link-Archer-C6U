@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.33.0] - 2026-09-08
+
+### Added
+
+- **MR / VR:** `set_ewan_connect(enable)` for Ethernet WAN DHCP renew/release; `Status.ewan_connected` from the main `WAN_IP_CONN` status fields (`connectionStatus`, `X_TP_IfName`) ([#224](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/224)).
+- **C6U / SG:** `delete_ipv4_reservation(macaddr)` removes a DHCP reservation by MAC (`operation=remove` with router `key` + list `index`); complements `add_ipv4_reservation` ([#220](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/220)).
+
 ## [5.32.1] - 2026-09-02
 
 ### Fixed
