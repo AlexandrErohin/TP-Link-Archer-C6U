@@ -5,7 +5,7 @@ from collections.abc import Callable
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus
+from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus, MeshNode
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 
@@ -62,6 +62,54 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                                 item.get('software_ver', ''))
 
         return firmware
+
+    def get_mesh_nodes(self) -> list[MeshNode]:
+        """Return every unit of the mesh, master included.
+
+        Reuses the device list ``get_firmware()`` already fetches, which until
+        now kept only the master's firmware and discarded the rest.
+        """
+        if not self.devices:
+            self.get_firmware()
+
+        nodes = []
+        for item in self.devices:
+            signal = item.get('signal_strength') or {}
+            rx = item.get('rx_rate_list') or {}
+            tx = item.get('tx_rate_list') or {}
+            ip = item.get('device_ip')
+            parent = item.get('previous')
+
+            nodes.append(MeshNode(
+                _macaddr=get_mac(item.get('mac')),
+                nickname=item.get('nickname', ''),
+                role=item.get('role', ''),
+                model=item.get('device_model', ''),
+                _ipaddr=get_ip(ip) if ip else None,
+                hardware_version=item.get('hardware_ver'),
+                firmware_version=item.get('software_ver'),
+                internet_status=item.get('inet_status'),
+                group_status=item.get('group_status'),
+                signal_2g=self._to_int(signal.get('band2_4')),
+                signal_5g=self._to_int(signal.get('band5')),
+                rx_rate_2g=self._to_int(rx.get('band2_4')),
+                rx_rate_5g=self._to_int(rx.get('band5')),
+                tx_rate_2g=self._to_int(tx.get('band2_4')),
+                tx_rate_5g=self._to_int(tx.get('band5')),
+                # A master reports an empty 'previous'; only slaves have a parent.
+                _parent_macaddr=get_mac(parent) if parent else None,
+                wired_ports=self._to_int(item.get('port_count')),
+            ))
+
+        return nodes
+
+    @staticmethod
+    def _to_int(value) -> int | None:
+        """The firmware mixes ints and numeric strings across these fields."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def get_status(self) -> Status:
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
