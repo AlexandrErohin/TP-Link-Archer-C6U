@@ -5,7 +5,7 @@ from collections import defaultdict
 import re
 import requests
 from requests import Session
-from tplinkrouterc6u.common.helper import get_ip, get_mac
+from tplinkrouterc6u.common.helper import get_ip, get_mac, is_valid_base64
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
@@ -371,6 +371,13 @@ class TplinkRE330Router(AbstractRouter):
         return f'sign={sign}\r\ndata={data}'
 
     def _decrypt_data(self, encrypted_text: str) -> str:
+        # A plain-text reply starts with the 0000 OK/error marker, e.g.
+        # "00000\r\n..." (data) or "00006\r\n" (error code, observed on
+        # TL-WR844N, issue #59). Such replies carry no base64 payload and must
+        # not be fed to b64decode; anything else is encrypted ciphertext.
+        if isinstance(encrypted_text, str) and encrypted_text.startswith('0000'):
+            if not is_valid_base64(encrypted_text):
+                return encrypted_text
         return self._encryption.aes.aes_decrypt(encrypted_text)
 
     def _extract_value(self, response_list, prefix):

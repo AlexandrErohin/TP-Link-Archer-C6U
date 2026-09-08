@@ -1,5 +1,20 @@
 from ipaddress import IPv4Address, IPv6Address, AddressValueError
 from macaddress import EUI48
+import re
+from base64 import b64decode
+
+
+def is_valid_base64(s: str) -> bool:
+    """Return True if s is a syntactically valid base64 string."""
+    if len(s) % 4 != 0:
+        return False
+    if re.fullmatch(r'[A-Za-z0-9+/]*={0,2}', s) is None:
+        return False
+    try:
+        b64decode(s, validate=True)
+        return True
+    except Exception:
+        return False
 
 
 def get_ip(ip: str) -> IPv4Address:

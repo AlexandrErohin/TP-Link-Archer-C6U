@@ -860,6 +860,13 @@ class TestTplinkC80RouterDecryptData(TestCase):
         client = TplinkC80Router('http://192.168.0.1', 'password')
         self.assertEqual(client._decrypt_data('00000'), '00000')
 
+    def test_error_code_marker_is_not_fed_to_base64(self) -> None:
+        """The real TL-WR844N answer for get_firmware is '00006\\r\\n'
+        (0000 OK/error marker + error code). It must be returned as-is
+        instead of crashing on b64decode (#59)."""
+        client = TplinkC80Router('http://192.168.0.1', 'password')
+        self.assertEqual(client._decrypt_data('00006\r\n'), '00006\r\n')
+
     def test_valid_base64_is_still_decrypted(self) -> None:
         client = TplinkC80Router('http://192.168.0.1', 'password')
         encrypted = client._encryption.aes.aes_encrypt('hello world')
