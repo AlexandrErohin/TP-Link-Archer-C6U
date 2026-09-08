@@ -1414,6 +1414,169 @@ X_TP_ExternalIPv6Address=2401:0005:1000::48
         self.assertTrue(status.wan_ipv6_enabled)
         self.assertEqual(status.wan_ipv6_addr, '2401:5:1000::48')
 
+    def test_get_status_ewan_connected(self) -> None:
+        """Ethernet WAN connectionStatus/X_TP_IfName come from the main WAN_IP_CONN act.
+
+        Shape after VR1600v / VR400 captures attached to PR #224.
+        """
+        response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[2,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.30.55
+defaultGateway=192.168.30.1
+name=ipoe_1_d
+connectionStatus=Connected
+X_TP_IfName=eth1.0
+[3,1,1,0,0,0]1
+enable=0
+MACAddress=
+externalIPAddress=0.0.0.0
+defaultGateway=0.0.0.0
+name=LTE
+connectionStatus=Disconnected
+X_TP_IfName=lte0
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(status.ewan_connected)
+        self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
+        self.assertEqual(status.conn_type, 'ipoe_1_d')
+
+    def test_get_status_ewan_disconnected(self) -> None:
+        response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[2,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=0.0.0.0
+defaultGateway=0.0.0.0
+name=ipoe_1_d
+connectionStatus=Disconnected
+X_TP_IfName=eth0.5.0
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertFalse(status.ewan_connected)
+
+    def test_get_status_ewan_none_without_eth_ifname(self) -> None:
+        response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=a0:28:84:de:dd:5c
+IPInterfaceIPAddress=192.168.4.1
+[1,1,1,0,0,0]1
+enable=1
+MACAddress=bf:75:44:4c:dc:9e
+externalIPAddress=192.168.30.55
+defaultGateway=192.168.30.1
+name=ipoe_1_d
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=0
+name=wlan1
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertIsNone(status.ewan_connected)
+
+    def test_set_ewan_connect_renew(self) -> None:
+        wan_common_response = '''[1,0,0,0,0,0]0
+WANAccessType=DSL
+[2,0,0,0,0,0]0
+WANAccessType=Ethernet
+[3,0,0,0,0,0]0
+WANAccessType=USB_3G
+[error]0
+
+'''
+        op_response = '''
+[error]0
+
+'''
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                nonlocal check_data
+                if data_str and 'WAN_COMMON_INTF_CFG' in data_str:
+                    return 200, wan_common_response
+                check_data = data_str
+                return 200, op_response
+
+        client = TPLinkMRClientTest('', '')
+        client.set_ewan_connect(True)
+
+        self.assertEqual(check_data, '7\r\n[ACT_DHCP_RENEW#2,1,1,0,0,0#0,0,0,0,0,0]0,0\r\n\r\n')
+
+    def test_set_ewan_connect_release(self) -> None:
+        wan_common_response = '''[1,0,0,0,0,0]0
+WANAccessType=DSL
+[2,0,0,0,0,0]0
+WANAccessType=Ethernet
+[3,0,0,0,0,0]0
+WANAccessType=USB_3G
+[error]0
+
+'''
+        op_response = '''
+[error]0
+
+'''
+        check_data = ''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                nonlocal check_data
+                if data_str and 'WAN_COMMON_INTF_CFG' in data_str:
+                    return 200, wan_common_response
+                check_data = data_str
+                return 200, op_response
+
+        client = TPLinkMRClientTest('', '')
+        client.set_ewan_connect(False)
+
+        self.assertEqual(check_data, '7\r\n[ACT_DHCP_RELEASE#2,1,1,0,0,0#0,0,0,0,0,0]0,0\r\n\r\n')
+
 
 if __name__ == '__main__':
     main()

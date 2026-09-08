@@ -101,7 +101,6 @@ class TPLinkMRClientBase(AbstractRouter):
         self._ee = None
         self._seq = None
         self._ipv6_support = True
-        self._wan_eth_support = True
         self._url_rsa_key = 'cgi/getParm'
 
         self._encryption = EncryptionWrapperMR()
@@ -158,7 +157,8 @@ class TPLinkMRClientBase(AbstractRouter):
         acts = [
             self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
             self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name']),
+                         attrs=['enable', 'MACAddress', 'externalIPAddress', 'defaultGateway', 'name',
+                                'connectionStatus', 'X_TP_IfName']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN', attrs=['enable', 'X_TP_Band']),
             self.ActItem(self.ActItem.GL, 'LAN_WLAN_GUESTNET', attrs=['enable', 'name']),
             self.ActItem(self.ActItem.GL, 'LAN_HOST_ENTRY', attrs=[
@@ -189,6 +189,8 @@ class TPLinkMRClientBase(AbstractRouter):
             status._wan_ipv4_addr = get_ip(item['externalIPAddress'])
             status._wan_ipv4_gateway = get_ip(item['defaultGateway'])
             status.conn_type = item.get('name', '')
+            if 'eth' in item.get('X_TP_IfName', ''):
+                status.ewan_connected = item.get('connectionStatus') == 'Connected'
 
         if values['2'].__class__ != list:
             status.wifi_2g_enable = bool(int(values['2']['enable']))
@@ -268,26 +270,6 @@ class TPLinkMRClientBase(AbstractRouter):
             except Exception:
                 self._ipv6_support = False
 
-        # E-WAN connect status (for DHCP release/renew)
-        # Probe once and disable if not supported by router.
-        if self._wan_eth_support:
-            try:
-                wan_eth_acts = [
-                    self.ActItem(self.ActItem.GS, 'WAN_IP_CONN',
-                        attrs=['enable', 'connectionStatus', 'X_TP_IfName'])
-                ]
-                _, wan_eth_values = self.req_act(wan_eth_acts)
-                if wan_eth_values:
-                    for item in self._to_list(wan_eth_values):
-                        if not bool(int(item.get('enable'))) and wan_eth_values.__class__ == list:
-                            continue
-                        if 'eth' in item.get('X_TP_IfName', ''):
-                            status.ewan_connected = item.get('connectionStatus') == 'Connected'
-                else:
-                    self._wan_eth_support = False
-            except Exception:
-                self._wan_eth_support = False
-        
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
