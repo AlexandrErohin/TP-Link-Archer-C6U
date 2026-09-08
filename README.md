@@ -529,7 +529,7 @@ Not all fields are filled by every client:
 - TL-MR150 v2
 - TL-MR6400 (v5, v5.3, v7)
 - TL-MR6500v
-- TL-R470GP-AC 4.0
+- TL-R470GP-AC (4.0, 6.0)
 - TL-R488GPM-AC 2.0
 - TL-SG108E v6.0
 - TL-WA1201 3.0
