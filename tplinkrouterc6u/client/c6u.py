@@ -263,6 +263,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpn_client_server = 'admin/vpn?form=server'
         self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
         self._url_ipv4_dhcps = 'admin/dhcps?form=setting&operation=read'
+        self._url_ipv4_dhcps_write = 'admin/dhcps?form=setting&operation=write'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -791,7 +792,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             'ipaddr_end': data.get('ipaddr_end', ''),
             'domain': data.get('domain', ''),
         })
-        self.request(self._url_ipv4_dhcps, payload)
+        self.request(self._url_ipv4_dhcps_write, payload)
 
     @staticmethod
     def _str2bool(v) -> bool | None:
@@ -865,6 +866,7 @@ class TplinkRouter(TplinkEncryption, TplinkRouterJson):
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
         self._url_vpnconn_pptpd = 'admin/vpnconn?form=config'
         self._url_ipv4_dhcps = 'admin/dhcps?form=setting'
+        self._url_ipv4_dhcps_write = 'admin/dhcps?form=setting'
 
 
 class TplinkRouterV1_11(TplinkRouterJson):

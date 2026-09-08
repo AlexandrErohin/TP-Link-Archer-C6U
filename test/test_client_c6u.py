@@ -1365,7 +1365,7 @@ class TestTPLinkClient(TestCase):
         client = TPLinkRouterTest('', '')
         result = client.set_ipv4_dhcps(False)
         self.assertIsNone(result)
-        self.assertEqual(check_url, client._url_ipv4_dhcps)
+        self.assertEqual(check_url, client._url_ipv4_dhcps_write)
         body = dict(parse_qsl(check_data, keep_blank_values=True))
         self.assertEqual(body['operation'], 'write')
         self.assertEqual(body['enable'], 'off')
