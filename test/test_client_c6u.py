@@ -1267,6 +1267,47 @@ class TestTPLinkClient(TestCase):
             loads(body['new']),
             {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'})
 
+    def test_delete_ipv4_reservation(self) -> None:
+        calls = []
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                calls.append((path, data))
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return [
+                        {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
+                        {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+                    ]
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff')
+
+        self.assertEqual(len(calls), 2)
+        load_path, load_data = calls[0]
+        self.assertIn('form=reservation', load_path)
+
+        del_path, del_data = calls[1]
+        self.assertEqual(del_path, 'admin/dhcps?form=reservation')
+        body = dict(parse_qsl(del_data))
+        self.assertEqual(body['operation'], 'remove')
+        self.assertEqual(body['key'], 'AA-BB-CC-DD-EE-FF')
+        self.assertEqual(body['index'], '1')
+
+    def test_delete_ipv4_reservation_not_found(self) -> None:
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return [{'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'}]
+
+        client = TPLinkRouterTest('', '')
+        with self.assertRaises(ClientException):
+            client.delete_ipv4_reservation('00:11:22:33:44:55')
+
     def test_set_ipv4_dhcps(self) -> None:
         """Read-modify-write of admin/dhcps?form=setting (AX55 capture from PR #199)."""
         setting = {
