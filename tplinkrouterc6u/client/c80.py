@@ -197,7 +197,8 @@ class TplinkC80Router(AbstractRouter):
             'lan_ip': extract_value(data_blocks[lan_ip_request], "ip "),
             'wan_ip': extract_value(data_blocks[wan_ip_request], "ip "),
             'gateway_ip': extract_value(data_blocks[wan_ip_request], "gateway "),
-            'uptime': extract_value(data_blocks[wan_ip_request], "upTime ")
+            'uptime': extract_value(data_blocks[wan_ip_request], "upTime "),
+            'wan_status' : extract_value(data_blocks[wan_ip_request], "status ")
         }
 
         wifi_status = {}
@@ -216,6 +217,7 @@ class TplinkC80Router(AbstractRouter):
         status._wan_ipv4_addr = get_ip(network_info['wan_ip'])
         status._wan_ipv4_gateway = get_ip(network_info['gateway_ip'])
         status.wan_ipv4_uptime = int(network_info['uptime']) // 100
+        status.ewan_connected = network_info['wan_status'] == '1'
 
         status.wifi_2g_enable = wifi_status[Connection.HOST_2G]
         status.wifi_5g_enable = wifi_status[Connection.HOST_5G]
@@ -259,6 +261,7 @@ class TplinkC80Router(AbstractRouter):
         status._wan_macaddr = get_mac(mac_info.get('mac 1', '00-00-00-00-00-00'))
         status._lan_ipv4_addr = get_ip(lan_info.get('ip') or self._host_ip())
         status._wan_ipv4_addr = get_ip(wan_info.get('ip') or self._host_ip())
+        status.ewan_connected = wan_info.get('status') == '1'
 
         gateway = wan_info.get('gateway') or lan_info.get('gateway')
         if gateway and gateway != '0.0.0.0':
@@ -306,6 +309,11 @@ class TplinkC80Router(AbstractRouter):
         body = self._encrypt_body(text)
         self.request(1, 0, True, data=body)
 
+    def set_ewan_connect(self, enable: bool) -> None:
+        text = 'wan -linkUp' if enable else 'wan -linkDown'
+        body = self._encrypt_body(text)
+        self.request(0, 0, True, data=body)
+    
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"
         lan_ip_request = "4|1,0,0"
