@@ -5,6 +5,11 @@ class Connection(Enum):
     HOST_2G = 'host_2g'
     HOST_5G = 'host_5g'
     HOST_6G = 'host_6g'
+    # MLO merges multiple bands. Clients are only seen on HOST_MLO, the other values are used for the switches for turning on/off MLO for certain bands.
+    HOST_MLO = 'host_mlo'
+    HOST_MLO_2G = 'host_mlo_2g'
+    HOST_MLO_5G = 'host_mlo_5g'
+    HOST_MLO_6G = 'host_mlo_6g'
     GUEST_2G = 'guest_2g'
     GUEST_5G = 'guest_5g'
     GUEST_6G = 'guest_6g'
@@ -15,7 +20,7 @@ class Connection(Enum):
     UNKNOWN = 'unknown'
 
     def is_host_wifi(self) -> bool:
-        return self in [Connection.HOST_2G, Connection.HOST_5G, Connection.HOST_6G]
+        return self in [Connection.HOST_2G, Connection.HOST_5G, Connection.HOST_6G, Connection.HOST_MLO]
 
     def is_guest_wifi(self) -> bool:
         return self in [Connection.GUEST_2G, Connection.GUEST_5G, Connection.GUEST_6G]
@@ -31,6 +36,8 @@ class Connection(Enum):
             band = '5G'
         elif self in [Connection.HOST_6G, Connection.GUEST_6G, Connection.IOT_6G]:
             band = '6G'
+        elif self in [Connection.HOST_MLO]:
+            band = 'MLO'
         return band
 
     def get_type(self) -> str | None:
@@ -43,6 +50,8 @@ class Connection(Enum):
             band = 'IoT'
         elif self == Connection.WIRED:
             band = 'wired'
+        elif self == Connection.UNKNOWN:
+            band = 'unknown'
         return band
 
 
