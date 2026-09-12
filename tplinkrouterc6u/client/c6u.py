@@ -248,11 +248,15 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._sysauth = None
         self._data_block = 'data'
         self._smart_network = True
+        self._wan_ipv4_dynamic = True
         self._easymesh = True
         self._perf_status = True
         self._url_firmware = 'admin/firmware?form=upgrade&operation=read'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation&operation=load'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
+        self._url_ipv4_dhcps = 'admin/dhcps?form=setting&operation=read'
+        self._url_ipv4_dhcps_write = 'admin/dhcps?form=setting&operation=write'
+        self._url_wan_ipv4_dynamic = 'admin/network?form=wan_ipv4_dynamic'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
         self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
         self._url_openvpn = 'admin/openvpn?form=config&operation=read'
@@ -262,8 +266,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpn_client_enable = 'admin/vpn?form=enable'
         self._url_vpn_client_server = 'admin/vpn?form=server'
         self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
-        self._url_ipv4_dhcps = 'admin/dhcps?form=setting&operation=read'
-        self._url_ipv4_dhcps_write = 'admin/dhcps?form=setting&operation=write'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -485,6 +487,17 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             # WiFi might be disabled on the router, skip wireless statistics
             pass
 
+        # Get WAN connected status (for DHCP release/renew)
+        if self._wan_ipv4_dynamic and data.get('wan_ipv4_conntype') == 'dhcp':
+            try:
+                wan_ipv4_dyn_response = self.request(self._url_wan_ipv4_dynamic + '&operation=read', 'operation=read')
+                if wan_ipv4_dyn_response:
+                    status.ewan_connected = wan_ipv4_dyn_response.get('conn_status') == 'connected'
+                else:
+                    self._wan_ipv4_dynamic = False
+            except Exception:
+                self._wan_ipv4_dynamic = False
+        
         easymesh_device_list = None
         if self._easymesh:
             try:
@@ -794,6 +807,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         })
         self.request(self._url_ipv4_dhcps_write, payload)
 
+    def set_ewan_connect(self, enable: bool) -> None:
+        op = 'renew' if enable else 'release'
+        self.request(self._url_wan_ipv4_dynamic + '&operation=' + op, 'operation=' + op)
+    
     @staticmethod
     def _str2bool(v) -> bool | None:
         return str(v).lower() in ("yes", "true", "on") if v is not None else None
