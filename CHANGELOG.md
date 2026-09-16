@@ -7,6 +7,7 @@
 - **EX:** IoT / 6G / MLO support — `CLIENT_TYPES` for `X_TP_LanConnType` 5–6/8–10, `Status` band enables (`iot_*`, `wifi_6g_*`, `wifi_mlo_*`), `Connection.HOST_MLO*`, and `set_wifi` via `ioTssidEnable` / `mloEnable`; unknown conn types map to `Connection.UNKNOWN` and still count ([#226](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/226), [HA #362](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/362)).
 - **C6U / LuCI:** `set_ewan_connect(enable)` renews/releases the Ethernet WAN DHCP lease via `wan_ipv4_dynamic` (`operation=renew` / `release`); `Status.ewan_connected` from `conn_status` when `wan_ipv4_conntype` is `dhcp` ([#230](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/230)).
 - **C80:** `set_ewan_connect(enable)` brings Ethernet WAN up/down via `wan -linkUp` / `wan -linkDown` (`code=0`); `Status.ewan_connected` from WAN block `status` (`None` if the field is absent) ([#227](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/227)).
+- Added MR60X 2.0 to supported list
 
 ### Fixed
 
