@@ -299,6 +299,9 @@ class TplinkC80RouterTest(TplinkC80Router):
                     return ResponseMock('blabla\r\nblabla\r\nblabla\r\nauthinfo1\r\nauthinfo2')
             elif use_token is True:
                 return ResponseMock(self.response)
+        if code == 0 and asyn == 0 and use_token is True:
+            # set_ewan_connect (#227): wan -linkUp / wan -linkDown → 00000
+            return ResponseMock(self.response if self.response else '00000')
         elif (code == 16 or code == 7) and asyn == 0:
             if use_token is False:
                 # Authorization
@@ -533,6 +536,7 @@ class TestTPLinkClient(TestCase):
         self.assertTrue(status.iot_5g_enable)
         self.assertTrue(status.wifi_2g_enable)
         self.assertTrue(status.wifi_5g_enable)
+        self.assertTrue(status.ewan_connected)
         self.assertEqual(status.wan_ipv4_uptime, 308149)
         self.assertEqual(status.mem_usage, None)
         self.assertEqual(status.cpu_usage, None)
@@ -659,6 +663,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.wan_ipv4_addr, '192.168.0.68')
         self.assertEqual(status.conn_type, 'Router/AP')
         self.assertTrue(status.wifi_2g_enable)
+        self.assertIsNone(status.ewan_connected)
         self.assertEqual(status.clients_total, 3)
         self.assertEqual(status.wifi_clients_total, 3)
         self.assertEqual(status.wired_total, 0)
@@ -799,53 +804,6 @@ class TestTPLinkClient(TestCase):
         client.get_status()
         self.assertEqual(ipv6_calls['n'], 1)
 
-
-class TestTplinkC80RouterSslContext(TestCase):
-
-    def test_ssl_context_enables_legacy_renegotiation(self) -> None:
-        import ssl
-
-        ctx = TplinkC80Router._build_ssl_context(True)
-        if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
-            self.assertTrue(ctx.options & ssl.OP_LEGACY_SERVER_CONNECT)
-        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
-        self.assertTrue(ctx.check_hostname)
-
-    def test_ssl_context_unverified_when_verify_off(self) -> None:
-        import ssl
-
-        ctx = TplinkC80Router._build_ssl_context(False)
-        self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
-        self.assertFalse(ctx.check_hostname)
-
-    def test_ssl_context_skips_loading_certs_when_verify_off(self) -> None:
-        import ssl
-
-        with patch.object(ssl.SSLContext, 'load_default_certs') as load_certs:
-            TplinkC80Router._build_ssl_context(False)
-        load_certs.assert_not_called()
-
-    def test_http_host_does_not_build_ssl_context(self) -> None:
-        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
-            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=True)
-        build_ctx.assert_not_called()
-        self.assertIs(client._session.verify, True)
-
-    def test_http_host_respects_verify_ssl_false(self) -> None:
-        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
-            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=False)
-        build_ctx.assert_not_called()
-        self.assertIs(client._session.verify, False)
-
-    def test_https_host_uses_ssl_context(self) -> None:
-        import ssl
-
-        sentinel = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        with patch.object(TplinkC80Router, '_build_ssl_context', return_value=sentinel) as build_ctx:
-            client = TplinkC80Router('https://192.168.0.1', 'password', verify_ssl=True)
-        build_ctx.assert_called_once_with(True)
-        self.assertIs(client._session.verify, sentinel)
-
     def test_get_firmware_falls_back_to_plaintext_on_00006(self) -> None:
         firmware_plain = (
             '00000\r\nid 0|1,0,0\r\nfullName 300Mbps%20Wi-Fi%20Router\r\nfacturer TP-Link\r\n'
@@ -899,6 +857,90 @@ class TestTplinkC80RouterSslContext(TestCase):
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0], '0|1,0,0')
         self.assertFalse(sent[0].startswith('sign='))
+
+    def test_get_status_ewan_disconnected(self) -> None:
+        # WAN block 23 with status 0 → ewan_connected False
+        status_down = STATUS_RESPONSE_TEXT.replace('status 1\r\ncode 0\r\nupTime 30814980',
+                                                   'status 0\r\ncode 0\r\nupTime 30814980', 1)
+        client = TplinkC80RouterTest('', '')
+        client.authorize()
+        client.set_encrypted_response(status_down)
+
+        status = client.get_status()
+
+        self.assertFalse(status.ewan_connected)
+
+    def test_set_ewan_connect_link_up_and_down(self) -> None:
+        # Capture from #227: wan -linkUp / wan -linkDown → response 00000
+        sent = []
+
+        class CaptureClient(TplinkC80RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 0 and asyn == 0 and use_token:
+                    sent.append(data)
+                    return ResponseMock('00000')
+                return super().request(code, asyn, use_token, data)
+
+        client = CaptureClient('', '')
+        client.authorize()
+
+        client.set_ewan_connect(True)
+        client.set_ewan_connect(False)
+
+        self.assertEqual(len(sent), 2)
+        self.assertTrue(sent[0].startswith('sign='))
+        self.assertTrue(sent[1].startswith('sign='))
+        up_plain = client._decrypt_data(sent[0].split('data=', 1)[1])
+        down_plain = client._decrypt_data(sent[1].split('data=', 1)[1])
+        self.assertEqual(up_plain, 'wan -linkUp')
+        self.assertEqual(down_plain, 'wan -linkDown')
+
+
+class TestTplinkC80RouterSslContext(TestCase):
+
+    def test_ssl_context_enables_legacy_renegotiation(self) -> None:
+        import ssl
+
+        ctx = TplinkC80Router._build_ssl_context(True)
+        if hasattr(ssl, 'OP_LEGACY_SERVER_CONNECT'):
+            self.assertTrue(ctx.options & ssl.OP_LEGACY_SERVER_CONNECT)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ctx.check_hostname)
+
+    def test_ssl_context_unverified_when_verify_off(self) -> None:
+        import ssl
+
+        ctx = TplinkC80Router._build_ssl_context(False)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
+        self.assertFalse(ctx.check_hostname)
+
+    def test_ssl_context_skips_loading_certs_when_verify_off(self) -> None:
+        import ssl
+
+        with patch.object(ssl.SSLContext, 'load_default_certs') as load_certs:
+            TplinkC80Router._build_ssl_context(False)
+        load_certs.assert_not_called()
+
+    def test_http_host_does_not_build_ssl_context(self) -> None:
+        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
+            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=True)
+        build_ctx.assert_not_called()
+        self.assertIs(client._session.verify, True)
+
+    def test_http_host_respects_verify_ssl_false(self) -> None:
+        with patch.object(TplinkC80Router, '_build_ssl_context') as build_ctx:
+            client = TplinkC80Router('http://192.168.0.1', 'password', verify_ssl=False)
+        build_ctx.assert_not_called()
+        self.assertIs(client._session.verify, False)
+
+    def test_https_host_uses_ssl_context(self) -> None:
+        import ssl
+
+        sentinel = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        with patch.object(TplinkC80Router, '_build_ssl_context', return_value=sentinel) as build_ctx:
+            client = TplinkC80Router('https://192.168.0.1', 'password', verify_ssl=True)
+        build_ctx.assert_called_once_with(True)
+        self.assertIs(client._session.verify, sentinel)
 
 
 if __name__ == '__main__':

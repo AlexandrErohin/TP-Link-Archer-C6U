@@ -136,7 +136,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
-| set_ewan_connect | enable: bool | DHCP renew (`True`) or release (`False`) for Ethernet WAN (MR/VR-style clients) |   |
+| set_ewan_connect | enable: bool | Ethernet WAN up/renew (`True`) or down/release (`False`): MR/VR use DHCP RENEW/RELEASE; C80 uses `wan -linkUp` / `wan -linkDown` |   |
 | authorize |   | authorize for actions |
 | logout |   | logout after all is done |
 | get_vpn_status |   | Gets VPN info for OpenVPN and PPTPVPN and connected clients amount | [VPNStatus](#vpn_status) |
@@ -179,7 +179,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | wan_ipv4_gateway_address | router wan ipv4 gateway address | ipaddress.IPv4Address, None |
 | wan_ipv6_enabled | Is WAN IPv6 enabled | bool, None |
 | wan_ipv6_addr | router wan ipv6 address | str, None |
-| ewan_connected | Is Ethernet WAN connected (`None` if no eth WAN / not reported; MR/VR-style) | bool, None |
+| ewan_connected | Is Ethernet WAN connected (`None` if no eth WAN / not reported; MR/VR/C80) | bool, None |
 | lan_ipv4_dhcp_enable | Is LAN IPv4 DHCP server enabled | bool, None |
 | wired_total | Total amount of wired clients | int |
 | wifi_clients_total | Total amount of host wifi clients | int |
