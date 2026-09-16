@@ -490,10 +490,8 @@ class TPLinkMRClientBase(AbstractRouter):
                         result[index] = obj
                 continue
             if '=' in line:
-                keyval = line.split('=')
-                assert len(keyval) == 2
-
-                obj[keyval[0]] = keyval[1]
+                key, value = line.split('=', 1)
+                obj[key] = value
 
         return result if result else []
 
