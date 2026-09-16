@@ -209,6 +209,85 @@ class TestTPLinkSG108EClient(TestCase):
         self.assertEqual(status.wired_total, 8)
         self.assertEqual(status.clients_total, 6)
 
+    def test_get_status_caches_lan_ipv4_addr(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
+            },
+        })
+        client.device_info = Mock(return_value={'macStr': '02:00:00:00:00:01'})
+        client.ip_settings = Mock(return_value={'ipStr': '192.0.2.23'})
+
+        first = client.get_status()
+        second = client.get_status()
+
+        self.assertEqual(first.lan_ipv4_addr, '192.0.2.23')
+        self.assertEqual(second.lan_ipv4_addr, '192.0.2.23')
+        self.assertEqual(first.lan_macaddr.lower(), '02-00-00-00-00-01')
+        self.assertEqual(second.lan_macaddr.lower(), '02-00-00-00-00-01')
+        self.assertEqual(second.wired_total, 8)
+        self.assertEqual(second.clients_total, 6)
+        client.ip_settings.assert_called_once()
+        client.device_info.assert_called_once()
+        self.assertEqual(client.port_stats.call_count, 2)
+
+    def test_get_status_caches_failed_lan_ipv4_lookup(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
+            },
+        })
+        client.device_info = Mock(side_effect=Exception('system info unavailable'))
+        client.ip_settings = Mock(side_effect=Exception('ip settings unavailable'))
+
+        first = client.get_status()
+        second = client.get_status()
+
+        self.assertEqual(first.wired_total, 8)
+        self.assertEqual(first.clients_total, 6)
+        self.assertIsNone(first.lan_macaddr)
+        self.assertIsNone(first.lan_ipv4_addr)
+        self.assertEqual(second.wired_total, 8)
+        self.assertEqual(second.clients_total, 6)
+        self.assertIsNone(second.lan_macaddr)
+        self.assertIsNone(second.lan_ipv4_addr)
+        client.ip_settings.assert_called_once()
+        client.device_info.assert_called_once()
+
+    def test_get_ipv4_status_does_not_use_lan_ip_cache(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
+            },
+        })
+        client.device_info = Mock(return_value={'macStr': '02:00:00:00:00:01'})
+        client.ip_settings = Mock(return_value={
+            'ipStr': '192.0.2.23',
+            'netmaskStr': '255.255.255.0',
+            'gatewayStr': '192.0.2.1',
+            'macStr': '02:00:00:00:00:01',
+        })
+
+        status = client.get_status()
+        self.assertEqual(status.lan_ipv4_addr, '192.0.2.23')
+        client.ip_settings.assert_called_once()
+
+        ipv4 = client.get_ipv4_status()
+        self.assertEqual(ipv4.lan_ipv4_ipaddr, '192.0.2.23')
+        self.assertEqual(client.ip_settings.call_count, 2)
+
     def test_get_port_status_maps_live_tl_sg108e_v6_payloads(self) -> None:
         client = TPLinkSG108EClient('http://192.0.2.23', 'password')
         client.port_stats = Mock(return_value={
