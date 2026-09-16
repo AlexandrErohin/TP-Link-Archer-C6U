@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from urllib import parse
+from urllib.parse import urlparse
 from collections import defaultdict
 import re
 import requests
@@ -67,6 +68,8 @@ class TplinkRE330Router(AbstractRouter):
         if self._verify_ssl is False:
             self._session.verify = False
         self._encryption = EncryptionState()
+        self._plain_data = False
+        self._wifi_request = None
         self.host = self.host.rstrip('/')
         # Mandatory Referer header
         self._headers = {
@@ -115,17 +118,20 @@ class TplinkRE330Router(AbstractRouter):
         self.request(11, 0, True)
 
     def get_firmware(self) -> Firmware:
-        text = '0|1,0,0'
-
-        body = self._encrypt_body(text)
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
+        response_text = self._post_data('0|1,0,0')
         device_datamap = dict(line.split(" ", 1) for line in response_text.split("\r\n")[1:-1])
 
         return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']),
                         parse.unquote(device_datamap['softVer']))
 
     def get_status(self) -> Status:
+        if self._wifi_request is None:
+            request = '13|1,0,0'
+            self._wifi_request = request in self._return_data_block(request)
+
+        return self._get_status_with_wifi() if self._wifi_request else self._get_status_without_wifi()
+
+    def _get_status_with_wifi(self) -> Status:
         mac_info_request = "1|1,0,0"
         lan_ip_request = "4|1,0,0"
         wan_ip_request = "23|1,0,0"
@@ -134,15 +140,7 @@ class TplinkRE330Router(AbstractRouter):
             mac_info_request, lan_ip_request, wan_ip_request, device_data_request,
             RouterConstants.HOST_WIFI_2G_REQUEST, RouterConstants.HOST_WIFI_5G_REQUEST
         ]
-        request_text = '#'.join(all_requests)
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
-        matches = TplinkRE330Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('#'.join(all_requests))
 
         def extract_value(response_list, prefix):
             return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
@@ -161,9 +159,7 @@ class TplinkRE330Router(AbstractRouter):
             value = data_blocks.get(request)
             wifi_status[key] = extract_value(data_blocks.get(request), "bEnable ") == '1' if value else None
 
-        device_data_response = data_blocks[device_data_request]
-
-        mapped_devices = self._parse_devices(device_data_response)
+        mapped_devices = self._parse_devices(data_blocks[device_data_request])
 
         status = Status()
         status._wan_macaddr = get_mac(network_info['wan_mac'])
@@ -189,18 +185,47 @@ class TplinkRE330Router(AbstractRouter):
         status.devices = mapped_devices
         return status
 
+    def _get_status_without_wifi(self) -> Status:
+        # WR844N and similar firmwares expose clients via DHCP block 9, not device block 13.
+        data_blocks = self._return_data_block('#'.join([
+            '1|1,0,0',
+            '4|1,0,0',
+            '9|1,0,0',
+            '23|1,0,0',
+            '0|1,0,0',
+        ]))
+
+        mac_info = self._parse_last_values_from_block(data_blocks.get('1|1,0,0', []))
+        lan_info = self._parse_last_values_from_block(data_blocks.get('4|1,0,0', []))
+        wan_info = self._parse_last_values_from_block(data_blocks.get('23|1,0,0', []))
+        devices = self._parse_dhcp_devices(data_blocks.get('9|1,0,0', []))
+
+        status = Status()
+        status._lan_macaddr = get_mac(mac_info.get('mac 0', '00-00-00-00-00-00'))
+        status._wan_macaddr = get_mac(mac_info.get('mac 1', '00-00-00-00-00-00'))
+        status._lan_ipv4_addr = get_ip(lan_info.get('ip') or self._host_ip())
+        status._wan_ipv4_addr = get_ip(wan_info.get('ip') or self._host_ip())
+
+        gateway = wan_info.get('gateway') or lan_info.get('gateway')
+        if gateway and gateway != '0.0.0.0':
+            status._wan_ipv4_gateway = get_ip(gateway)
+
+        uptime = wan_info.get('upTime')
+        status.wan_ipv4_uptime = int(uptime) // 100 if uptime and uptime.isdigit() else None
+        status.devices = devices
+        status.wired_total = 0
+        status.wifi_clients_total = len(devices)
+        status.clients_total = len(devices)
+        status.wifi_2g_enable = True
+        status.conn_type = 'Router/AP'
+        return status
+
     def set_led_status(self, status: bool) -> None:
         text = f'id 112|1,0,0\r\nenable {1 if status else 0}\r\n'
-        body = self._encrypt_body(text)
-        self.request(1, 0, True, data=body)
+        self._post_data(text, code=1, asyn=0)
 
     def get_led_status(self) -> bool:
-        text = '112|1,0,0'
-        body = self._encrypt_body(text)
-        response = self.request(2, 0, True, data=body)
-
-        response_text = self._decrypt_data(response.text)
-        response_text = response_text.splitlines()
+        response_text = self._post_data('112|1,0,0', code=2, asyn=0).splitlines()
         if len(response_text) < 3:
             raise ClientException("Invalid response for LED status from router")
 
@@ -212,8 +237,7 @@ class TplinkRE330Router(AbstractRouter):
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         enable_string = f'bEnable {int(enable)}'
         text = f'id {RouterConstants.CONNECTION_REQUESTS_MAP[wifi]}\r\n{enable_string}'
-        body = self._encrypt_body(text)
-        self.request(1, 0, True, data=body)
+        self._post_data(text, code=1, asyn=0)
 
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"
@@ -224,15 +248,7 @@ class TplinkRE330Router(AbstractRouter):
         static_ip_request = "24|1,0,0"
         all_requests = [
             mac_info_request, lan_ip_request, dhcp_request, link_type_request, wan_ip_request, static_ip_request]
-        request_text = '#'.join(all_requests)
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
-        matches = TplinkRE330Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('#'.join(all_requests))
 
         network_info = {
             'lan_mac': self._extract_value(data_blocks[mac_info_request], "mac 0 "),
@@ -264,13 +280,7 @@ class TplinkRE330Router(AbstractRouter):
         return ipv4status
 
     def get_ipv4_reservations(self) -> list[IPv4Reservation]:
-        body = self._encrypt_body('12|1,0,0')
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-        matches = TplinkRE330Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('12|1,0,0')
         filtered_reservations = self._parse_response_to_dict(data_blocks['12|1,0,0'])
 
         mapped_reservations: list[IPv4Reservation] = []
@@ -281,14 +291,7 @@ class TplinkRE330Router(AbstractRouter):
         return mapped_reservations
 
     def get_dhcp_leases(self) -> list[IPv4DHCPLease]:
-        body = self._encrypt_body('9|1,0,0')
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-        matches = TplinkRE330Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
-
+        data_blocks = self._return_data_block('9|1,0,0')
         filtered_leases = self._parse_response_to_dict(data_blocks['9|1,0,0'])
 
         mapped_leases: list[IPv4DHCPLease] = []
@@ -371,7 +374,55 @@ class TplinkRE330Router(AbstractRouter):
         return f'sign={sign}\r\ndata={data}'
 
     def _decrypt_data(self, encrypted_text: str) -> str:
+        # Error/OK markers (00000, 00006, …) are plain text, not ciphertext.
+        if isinstance(encrypted_text, str) and encrypted_text.startswith('0000'):
+            return encrypted_text
         return self._encryption.aes.aes_decrypt(encrypted_text)
+
+    @staticmethod
+    def _is_reject_encrypted(text: str) -> bool:
+        # WR844N (#59): encrypted data body is rejected with error code 6.
+        return isinstance(text, str) and text.startswith('00006')
+
+    def _post_data(self, text: str, code: int = 2, asyn: int = 1) -> str:
+        """Send a data request; fall back to plaintext if encryption is rejected."""
+        if self._plain_data:
+            response = self.request(code, asyn, True, data=text)
+        else:
+            response = self.request(code, asyn, True, data=self._encrypt_body(text))
+            if self._is_reject_encrypted(response.text):
+                self._plain_data = True
+                response = self.request(code, asyn, True, data=text)
+        return self._decrypt_data(response.text)
+
+    def _return_data_block(self, request_text: str) -> dict[str, list[str]]:
+        response_text = self._post_data(request_text)
+        matches = TplinkRE330Router.DATA_REGEX.findall(response_text)
+        return {match[0]: match[1].strip().split("\r\n") for match in matches}
+
+    def _parse_last_values_from_block(self, lines: list[str]) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for line in lines:
+            if line == '00000' or line.startswith('id '):
+                continue
+            key, _, value = line.rpartition(' ')
+            if key:
+                values[key] = value.strip()
+        return values
+
+    def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
+        devices: list[Device] = []
+        for item in self._parse_response_to_dict(response_data):
+            ip = item.get('ip')
+            mac = item.get('mac')
+            if not ip or not mac or mac == '00-00-00-00-00-00':
+                continue
+            devices.append(Device(Connection.HOST_2G, get_mac(mac), get_ip(ip),
+                                  parse.unquote(item.get('hostName', ''))))
+        return devices
+
+    def _host_ip(self) -> str:
+        return urlparse(self.host).hostname or '0.0.0.0'
 
     def _extract_value(self, response_list, prefix):
         return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)

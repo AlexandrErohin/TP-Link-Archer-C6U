@@ -846,6 +846,60 @@ class TestTplinkC80RouterSslContext(TestCase):
         build_ctx.assert_called_once_with(True)
         self.assertIs(client._session.verify, sentinel)
 
+    def test_get_firmware_falls_back_to_plaintext_on_00006(self) -> None:
+        firmware_plain = (
+            '00000\r\nid 0|1,0,0\r\nfullName 300Mbps%20Wi-Fi%20Router\r\nfacturer TP-Link\r\n'
+            'modelName TL-WR844N\r\nmodelVer 1.0\r\n'
+            'softVer 1.15.20%20Build%20260611%20Rel.30987n(4555)\r\n'
+            'hardVer TL-WR844N%201.0\r\nprodId 0x8440001\r\n'
+        )
+
+        class PlainFallbackClient(TplinkC80RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 2 and asyn == 1 and use_token:
+                    if isinstance(data, str) and data.startswith('sign='):
+                        return ResponseMock('00006\r\n')
+                    if data == '0|1,0,0':
+                        return ResponseMock(firmware_plain)
+                return super().request(code, asyn, use_token, data)
+
+        client = PlainFallbackClient('', '')
+        client.authorize()
+        self.assertFalse(client._plain_data)
+
+        firmware = client.get_firmware()
+
+        self.assertTrue(client._plain_data)
+        self.assertEqual(firmware.model, 'TL-WR844N')
+        self.assertEqual(firmware.hardware_version, 'TL-WR844N 1.0')
+        self.assertEqual(firmware.firmware_version, '1.15.20 Build 260611 Rel.30987n(4555)')
+
+    def test_subsequent_data_requests_stay_plaintext_after_fallback(self) -> None:
+        firmware_plain = (
+            '00000\r\nid 0|1,0,0\r\nmodelName TL-WR844N\r\n'
+            'hardVer TL-WR844N%201.0\r\nsoftVer 1.0\r\n'
+        )
+        sent = []
+
+        class CaptureClient(TplinkC80RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 2 and asyn == 1 and use_token:
+                    sent.append(data)
+                    if isinstance(data, str) and data.startswith('sign='):
+                        return ResponseMock('00006\r\n')
+                    return ResponseMock(firmware_plain)
+                return super().request(code, asyn, use_token, data)
+
+        client = CaptureClient('', '')
+        client.authorize()
+        client.get_firmware()
+        sent.clear()
+        client.get_firmware()
+
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0], '0|1,0,0')
+        self.assertFalse(sent[0].startswith('sign='))
+
 
 if __name__ == '__main__':
     main()

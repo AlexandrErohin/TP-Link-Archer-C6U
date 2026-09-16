@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **RE330 / C80:** when a router rejects an encrypted data body with `00006` (TL-WR844N and similar), retry the same request as plaintext and keep using plaintext for later calls; RE330 also falls back to DHCP-based status when device block `13` is absent ([#59](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/59)).
+
 ## [5.33.0] - 2026-09-08
 
 ### Added

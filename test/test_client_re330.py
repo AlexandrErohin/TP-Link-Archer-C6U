@@ -79,6 +79,8 @@ class TplinkRE330RouterTest(TplinkRE330Router):
                     return ResponseMock('blabla\r\nblabla\r\nblabla\r\nauthinfo1\r\nauthinfo2')
             elif use_token is True:
                 return ResponseMock(self.response)
+        if code == 1 and asyn == 0 and use_token is True:
+            return ResponseMock(self.response if self.response else '00000')
         if code == 7 and asyn == 1:
             if use_token is False:
                 # Authorization
@@ -290,6 +292,75 @@ class TestTPLinkClient(TestCase):
         client.set_encrypted_response('00000\r\nid 112|1,0,0\r\nenable 0')
         led_status = client.get_led_status()
         self.assertEqual(led_status, False)
+
+    def test_get_firmware_falls_back_to_plaintext_on_00006(self) -> None:
+        # Real WR844N response from #59: encrypted body → 00006; plain body → firmware block.
+        firmware_plain = (
+            '00000\r\nid 0|1,0,0\r\nfullName 300Mbps%20Wi-Fi%20Router\r\nfacturer TP-Link\r\n'
+            'modelName TL-WR844N\r\nmodelVer 1.0\r\n'
+            'softVer 1.15.20%20Build%20260611%20Rel.30987n(4555)\r\n'
+            'hardVer TL-WR844N%201.0\r\nprodId 0x8440001\r\n'
+        )
+
+        class PlainFallbackClient(TplinkRE330RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 2 and asyn == 1 and use_token:
+                    if isinstance(data, str) and data.startswith('sign='):
+                        return ResponseMock('00006\r\n')
+                    if data == '0|1,0,0':
+                        return ResponseMock(firmware_plain)
+                return super().request(code, asyn, use_token, data)
+
+        client = PlainFallbackClient('', '')
+        client.authorize()
+        self.assertFalse(client._plain_data)
+
+        firmware = client.get_firmware()
+
+        self.assertTrue(client._plain_data)
+        self.assertEqual(firmware.model, 'TL-WR844N')
+        self.assertEqual(firmware.hardware_version, 'TL-WR844N 1.0')
+        self.assertEqual(firmware.firmware_version, '1.15.20 Build 260611 Rel.30987n(4555)')
+
+    def test_get_status_without_wifi_via_dhcp_block(self) -> None:
+        status_plain = (
+            '00000\r\nid 1|1,0,0\r\nauthKey token\r\nreserved\r\nsetWzd 1\r\nmode 4\r\n'
+            'mac 0 40-ae-30-af-c8-72\r\nmac 1 40-ae-30-af-c8-73\r\nwanMacType 0\r\n'
+            'id 4|1,0,0\r\nip 192.168.2.1\r\nmask 255.255.255.0\r\nmode 0\r\n'
+            'smartIp 0\r\ngateway 0.0.0.0\r\n'
+            'id 9|1,0,0\r\nhostName 0 LGwebOSTV\r\nhostName 1 Kaspars\r\n'
+            'hostName 2 Redmi-Note-13-Pro-5G\r\nhostName 3\r\n'
+            'mac 0 60-75-6c-a1-4a-82\r\nmac 1 70-08-10-0b-c6-24\r\n'
+            'mac 2 d6-02-54-6b-67-c4\r\nmac 3 00-00-00-00-00-00\r\n'
+            'ip 0 192.168.2.100\r\nip 1 192.168.2.101\r\nip 2 192.168.2.102\r\nip 3 0.0.0.0\r\n'
+            'state 0 5\r\nstate 1 5\r\nstate 2 5\r\nstate 3 0\r\n'
+            'expires 0 4979\r\nexpires 1 5514\r\nexpires 2 6296\r\nexpires 3 0\r\n'
+            'id 0|1,0,0\r\nmodelName TL-WR844N\r\nhardVer TL-WR844N%201.0'
+        )
+
+        class NoWifiClient(TplinkRE330RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 2 and asyn == 1 and use_token:
+                    if isinstance(data, str) and data.startswith('sign='):
+                        return ResponseMock('00006\r\n')
+                    return ResponseMock(status_plain)
+                return super().request(code, asyn, use_token, data)
+
+        client = NoWifiClient('http://192.168.0.68', '')
+        client.authorize()
+
+        status = client.get_status()
+
+        self.assertTrue(client._plain_data)
+        self.assertFalse(client._wifi_request)
+        self.assertEqual(status.lan_macaddr, '40-AE-30-AF-C8-72')
+        self.assertEqual(status.wan_macaddr, '40-AE-30-AF-C8-73')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.2.1')
+        self.assertEqual(status.wan_ipv4_addr, '192.168.0.68')
+        self.assertEqual(status.conn_type, 'Router/AP')
+        self.assertEqual(status.clients_total, 3)
+        self.assertEqual(status.devices[0].hostname, 'LGwebOSTV')
+        self.assertEqual(status.devices[0].ipaddr, '192.168.2.100')
 
 
 if __name__ == '__main__':

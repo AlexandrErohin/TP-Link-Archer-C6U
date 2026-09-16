@@ -95,6 +95,7 @@ class TplinkC80Router(AbstractRouter):
         self._encryption = EncryptionState()
         self._wifi_request = None
         self._ipv6_support = True
+        self._plain_data = False
 
     @staticmethod
     def _build_ssl_context(verify_ssl: bool):
@@ -156,12 +157,7 @@ class TplinkC80Router(AbstractRouter):
         self.request(11, 0, True)
 
     def get_firmware(self) -> Firmware:
-        text = '0|1,0,0'
-
-        body = self._encrypt_body(text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
+        response_text = self._post_data('0|1,0,0')
         device_datamap = dict(line.split(" ", 1) for line in response_text.split("\r\n")[1:-1])
 
         return Firmware(parse.unquote(device_datamap['hardVer']), parse.unquote(device_datamap['modelName']),
@@ -303,8 +299,7 @@ class TplinkC80Router(AbstractRouter):
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         enable_string = f'bEnable {int(enable)}'
         text = f'id {RouterConstants.CONNECTION_REQUESTS_MAP[wifi]}\r\n{enable_string}'
-        body = self._encrypt_body(text)
-        self.request(1, 0, True, data=body)
+        self._post_data(text, code=1, asyn=0)
 
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"
@@ -315,15 +310,7 @@ class TplinkC80Router(AbstractRouter):
         static_ip_request = "24|1,0,0"
         all_requests = [
             mac_info_request, lan_ip_request, dhcp_request, link_type_request, wan_ip_request, static_ip_request]
-        request_text = '#'.join(all_requests)
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('#'.join(all_requests))
 
         network_info = {
             'lan_mac': self._extract_value(data_blocks[mac_info_request], "mac 0 "),
@@ -355,13 +342,7 @@ class TplinkC80Router(AbstractRouter):
         return ipv4status
 
     def get_ipv4_reservations(self) -> list[IPv4Reservation]:
-        body = self._encrypt_body('12|1,0,0')
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('12|1,0,0')
         filtered_reservations = self._parse_response_to_dict(data_blocks['12|1,0,0'])
 
         mapped_reservations: list[IPv4Reservation] = []
@@ -372,14 +353,7 @@ class TplinkC80Router(AbstractRouter):
         return mapped_reservations
 
     def get_dhcp_leases(self) -> list[IPv4DHCPLease]:
-        body = self._encrypt_body('9|1,0,0')
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
-
+        data_blocks = self._return_data_block('9|1,0,0')
         filtered_leases = self._parse_response_to_dict(data_blocks['9|1,0,0'])
 
         mapped_leases: list[IPv4DHCPLease] = []
@@ -393,17 +367,7 @@ class TplinkC80Router(AbstractRouter):
     def get_ipv6_status(self) -> IPv6Status:
         wan_ipv6_request = RouterConstants.IPV6_WAN_REQUEST
         site_ipv6_request = RouterConstants.IPV6_SITE_REQUEST
-        all_requests = [
-            wan_ipv6_request, site_ipv6_request]
-        request_text = '#'.join(all_requests)
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block('#'.join([wan_ipv6_request, site_ipv6_request]))
 
         network_info = {
             'wan_ipv6_status': self._extract_value(data_blocks[wan_ipv6_request], "status "),
@@ -432,13 +396,7 @@ class TplinkC80Router(AbstractRouter):
         return ipv6status
 
     def get_vpn_status(self) -> VPNStatus:
-        body = self._encrypt_body("22|1,0,0")
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-        matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
-        data_blocks = {match[0]: match[1].strip().split("\r\n") for match in matches}
+        data_blocks = self._return_data_block("22|1,0,0")
 
         vpn_status = VPNStatus()
         vpn_status.pptpvpn_enable = self._extract_value(data_blocks["22|1,0,0"], "linkType ") == '4'
@@ -517,21 +475,33 @@ class TplinkC80Router(AbstractRouter):
         return f'sign={sign}\r\ndata={data}'
 
     def _decrypt_data(self, encrypted_text: str) -> str:
-        if isinstance(encrypted_text, str) and encrypted_text.startswith('00000\r\n'):
+        # Error/OK markers (00000, 00006, …) and plaintext data blocks are not ciphertext.
+        if isinstance(encrypted_text, str) and encrypted_text.startswith('0000'):
             return encrypted_text
         return self._encryption.aes.aes_decrypt(encrypted_text)
+
+    @staticmethod
+    def _is_reject_encrypted(text: str) -> bool:
+        # WR844N (#59): encrypted data body is rejected with error code 6.
+        return isinstance(text, str) and text.startswith('00006')
+
+    def _post_data(self, text: str, code: int = 2, asyn: int = 1) -> str:
+        """Send a data request; fall back to plaintext if encryption is rejected."""
+        if self._plain_data:
+            response = self.request(code, asyn, True, data=text)
+        else:
+            response = self.request(code, asyn, True, data=self._encrypt_body(text))
+            if self._is_reject_encrypted(response.text):
+                self._plain_data = True
+                response = self.request(code, asyn, True, data=text)
+        return self._decrypt_data(response.text)
 
     def _extract_value(self, response_list, prefix):
         return next((s.split(prefix, 1)[1] for s in response_list if s.startswith(prefix)), None)
 
     def _return_data_block(self, request_text: str) -> dict[str, str]:
-        body = self._encrypt_body(request_text)
-
-        response = self.request(2, 1, True, data=body)
-        response_text = self._decrypt_data(response.text)
-
+        response_text = self._post_data(request_text)
         matches = TplinkC80Router.DATA_REGEX.findall(response_text)
-
         return {match[0]: match[1].strip().split("\r\n") for match in matches}
 
     def _parse_last_values_from_block(self, lines: list[str]) -> dict[str, str]:
