@@ -1370,17 +1370,17 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(body['operation'], 'write')
         self.assertEqual(body['enable'], 'off')
         self.assertEqual(body['leasetime'], '120')
-        self.assertEqual(body['pri_dns'], '')
-        self.assertEqual(body['snd_dns'], '')
+        self.assertNotIn('pri_dns', body)
+        self.assertNotIn('snd_dns', body)
         self.assertEqual(body['gateway'], '192.168.0.1')
         self.assertEqual(body['ipaddr_start'], '192.168.0.2')
         self.assertEqual(body['ipaddr_end'], '192.168.0.253')
-        self.assertEqual(body['domain'], '')
+        self.assertNotIn('domain', body)
 
         client.set_ipv4_dhcps(True)
         body = dict(parse_qsl(check_data, keep_blank_values=True))
         self.assertEqual(body['enable'], 'on')
-        self.assertEqual(body['domain'], '')
+        self.assertNotIn('domain', body)
 
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'

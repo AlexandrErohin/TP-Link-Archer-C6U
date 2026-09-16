@@ -781,18 +781,15 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def set_ipv4_dhcps(self, enable: bool) -> None:
         data = self.request(self._url_ipv4_dhcps, 'operation=read')
-        payload = urlencode({
+        payload = {
             'operation': 'write',
             'enable': 'on' if enable else 'off',
-            'leasetime': data.get('leasetime', ''),
-            'pri_dns': data.get('pri_dns', ''),
-            'snd_dns': data.get('snd_dns', ''),
-            'gateway': data.get('gateway', ''),
-            'ipaddr_start': data.get('ipaddr_start', ''),
-            'ipaddr_end': data.get('ipaddr_end', ''),
-            'domain': data.get('domain', ''),
-        })
-        self.request(self._url_ipv4_dhcps_write, payload)
+        }
+        for key in ('leasetime', 'pri_dns', 'snd_dns', 'gateway', 'ipaddr_start', 'ipaddr_end', 'domain'):
+            value = data.get(key, '')
+            if value != '':
+                payload[key] = value
+        self.request(self._url_ipv4_dhcps_write, urlencode(payload))
 
     @staticmethod
     def _str2bool(v) -> bool | None:
