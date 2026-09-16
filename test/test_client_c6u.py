@@ -294,6 +294,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(status.iot_5g_enable, None)
         self.assertEqual(status.wifi_2g_enable, True)
         self.assertEqual(status.wifi_5g_enable, True)
+        self.assertIsNone(status.ewan_connected)
         self.assertEqual(status.wan_ipv4_uptime, None)
         self.assertEqual(status.mem_usage, 0.43)
         self.assertEqual(status.conn_type, '1')
@@ -1381,6 +1382,156 @@ class TestTPLinkClient(TestCase):
         body = dict(parse_qsl(check_data, keep_blank_values=True))
         self.assertEqual(body['enable'], 'on')
         self.assertNotIn('domain', body)
+
+    def test_get_status_ewan_connected_dhcp(self) -> None:
+        """DHCP WAN probes wan_ipv4_dynamic; conn_status maps to ewan_connected (capture #230)."""
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "wan_ipv4_conntype": "dhcp",
+        "access_devices_wired": [],
+        "access_devices_wireless_host": [],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '''
+{"data": [], "timeout": false, "success": true, "operator": "load"}
+'''
+        wan_dyn = {'conntype': 'dhcp', 'conn_status': 'connected'}
+        router_class = self.router_class
+        requested = []
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                requested.append((path, data))
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                if path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                if path == 'admin/network?form=wan_ipv4_dynamic&operation=read':
+                    return dict(wan_dyn)
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+        self.assertTrue(status.ewan_connected)
+        wan_reqs = [(p, d) for p, d in requested if 'wan_ipv4_dynamic' in p]
+        self.assertEqual(len(wan_reqs), 1)
+        self.assertEqual(wan_reqs[0][0], 'admin/network?form=wan_ipv4_dynamic&operation=read')
+        self.assertEqual(wan_reqs[0][1], 'operation=read')
+
+        wan_dyn['conn_status'] = 'disconnected'
+        status = client.get_status()
+        self.assertFalse(status.ewan_connected)
+
+    def test_get_status_ewan_skips_non_dhcp(self) -> None:
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "wan_ipv4_conntype": "static",
+        "access_devices_wired": [],
+        "access_devices_wireless_host": [],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '''
+{"data": [], "timeout": false, "success": true, "operator": "load"}
+'''
+        router_class = self.router_class
+        requested = []
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                requested.append(path)
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                if path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+        self.assertIsNone(status.ewan_connected)
+        self.assertFalse(any('wan_ipv4_dynamic' in p for p in requested))
+
+    def test_get_status_ewan_unsupported_disables_flag(self) -> None:
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "wan_ipv4_conntype": "dhcp",
+        "access_devices_wired": [],
+        "access_devices_wireless_host": [],
+        "wireless_2g_enable": "on"
+    }
+}
+'''
+        response_stats = '''
+{"data": [], "timeout": false, "success": true, "operator": "load"}
+'''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                if path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                if path == 'admin/network?form=wan_ipv4_dynamic&operation=read':
+                    raise ClientException('wan_ipv4_dynamic not supported')
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        self.assertTrue(client._wan_ipv4_dynamic)
+        status = client.get_status()
+        self.assertFalse(client._wan_ipv4_dynamic)
+        self.assertIsNone(status.ewan_connected)
+
+        requested = []
+
+        def tracking_request(path, data, ignore_response=False, ignore_errors=False):
+            requested.append(path)
+            if path == 'admin/status?form=all&operation=read':
+                return loads(response_status)['data']
+            if path == 'admin/wireless?form=statistics':
+                return loads(response_stats)['data']
+            raise ClientException()
+
+        client.request = tracking_request
+        client.get_status()
+        self.assertFalse(any('wan_ipv4_dynamic' in p for p in requested))
+
+    def test_set_ewan_connect_renew_and_release(self) -> None:
+        check_url = ''
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.set_ewan_connect(True)
+        self.assertEqual(check_url, 'admin/network?form=wan_ipv4_dynamic&operation=renew')
+        self.assertEqual(check_data, 'operation=renew')
+
+        client.set_ewan_connect(False)
+        self.assertEqual(check_url, 'admin/network?form=wan_ipv4_dynamic&operation=release')
+        self.assertEqual(check_data, 'operation=release')
 
     def test_get_ipv4_status_empty(self) -> None:
         response_network = '{"result": {}, "error_code": 0}'
