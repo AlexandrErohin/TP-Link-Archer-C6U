@@ -136,10 +136,7 @@ class TPLinkSG108EClient(AbstractRouter):
         status.devices = []
         status._lan_macaddr = self._resolve_lan_mac()
         try:
-            settings = self.ip_settings()
-            ip = settings.get("ipStr") or settings.get("ip")
-            if ip:
-                status._lan_ipv4_addr = get_ip(ip)
+            status._lan_ipv4_addr = self._lan_ip_from_settings(self.ip_settings())
         except Exception:
             pass
 
@@ -156,10 +153,15 @@ class TPLinkSG108EClient(AbstractRouter):
         self._lan_mac_resolved = True
         return self._lan_mac
 
+    @staticmethod
+    def _lan_ip_from_settings(settings: dict, default: str | None = None):
+        ip = settings.get("ipStr") or settings.get("ip") or default
+        return get_ip(ip) if ip else None
+
     def get_ipv4_status(self) -> IPv4Status:
         settings = self.ip_settings()
         ipv4 = IPv4Status()
-        ipv4._lan_ipv4_ipaddr = get_ip(settings.get("ipStr") or settings.get("ip") or "0.0.0.0")
+        ipv4._lan_ipv4_ipaddr = self._lan_ip_from_settings(settings, default="0.0.0.0")
         ipv4._lan_ipv4_netmask = get_ip(settings.get("netmaskStr") or settings.get("netmask") or "0.0.0.0")
         ipv4._wan_ipv4_gateway = get_ip(settings.get("gatewayStr") or settings.get("gateway") or "0.0.0.0")
         mac = settings.get("macStr") or settings.get("mac")

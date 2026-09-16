@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **TL-SG108E:** `get_status()` fills `lan_ipv4_addr` from IP settings (`ipStr` / `ip`); lookup is best-effort so a failed IP page does not break port aggregates ([#229](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/229)).
 - **RE330 / C80:** when a router rejects an encrypted data body with `00006` (TL-WR844N and similar), retry the same request as plaintext and keep using plaintext for later calls; RE330 also falls back to DHCP-based status when device block `13` is absent ([#59](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/59)).
 
 ## [5.33.0] - 2026-09-08
