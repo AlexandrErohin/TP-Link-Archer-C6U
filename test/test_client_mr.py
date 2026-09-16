@@ -73,6 +73,21 @@ test=10
         self.assertEqual(len(result['5']), 1)
         self.assertEqual(result['5']['test'], '10')
 
+    def test_merge_response_value_with_equals(self) -> None:
+        """ACT values may contain '=' (e.g. SMS URLs); split only on the first '=' (#231)."""
+        response = '''[1,0,0,0,0,0]0
+index=1
+from=123
+content=Visit https://example.com/page?id=1
+receivedTime=2024-01-01 12:00:00
+unread=1
+[error]0
+'''
+        client = TPLinkMRClient('', '')
+        result = client._merge_response(response)
+        self.assertEqual(result['0']['content'], 'Visit https://example.com/page?id=1')
+        self.assertEqual(result['0']['from'], '123')
+
     def test_merge_response_no_response(self) -> None:
         response = '''
 name=wlan6
@@ -809,6 +824,26 @@ unread=0
 
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].content, 'Line one\nLine two')
+
+    def test_get_sms_content_with_equals(self) -> None:
+        response = '''[1,0,0,0,0,0]1
+index=1
+from=sender1
+content=Visit https://example.com/page?id=1
+receivedTime=2024-11-15 22:28:09
+unread=0
+[error]0
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        messages = client.get_sms()
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].content, 'Visit https://example.com/page?id=1')
 
     def test_send_ussd(self) -> None:
         responses = ['''[error]0
