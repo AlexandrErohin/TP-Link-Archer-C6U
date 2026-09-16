@@ -135,6 +135,13 @@ class TPLinkSG108EClient(AbstractRouter):
         status.guest_clients_total = 0
         status.devices = []
         status._lan_macaddr = self._resolve_lan_mac()
+        try:
+            settings = self.ip_settings()
+            ip = settings.get("ipStr") or settings.get("ip")
+            if ip:
+                status._lan_ipv4_addr = get_ip(ip)
+        except Exception:
+            pass
 
         return status
 

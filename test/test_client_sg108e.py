@@ -161,14 +161,16 @@ class TestTPLinkSG108EClient(TestCase):
                 'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
             },
         })
-        # The MAC lookup is best-effort and must not break the port counts.
+        # The MAC/IP lookups are best-effort and must not break the port counts.
         client.device_info = Mock(side_effect=Exception('system info unavailable'))
+        client.ip_settings = Mock(side_effect=Exception('ip settings unavailable'))
 
         status = client.get_status()
         self.assertEqual(status.wired_total, 8)
         # 7 ports link-up (one is down), disabled port ignored.
         self.assertEqual(status.clients_total, 6)
         self.assertIsNone(status.lan_macaddr)
+        self.assertIsNone(status.lan_ipv4_addr)
 
     def test_get_status_populates_lan_macaddr(self) -> None:
         client = TPLinkSG108EClient('http://192.0.2.23', 'password')
@@ -181,10 +183,31 @@ class TestTPLinkSG108EClient(TestCase):
             },
         })
         client.device_info = Mock(return_value={'macStr': '02:00:00:00:00:01'})
+        client.ip_settings = Mock(return_value={})
 
         status = client.get_status()
         # EUI48 stringifies with hyphens in this project.
         self.assertEqual(status.lan_macaddr.lower(), '02-00-00-00-00-01')
+        self.assertIsNone(status.lan_ipv4_addr)
+
+    def test_get_status_populates_lan_ipv4_addr(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+
+        client.port_stats = Mock(return_value={
+            'max_port_num': 8,
+            'all_info': {
+                'state': [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                'link_status': [6, 6, 0, 5, 5, 6, 5, 6, 0, 0],
+            },
+        })
+        client.device_info = Mock(return_value={'macStr': '02:00:00:00:00:01'})
+        client.ip_settings = Mock(return_value={'ipStr': '192.0.2.23'})
+
+        status = client.get_status()
+        self.assertEqual(status.lan_ipv4_addr, '192.0.2.23')
+        self.assertEqual(status.lan_macaddr.lower(), '02-00-00-00-00-01')
+        self.assertEqual(status.wired_total, 8)
+        self.assertEqual(status.clients_total, 6)
 
     def test_get_port_status_maps_live_tl_sg108e_v6_payloads(self) -> None:
         client = TPLinkSG108EClient('http://192.0.2.23', 'password')
