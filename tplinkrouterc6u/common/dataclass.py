@@ -77,6 +77,9 @@ class Status:
     wifi_2g_enable: bool | None = None
     wifi_5g_enable: bool | None = None
     wifi_6g_enable: bool | None = None
+    wifi_mlo_2g_enable: bool | None = None
+    wifi_mlo_5g_enable: bool | None = None
+    wifi_mlo_6g_enable: bool | None = None
     wan_ipv4_uptime: int | None = None
     mem_usage: float | None = None
     cpu_usage: float | None = None

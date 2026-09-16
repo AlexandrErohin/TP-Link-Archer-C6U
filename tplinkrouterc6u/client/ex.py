@@ -22,11 +22,32 @@ from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
 
 # Class for EX series routers which supports old firmwares with AES cipher CBC mode
 class TPLinkEXClient(TPLinkMRClientBase):
+    CLIENT_TYPES = {
+        0: Connection.WIRED,
+        1: Connection.HOST_2G,
+        2: Connection.GUEST_2G, # Also 2G for multi ssid
+        3: Connection.HOST_5G,
+        4: Connection.GUEST_5G, # Also 5G for multi ssid
+        5: Connection.HOST_6G,
+        6: Connection.GUEST_6G,  # Also 6G for multi ssid
+        # 7 was not found
+        8: Connection.IOT_2G,
+        9: Connection.IOT_5G,
+        10: Connection.HOST_MLO,
+    }
+
     WIFI_SET = {
         Connection.HOST_2G: '1,0,0,0,0,0',
         Connection.HOST_5G: '2,0,0,0,0,0',
+        Connection.HOST_6G: '3,0,0,0,0,0',
+        Connection.HOST_MLO_2G: '1,0,0,0,0,0',
+        Connection.HOST_MLO_5G: '2,0,0,0,0,0',
+        Connection.HOST_MLO_6G: '3,0,0,0,0,0',
         Connection.GUEST_2G: '1,0,0,0,0,0',
         Connection.GUEST_5G: '2,0,0,0,0,0',
+        Connection.GUEST_6G: '3,0,0,0,0,0',
+        Connection.IOT_2G: '1,0,0,0,0,0',
+        Connection.IOT_5G: '2,0,0,0,0,0',
     }
 
     class ActItem:
@@ -127,16 +148,54 @@ class TPLinkEXClient(TPLinkMRClientBase):
             status._wan_ipv4_gateway = get_ip(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
 
         if values[2]:
-            if values[2].__class__ != list:
-                status.wifi_2g_enable = bool(int(values[2]['primaryEnable']))
-                status.guest_2g_enable = bool(int(values[2]['guestEnable'])) if values[2].get('guestEnable') else None
-            else:
-                status.wifi_2g_enable = bool(int(values[2][0]['primaryEnable']))
-                status.wifi_5g_enable = bool(int(values[2][1]['primaryEnable']))
-                status.guest_2g_enable = bool(int(values[2][0]['guestEnable'])) \
-                    if values[2][0].get('guestEnable') else None
-                status.guest_5g_enable = bool(int(values[2][1]['guestEnable'])) \
-                    if values[2][1].get('guestEnable') else None
+            networks = values[2]  if values[2].__class__ == list else [values[2]]
+            
+            if len(networks) > 0:
+                status.wifi_2g_enable = bool(int(networks[0]['primaryEnable']))
+                status.guest_2g_enable = (
+                    bool(int(networks[0]['guestEnable']))
+                    if networks[0].get('guestEnable')
+                    else None
+                )
+                status.iot_2g_enable = (
+                    bool(int(networks[0]['ioTssidEnable']))
+                    if networks[0].get('ioTssidEnable')
+                    else None
+                )
+                status.wifi_mlo_2g_enable = (
+                    bool(int(networks[0]['mloEnable']))
+                    if networks[0].get('mloEnable')
+                    else None
+                )
+            if len(networks) > 1:
+                status.wifi_5g_enable = bool(int(networks[1]['primaryEnable']))
+                status.guest_5g_enable = (
+                    bool(int(networks[1]['guestEnable']))
+                    if networks[1].get('guestEnable')
+                    else None
+                )
+                status.iot_5g_enable = (
+                    bool(int(networks[1]['ioTssidEnable']))
+                    if networks[1].get('ioTssidEnable')
+                    else None
+                )
+                status.wifi_mlo_5g_enable = (
+                    bool(int(networks[1]['mloEnable']))
+                    if networks[1].get('mloEnable')
+                    else None
+                )
+            if len(networks) > 2:
+                status.wifi_6g_enable = bool(int(networks[2]['primaryEnable']))
+                status.guest_6g_enable = (
+                    bool(int(networks[2]['guestEnable']))
+                    if networks[2].get('guestEnable')
+                    else None
+                )
+                status.wifi_mlo_6g_enable = (
+                    bool(int(networks[2]['mloEnable']))
+                    if networks[2].get('mloEnable')
+                    else None
+                )
 
         devices = {}
         for val in self._to_list(values[3]):
@@ -151,6 +210,13 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 status.guest_clients_total += 1
             elif conn.is_host_wifi():
                 status.wifi_clients_total += 1
+            elif conn.is_iot():
+                if status.iot_clients_total is None:
+                    status.iot_clients_total = 0
+                status.iot_clients_total += 1
+            else:
+                status.wifi_clients_total += 1
+
             devices[val['physAddress']] = Device(conn,
                                                  get_mac(val['physAddress']),
                                                  get_ip(val['IPAddress']),
@@ -163,7 +229,12 @@ class TPLinkEXClient(TPLinkMRClientBase):
         status.cpu_usage = int(values[5]['CPUUsage']) / 100
 
         status.devices = list(devices.values())
-        status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
+        status.clients_total = (
+            status.wired_total
+            + status.wifi_clients_total
+            + status.guest_clients_total
+            + (status.iot_clients_total or 0)
+        )
 
         return status
 
@@ -240,7 +311,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
         return ipv4_status
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        atr = [f'"primaryEnable":"{int(enable)}"' if 'GUEST' not in str(wifi) else f'"guestEnable":"{int(enable)}"']
+        if 'GUEST' in str(wifi):
+            attr_key = 'guestEnable'
+        elif 'IOT' in str(wifi):
+            attr_key = 'ioTssidEnable'
+        elif 'MLO' in str(wifi):
+            attr_key = 'mloEnable'
+        else:
+            attr_key = 'primaryEnable'
+        atr = [f'"{attr_key}":"{int(enable)}"']
         acts = [
             self.ActItem(
                 self.ActItem.SET,
