@@ -4,6 +4,7 @@ from macaddress import EUI48
 from ipaddress import IPv4Address
 from tplinkrouterc6u import (
     TPLinkEXClient,
+    TPLinkEXClientGCMOAEP,
     Connection,
     Firmware,
     Status,
@@ -18,6 +19,8 @@ from tplinkrouterc6u import (
     SMS,
     ServingCell,
 )
+from tplinkrouterc6u.common.encryption import EncryptionWrapperMRGCMOAEP
+from tplinkrouterc6u.provider import TplinkRouterProvider
 
 
 class TestTPLinkEXClient(TestCase):
@@ -1195,6 +1198,59 @@ class TestTPLinkEXClient(TestCase):
         self.assertIn('http:///cgi_gdpr?9?_', check_url)
         self.assertEqual(check_data, ('{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0"},'
                                       '"operation":"do","oid":"DEV2_LTE_SMS_RECVMSGENTRY"}'))
+
+    def test_get_status_without_mem_proc(self) -> None:
+        """EX920 leaves DEV2_MEM_STATUS / DEV2_PROC_STATUS empty; req_act
+        omits those slots. get_status must not IndexError (HA #393).
+        """
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"192.168.30.55",'
+                        '"connIPv4Gateway":"192.168.30.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"}],'
+                                '"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"0","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.30.10","hostName":"host1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                elif 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                elif 'DEV2_MEM_STATUS' in data_str or 'DEV2_PROC_STATUS' in data_str:
+                    return 200, ''
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
+        self.assertEqual(status.wired_total, 1)
+        self.assertEqual(status.clients_total, 1)
+        self.assertIsNone(status.mem_usage)
+        self.assertIsNone(status.cpu_usage)
+
+    def test_gcm_oaep_client_uses_oaep_wrapper(self) -> None:
+        client = TPLinkEXClientGCMOAEP('http://192.168.0.1', 'password')
+        self.assertIsInstance(client._encryption, EncryptionWrapperMRGCMOAEP)
+        self.assertEqual(client.username, 'user')
+
+    def test_gcm_oaep_registered_before_gcm_in_provider(self) -> None:
+        clients = list(TplinkRouterProvider.get_clients())
+        self.assertIn(TPLinkEXClientGCMOAEP.__name__, clients)
+        self.assertLess(
+            clients.index(TPLinkEXClientGCMOAEP.__name__),
+            clients.index('TPLinkEXClientGCM'),
+        )
 
 
 if __name__ == '__main__':

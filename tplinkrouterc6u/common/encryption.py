@@ -1,6 +1,6 @@
 from base64 import b64encode, b64decode
 from Crypto.PublicKey.RSA import construct
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_v1_5, PKCS1_OAEP
 from binascii import b2a_hex, hexlify
 from Crypto.Cipher import AES
 from Crypto import Random
@@ -12,6 +12,10 @@ from random import randint
 from Crypto.PublicKey.ECC import EccPoint, _curves as _ecc_curves
 from Crypto.Hash import SHA256 as CryptoSHA256, HMAC as CryptoHMAC
 from json import dumps as json_dumps
+
+# SHA-1 digest size used by pycryptodome's PKCS1_OAEP.new() default hash.
+# OAEP overhead is 2*hLen+2 = 42 bytes.
+_OAEP_HASH_LEN = 20
 
 
 class EncryptionWrapper:
@@ -201,6 +205,10 @@ class EncryptionWrapperMR:
 
 class EncryptionWrapperMRGCM:
     RSA_USE_PKCS_V1_5 = False
+    # When True, sign with RSA-OAEP (SHA-1), as used by EX920 and similar
+    # firmwares whose /js/tpEncrypt.js sets rsaEncrypt = $.rsa.encryptOAEP.
+    # Must not be combined with RSA_USE_PKCS_V1_5.
+    RSA_USE_OAEP = False
     AES_KEY_LEN = 128 // 8
     AES_IV_LEN = 12  # previously 16
 
@@ -251,16 +259,26 @@ class EncryptionWrapperMRGCM:
         else:
             sign_data = 'h={}&s={}'.format(hash, seq)
 
-        # set step based on whether PKCS padding is used
+        # set step based on whether PKCS / OAEP padding is used
         rsa_byte_len = len(nn) // 2  # hexlen / 2 * 8 / 8
-        step = (rsa_byte_len - 11) if self.RSA_USE_PKCS_V1_5 else rsa_byte_len
+        if self.RSA_USE_OAEP:
+            # OAEP (SHA-1) overhead is 2*hLen+2; on a 512-bit key this yields
+            # 22-byte chunks (5 blocks / 640 hex for a typical login sign_data).
+            step = rsa_byte_len - 2 * _OAEP_HASH_LEN - 2
+        elif self.RSA_USE_PKCS_V1_5:
+            step = rsa_byte_len - 11
+        else:
+            step = rsa_byte_len
 
         # encrypt the signature using the RSA public key
         rsa_key = self._make_rsa_pub_key(nn, ee)
 
-        # make the PKCS#1 v1.5 cipher
-        if self.RSA_USE_PKCS_V1_5:
+        if self.RSA_USE_OAEP:
+            rsa = PKCS1_OAEP.new(rsa_key)
+        elif self.RSA_USE_PKCS_V1_5:
             rsa = PKCS1_v1_5.new(rsa_key)
+        else:
+            rsa = None
 
         signature = ''
         pos = 0
@@ -268,8 +286,7 @@ class EncryptionWrapperMRGCM:
         while pos < len(sign_data):
             sign_data_bin = sign_data[pos: pos + step].encode('utf8')
 
-            if self.RSA_USE_PKCS_V1_5:
-                # encrypt using the PKCS#1 v1.5 padding
+            if self.RSA_USE_OAEP or self.RSA_USE_PKCS_V1_5:
                 enc = rsa.encrypt(sign_data_bin)
             else:
                 # encrypt using NOPADDING
@@ -310,6 +327,11 @@ class EncryptionWrapperMRGCM:
         n = int('0x' + nn, 16)
         e = int('0x' + ee, 16)
         return RSA.construct((n, e))
+
+
+class EncryptionWrapperMRGCMOAEP(EncryptionWrapperMRGCM):
+    """GCM session cipher with RSA-OAEP login signatures (EX920-class firmware)."""
+    RSA_USE_OAEP = True
 
 
 class EncryptionWrapperMRECC:

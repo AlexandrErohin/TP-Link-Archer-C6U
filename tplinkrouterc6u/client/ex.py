@@ -17,6 +17,7 @@ from tplinkrouterc6u.common.dataclass import (
     ServingCell,
     VPNStatus)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
+from tplinkrouterc6u.common.encryption import EncryptionWrapperMRGCMOAEP
 from tplinkrouterc6u.client.mr import TPLinkMRClientBase, TPLinkMRClientBaseGCM
 
 
@@ -227,11 +228,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
                                                  get_ip(val['IPAddress']),
                                                  val['hostName'])
 
-        total = int(values[4]['total'])
-        free = int(values[4]["free"])
-        status.mem_usage = ((total - free) / total)
+        # Some firmwares (e.g. EX920) leave DEV2_MEM_STATUS / DEV2_PROC_STATUS
+        # empty; req_act skips empty replies, so trailing slots may be absent.
+        if len(values) > 4 and values[4]:
+            total = int(values[4]['total'])
+            free = int(values[4]['free'])
+            status.mem_usage = ((total - free) / total)
 
-        status.cpu_usage = int(values[5]['CPUUsage']) / 100
+        if len(values) > 5 and values[5]:
+            status.cpu_usage = int(values[5]['CPUUsage']) / 100
 
         status.devices = list(devices.values())
         status.clients_total = (
@@ -522,7 +527,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
         )
 
         sign, data = self._prepare_data(login_data, True)
-        assert len(sign) == 256
+        # One RSA block = len(nn) hex chars; no-padding uses 2 blocks (256),
+        # OAEP on a 512-bit key uses 5 (640). Accept any whole-block length.
+        assert self._nn and len(sign) % len(self._nn) == 0
 
         request_data = f"sign={sign}\r\ndata={data}\r\n"
 
@@ -622,7 +629,9 @@ class TPLinkEXClientGCM(TPLinkMRClientBaseGCM, TPLinkEXClient):
         )
 
         sign, data, tag = self._prepare_data(login_data, True)
-        assert len(sign) == 256
+        # One RSA block = len(nn) hex chars; no-padding uses 2 blocks (256),
+        # OAEP on a 512-bit key uses 5 (640). Accept any whole-block length.
+        assert self._nn and len(sign) % len(self._nn) == 0
 
         request_data = f"sign={sign}\r\ndata={data}\r\ntag={tag}\r\n"
 
@@ -645,3 +654,18 @@ class TPLinkEXClientGCM(TPLinkMRClientBaseGCM, TPLinkEXClient):
             if self._logger:
                 self._logger.debug(error)
             raise ClientException(error)
+
+
+# Class for EX series routers with AES-GCM and RSA-OAEP signatures (e.g. EX920)
+class TPLinkEXClientGCMOAEP(TPLinkEXClientGCM):
+    """
+    EX GCM client for firmwares that sign with RSA-OAEP instead of raw RSA
+    (HA #393 / EX920). Session AES-GCM is unchanged; only the login/request
+    signature padding differs. Default username remains ``user`` (password-only
+    UI on these models).
+    """
+
+    def __init__(self, host: str, password: str, username: str = 'user', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        self._encryption = EncryptionWrapperMRGCMOAEP()

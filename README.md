@@ -15,6 +15,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 
 ## Usage
 - Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
+- EX series (and some password-only UIs such as EX920): use username `user` — `admin` is rejected even when the web UI does not ask for a username
 - Use Local Password which is for Log In with Local Password. Login with TP-LINK ID doesnt work
 - If you use `https` connection - You need to turn on "Local Management via HTTPS" (advanced->system->administration) in the router web UI
 
@@ -37,6 +38,7 @@ from tplinkrouterc6u import (
     TplinkVR1200vRouter,
     TPLinkEXClient, # Class for EX series routers which supports old firmwares with AES cipher CBC mode
     TPLinkEXClientGCM, # Class for EX series routers which supports AES cipher GCM mode
+    TPLinkEXClientGCMOAEP, # EX GCM + RSA-OAEP signatures (e.g. EX920)
     TPLinkRClient, # For routers like TL-R470GP-AC
     TPLinkXDRClient,
     TPLinkDecoClient,
@@ -516,6 +518,7 @@ Not all fields are filled by every client:
 - Deco XE75PRO (v3.0)
 - EAP115 v2.0
 - EX511 v2.0
+- EX920 v1.0
 - HB810 v2.6
 - HX510 v1.0
 - M8550 v1

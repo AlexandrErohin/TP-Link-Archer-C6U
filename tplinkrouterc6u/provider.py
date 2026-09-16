@@ -12,7 +12,7 @@ from tplinkrouterc6u.client.c50 import TPLinkC50Client
 from tplinkrouterc6u.client.wr841 import TPLinkWR841NClient
 from tplinkrouterc6u.client.mr200 import TPLinkMR200Client
 from tplinkrouterc6u.client.mr6400v7 import TPLinkMR6400v7Client
-from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM
+from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM, TPLinkEXClientGCMOAEP
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
@@ -79,6 +79,7 @@ class TplinkRouterProvider:
         return {
             TplinkC5400XRouter.__name__: TplinkC5400XRouter,
             TPLinkVRClient.__name__: TPLinkVRClient,
+            TPLinkEXClientGCMOAEP.__name__: TPLinkEXClientGCMOAEP,
             TPLinkEXClientGCM.__name__: TPLinkEXClientGCM,
             TPLinkEXClient.__name__: TPLinkEXClient,
             TplinkVR1200vRouter.__name__: TplinkVR1200vRouter,

@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **EX / EX920:** `TPLinkEXClientGCMOAEP` — AES-GCM session with RSA-OAEP (SHA-1) login signatures for firmwares whose `tpEncrypt.js` uses `encryptOAEP` (HA [#393](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/393)). Registered in the provider before `TPLinkEXClientGCM`. EX920 v1.0 added to the supported list.
+
+### Fixed
+
+- **EX:** `assert len(sign) == 256` rejected valid OAEP signatures (5×128 hex on a 512-bit key); assert now checks whole RSA-block multiples of `len(nn)`.
+- **EX:** `get_status()` no longer raises `IndexError` when `DEV2_MEM_STATUS` / `DEV2_PROC_STATUS` return empty (EX920); `mem_usage` / `cpu_usage` stay `None`.
+
 ## [5.34.0] - 2026-09-16
 
 ### Added
