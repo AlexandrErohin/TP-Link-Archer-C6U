@@ -650,6 +650,102 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(check_data, '{"data":{"stack":"1,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
                                      '"primaryEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
 
+        client.set_wifi(Connection.GUEST_6G, False)
+        self.assertEqual(check_data, '{"data":{"stack":"3,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
+                                     '"guestEnable":"0"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
+
+        client.set_wifi(Connection.IOT_2G, True)
+        self.assertEqual(check_data, '{"data":{"stack":"1,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
+                                     '"ioTssidEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
+
+        client.set_wifi(Connection.HOST_MLO_5G, True)
+        self.assertEqual(check_data, '{"data":{"stack":"2,0,0,0,0,0","pstack":"0,0,0,0,0,0",'
+                                     '"mloEnable":"1"},"operation":"so","oid":"DEV2_ADT_WIFI_COMMON"}')
+
+        with self.assertRaises(ClientException):
+            client.set_wifi(Connection.HOST_MLO, True)
+
+    def test_get_status_iot_6g_mlo(self) -> None:
+        """HB810-style WIFI_COMMON + host types 5/8/9/10/7 (unknown) from #226."""
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"192.168.30.55",'
+                        '"connIPv4Gateway":"192.168.30.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = (
+            '{"data":['
+            '{"primaryEnable":"1","guestEnable":"0","ioTssidEnable":"1","mloEnable":"1","stack":"1,0,0,0,0,0"},'
+            '{"primaryEnable":"1","guestEnable":"0","ioTssidEnable":"0","mloEnable":"1","stack":"2,0,0,0,0,0"},'
+            '{"primaryEnable":"1","guestEnable":"1","ioTssidEnable":"1","mloEnable":"0","stack":"3,0,0,0,0,0"}'
+            '],"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}'
+        )
+        DEV2_HOST_ENTRY = (
+            '{"data":['
+            '{"active":"1","X_TP_LanConnType":"5","physAddress":"11-11-11-11-11-11",'
+            '"IPAddress":"192.168.30.20","hostName":"host6g","stack":"1,0,0,0,0,0"},'
+            '{"active":"1","X_TP_LanConnType":"8","physAddress":"22-22-22-22-22-22",'
+            '"IPAddress":"192.168.30.21","hostName":"iot2g","stack":"2,0,0,0,0,0"},'
+            '{"active":"1","X_TP_LanConnType":"9","physAddress":"33-33-33-33-33-33",'
+            '"IPAddress":"192.168.30.22","hostName":"iot5g","stack":"3,0,0,0,0,0"},'
+            '{"active":"1","X_TP_LanConnType":"10","physAddress":"44-44-44-44-44-44",'
+            '"IPAddress":"192.168.30.23","hostName":"mlo","stack":"4,0,0,0,0,0"},'
+            '{"active":"1","X_TP_LanConnType":"7","physAddress":"55-55-55-55-55-55",'
+            '"IPAddress":"192.168.30.24","hostName":"unknown","stack":"5,0,0,0,0,0"}'
+            '],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
+        )
+        DEV2_MEM_STATUS = ('{"data":{"total":"192780","free":"78400","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"47","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                elif 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                elif 'DEV2_MEM_STATUS' in data_str:
+                    return 200, DEV2_MEM_STATUS
+                elif 'DEV2_PROC_STATUS' in data_str:
+                    return 200, DEV2_PROC_STATUS
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(status.wifi_2g_enable)
+        self.assertTrue(status.wifi_5g_enable)
+        self.assertTrue(status.wifi_6g_enable)
+        self.assertFalse(status.guest_2g_enable)
+        self.assertFalse(status.guest_5g_enable)
+        self.assertTrue(status.guest_6g_enable)
+        self.assertTrue(status.iot_2g_enable)
+        self.assertFalse(status.iot_5g_enable)
+        self.assertTrue(status.iot_6g_enable)
+        self.assertTrue(status.wifi_mlo_2g_enable)
+        self.assertTrue(status.wifi_mlo_5g_enable)
+        self.assertFalse(status.wifi_mlo_6g_enable)
+
+        self.assertEqual(status.wifi_clients_total, 3)  # HOST_6G + HOST_MLO + UNKNOWN
+        self.assertEqual(status.iot_clients_total, 2)
+        self.assertEqual(status.guest_clients_total, 0)
+        self.assertEqual(status.wired_total, 0)
+        self.assertEqual(status.clients_total, 5)
+
+        by_mac = {d.macaddr: d for d in status.devices}
+        self.assertEqual(by_mac['11-11-11-11-11-11'].type, Connection.HOST_6G)
+        self.assertEqual(by_mac['22-22-22-22-22-22'].type, Connection.IOT_2G)
+        self.assertEqual(by_mac['33-33-33-33-33-33'].type, Connection.IOT_5G)
+        self.assertEqual(by_mac['44-44-44-44-44-44'].type, Connection.HOST_MLO)
+        self.assertEqual(by_mac['55-55-55-55-55-55'].type, Connection.UNKNOWN)
+        self.assertEqual(len(status.devices), 5)
+
     def test_get_vpn_status(self) -> None:
         DEV2_OPENVPN = ('{"data":{"enable":"1","stack":"0,0,0,0,0,0"},'
                         '"operation":"go","oid":"DEV2_OPENVPN","success":true}')

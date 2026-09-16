@@ -25,9 +25,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
     CLIENT_TYPES = {
         0: Connection.WIRED,
         1: Connection.HOST_2G,
-        2: Connection.GUEST_2G, # Also 2G for multi ssid
+        2: Connection.GUEST_2G,  # Also 2G for multi ssid
         3: Connection.HOST_5G,
-        4: Connection.GUEST_5G, # Also 5G for multi ssid
+        4: Connection.GUEST_5G,  # Also 5G for multi ssid
         5: Connection.HOST_6G,
         6: Connection.GUEST_6G,  # Also 6G for multi ssid
         # 7 was not found
@@ -48,6 +48,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
         Connection.GUEST_6G: '3,0,0,0,0,0',
         Connection.IOT_2G: '1,0,0,0,0,0',
         Connection.IOT_5G: '2,0,0,0,0,0',
+        Connection.IOT_6G: '3,0,0,0,0,0',
     }
 
     class ActItem:
@@ -148,8 +149,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
             status._wan_ipv4_gateway = get_ip(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
 
         if values[2]:
-            networks = values[2]  if values[2].__class__ == list else [values[2]]
-            
+            networks = values[2] if values[2].__class__ == list else [values[2]]
+
             if len(networks) > 0:
                 status.wifi_2g_enable = bool(int(networks[0]['primaryEnable']))
                 status.guest_2g_enable = (
@@ -191,6 +192,11 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     if networks[2].get('guestEnable')
                     else None
                 )
+                status.iot_6g_enable = (
+                    bool(int(networks[2]['ioTssidEnable']))
+                    if networks[2].get('ioTssidEnable')
+                    else None
+                )
                 status.wifi_mlo_6g_enable = (
                     bool(int(networks[2]['mloEnable']))
                     if networks[2].get('mloEnable')
@@ -201,10 +207,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
         for val in self._to_list(values[3]):
             if int(val['active']) == 0:
                 continue
-            conn = self.CLIENT_TYPES.get(int(val['X_TP_LanConnType']))
-            if conn is None:
-                continue
-            elif conn == Connection.WIRED:
+            conn = self.CLIENT_TYPES.get(int(val['X_TP_LanConnType']), Connection.UNKNOWN)
+            if conn == Connection.WIRED:
                 status.wired_total += 1
             elif conn.is_guest_wifi():
                 status.guest_clients_total += 1
@@ -215,6 +219,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     status.iot_clients_total = 0
                 status.iot_clients_total += 1
             else:
+                # Unknown / unmapped X_TP_LanConnType — still count toward totals
                 status.wifi_clients_total += 1
 
             devices[val['physAddress']] = Device(conn,
@@ -311,11 +316,13 @@ class TPLinkEXClient(TPLinkMRClientBase):
         return ipv4_status
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        if 'GUEST' in str(wifi):
+        if wifi not in self.WIFI_SET:
+            raise ClientException(f'Unsupported wifi connection for EX set_wifi: {wifi}')
+        if wifi.is_guest_wifi():
             attr_key = 'guestEnable'
-        elif 'IOT' in str(wifi):
+        elif wifi.is_iot():
             attr_key = 'ioTssidEnable'
-        elif 'MLO' in str(wifi):
+        elif wifi.is_mlo_switch():
             attr_key = 'mloEnable'
         else:
             attr_key = 'primaryEnable'

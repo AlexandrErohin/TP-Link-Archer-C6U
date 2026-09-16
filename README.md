@@ -195,6 +195,9 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | wifi_2g_enable | Is host wifi 2.4G enabled | bool, None |
 | wifi_5g_enable | Is host wifi 5G enabled | bool, None |
 | wifi_6g_enable | Is host wifi 6G enabled | bool, None |
+| wifi_mlo_2g_enable | Is MLO enabled on 2.4G (EX / HB810-class) | bool, None |
+| wifi_mlo_5g_enable | Is MLO enabled on 5G (EX / HB810-class) | bool, None |
+| wifi_mlo_6g_enable | Is MLO enabled on 6G (EX / HB810-class) | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
@@ -403,6 +406,10 @@ Not all fields are filled by every client:
 - Connection.HOST_2G - host wifi 2.4G
 - Connection.HOST_5G - host wifi 5G
 - Connection.HOST_6G - host wifi 6G
+- Connection.HOST_MLO - host MLO client connection (EX; multi-link)
+- Connection.HOST_MLO_2G - MLO enable switch for 2.4G (EX `set_wifi` only)
+- Connection.HOST_MLO_5G - MLO enable switch for 5G (EX `set_wifi` only)
+- Connection.HOST_MLO_6G - MLO enable switch for 6G (EX `set_wifi` only)
 - Connection.GUEST_2G - guest wifi 2.4G
 - Connection.GUEST_5G - guest wifi 5G
 - Connection.GUEST_6G - guest wifi 6G
