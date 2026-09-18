@@ -133,11 +133,17 @@ class Status:
 
 @dataclass
 class MeshNode:
-    """A node of an EasyMesh network, as reported by the main router.
+    """A node of a mesh network, as reported by the main router.
 
-    The main router is the entry whose role is 'main_router'; every other entry
-    is a satellite whose parent_macaddr points at the node it uplinks through,
-    which may itself be a satellite in a multi-hop mesh.
+    The main router is the entry whose role is 'main_router' on EasyMesh or
+    'master' on Deco; every other entry is a satellite whose parent_macaddr
+    points at the node it uplinks through, which may itself be a satellite in a
+    multi-hop mesh.
+
+    Families populate different subsets. EasyMesh reports signal as a 1-3 bar
+    level in ``signal_level``; Deco reports the backhaul per band in dBm, in
+    ``signal_2g``/``signal_5g``. Backhaul fields are ``None`` on the main
+    router, which has no uplink of its own.
     """
     _macaddr: EUI48 | None = None
     _ipaddr: IPv4Address | None = None
@@ -154,6 +160,17 @@ class MeshNode:
     client_num: int | None = None
     signal_level: int | None = None
     support_reboot: bool | None = None
+    hardware_version: str | None = None
+    firmware_version: str | None = None
+    internet_status: str | None = None
+    group_status: str | None = None
+    signal_2g: int | None = None
+    signal_5g: int | None = None
+    rx_rate_2g: int | None = None
+    rx_rate_5g: int | None = None
+    tx_rate_2g: int | None = None
+    tx_rate_5g: int | None = None
+    wired_ports: int | None = None
 
     @property
     def macaddr(self) -> str | None:
