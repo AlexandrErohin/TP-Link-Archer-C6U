@@ -206,9 +206,9 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | wifi_2g_enable | Is host wifi 2.4G enabled | bool, None |
 | wifi_5g_enable | Is host wifi 5G enabled | bool, None |
 | wifi_6g_enable | Is host wifi 6G enabled | bool, None |
-| wifi_mlo_2g_enable | Is MLO enabled on 2.4G (EX / HB810-class) | bool, None |
-| wifi_mlo_5g_enable | Is MLO enabled on 5G (EX / HB810-class) | bool, None |
-| wifi_mlo_6g_enable | Is MLO enabled on 6G (EX / HB810-class) | bool, None |
+| wifi_mlo_2g_enable | Is MLO enabled on 2.4G (EX / C6U-SG when `mlo_host_2g_enable` is present) | bool, None |
+| wifi_mlo_5g_enable | Is MLO enabled on 5G (EX / C6U-SG when `mlo_host_5g_enable` is present) | bool, None |
+| wifi_mlo_6g_enable | Is MLO enabled on 6G (EX / C6U-SG when `mlo_host_6g_enable` is present) | bool, None |
 | wan_ipv4_uptime | Internet Uptime | int, None |
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
@@ -526,6 +526,7 @@ Not all fields are filled by every client:
 - Archer C6U v1.0
 - Archer C7 (v4.0, v5.0)
 - Archer C80 (1.0, 2.20)
+- Archer GE800 v1.0
 - Archer GX90 v1.0
 - Archer MR200 (v2, v5, v5.3, v6.0)
 - Archer MR400 V.4.3
@@ -533,6 +534,7 @@ Not all fields are filled by every client:
 - Archer MR600 (v1, v2, v3)
 - Archer NX200 (v1.0, v2.0)
 - Archer VR1200v (v1, v2)
+- Archer VR1600v v1
 - Archer VR2100v v1
 - Archer VR2800 v1
 - Archer VR400 (v2, v3)

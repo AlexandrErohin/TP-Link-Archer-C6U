@@ -415,6 +415,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.wifi_2g_enable = self._str2bool(data.get('wireless_2g_enable'))
         status.wifi_5g_enable = self._str2bool(data.get('wireless_5g_enable'))
         status.wifi_6g_enable = self._str2bool(data.get('wireless_6g_enable'))
+        status.wifi_mlo_2g_enable = self._str2bool(data.get('mlo_host_2g_enable'))
+        status.wifi_mlo_5g_enable = self._str2bool(data.get('mlo_host_5g_enable'))
+        status.wifi_mlo_6g_enable = self._str2bool(data.get('mlo_host_6g_enable'))
 
         if (status.mem_usage is None or status.cpu_usage is None) and self._perf_status:
             try:
@@ -460,10 +463,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
                     devices[mac] = Device(conn, get_mac(item.get('mac', '00:00:00:00:00:00')),
                                           get_ip(item.get('ip', '0.0.0.0')), item.get('deviceName', ''))
+                    # Clients only present in game_accelerator (e.g. MLO / 6G on GE800)
+                    # are absent from access_devices_*; count them here like IoT.
                     if conn.is_iot():
                         if status.iot_clients_total is None:
                             status.iot_clients_total = 0
                         status.iot_clients_total += 1
+                    elif conn.is_host_wifi():
+                        status.wifi_clients_total += 1
+                    elif conn.is_guest_wifi():
+                        status.guest_clients_total += 1
 
                 device = devices[mac]
                 device.down_speed = item.get('downloadSpeed', item.get('downSpeed'))
@@ -878,6 +887,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             result = Connection.IOT_5G
         elif data.startswith('iot_6'):
             result = Connection.IOT_6G
+        elif data == 'mlo':
+            # game_accelerator deviceTag on BE/GE firmwares (e.g. Archer GE800); #233
+            result = Connection.HOST_MLO
         return result
 
 

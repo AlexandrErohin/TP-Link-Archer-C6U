@@ -5,12 +5,14 @@
 ### Added
 
 - **C6U / SG:** `get_mesh_nodes()` returns EasyMesh nodes as `MeshNode` (topology via `parent_macaddr`, firmware-dependent `signal_level` bars, `support_reboot`); clients without the form raise `NotImplementedError` ([#218](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/218), [HA #212](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/212)).
+- **C6U / SG:** `deviceTag: "mlo"` from `game_accelerator` maps to `Connection.HOST_MLO`; host/guest clients only present there (e.g. MLO / 6G) are counted in `wifi_clients_total` / `guest_clients_total`; `mlo_host_*_enable` fills `Status.wifi_mlo_*` ([#233](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/233)).
 - **EX / EX920:** `TPLinkEXClientGCMOAEP` — AES-GCM session with RSA-OAEP (SHA-1) login signatures for firmwares whose `tpEncrypt.js` uses `encryptOAEP` (HA [#393](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/393)). Registered in the provider before `TPLinkEXClientGCM`. EX920 v1.0 added to the supported list.
+- Added Archer GE800 v1.0 and Archer VR1600v v1 to supported list
 
 ### Fixed
 
 - **EX:** `assert len(sign) == 256` rejected valid OAEP signatures (5×128 hex on a 512-bit key); assert now checks whole RSA-block multiples of `len(nn)`.
-- **EX:** `get_status()` no longer raises `IndexError` when `DEV2_MEM_STATUS` / `DEV2_PROC_STATUS` return empty (EX920); `mem_usage` / `cpu_usage` stay `None`.
+- **EX:** `req_act()` keeps one result slot per act (`None` when the reply has no `data`), so positional indexes stay stable when firmwares such as EX920 return success-without-data for WIFI / HOST / MEM / PROC; `get_status()` (mem/cpu stay `None`), VPN, reservations and LTE serving cells no longer `IndexError` ([HA #393](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/393)).
 
 ## [5.34.0] - 2026-09-16
 

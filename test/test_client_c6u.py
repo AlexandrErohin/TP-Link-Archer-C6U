@@ -656,6 +656,102 @@ class TestTPLinkClient(TestCase):
         for device in status.devices:
             self.assertIsNone(device.ap_name)
 
+    def test_get_status_mlo_device_tag_from_game_accelerator(self) -> None:
+        """GE800: MLO clients appear only in game_accelerator with deviceTag mlo (#233)."""
+        response_status = '''
+{
+    "success": true,
+    "data": {
+        "lan_macaddr": "06:e6:97:9e:23:f5",
+        "access_devices_wireless_host": [
+            {
+                "wire_type": "5G",
+                "macaddr": "aa:aa:aa:aa:aa:01",
+                "ipaddr": "192.168.0.50",
+                "hostname": "phone"
+            }
+        ],
+        "wireless_5g_enable": "on",
+        "mlo_host_2g_enable": "on",
+        "mlo_host_5g_enable": "on",
+        "mlo_host_6g_enable": "on"
+    }
+}
+'''
+        response_game_accelerator = '''
+{
+    "data": [
+        {
+            "deviceName": "laptop",
+            "deviceTag": "mlo",
+            "isGuest": false,
+            "host": "HOST",
+            "mac": "aa:bb:cc:dd:ee:01",
+            "ip": "192.168.0.100",
+            "signal": -42,
+            "txrate": 1208000,
+            "rxrate": 1441000,
+            "txrateMlo": {"mlo_host_2g": 1000, "mlo_host_5g": 6000, "mlo_host_6g": 1201000},
+            "rxrateMlo": {"mlo_host_2g": 0, "mlo_host_5g": 0, "mlo_host_6g": 1441000}
+        },
+        {
+            "deviceName": "iot-cam",
+            "deviceTag": "6G",
+            "isGuest": false,
+            "mac": "aa:bb:cc:dd:ee:02",
+            "ip": "192.168.0.101",
+            "signal": -55
+        }
+    ],
+    "timeout": false,
+    "success": true
+}
+'''
+        response_stats = '''
+{"data": [], "timeout": false, "success": true, "operator": "load"}
+'''
+
+        router_class = self.router_class
+        game_accelerator_path = self.game_accelerator_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == game_accelerator_path:
+                    return loads(response_game_accelerator)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertTrue(status.wifi_mlo_2g_enable)
+        self.assertTrue(status.wifi_mlo_5g_enable)
+        self.assertTrue(status.wifi_mlo_6g_enable)
+        # 1 from access_devices + 1 MLO + 1 6G from game_accelerator
+        self.assertEqual(status.wifi_clients_total, 3)
+        self.assertEqual(status.clients_total, 3)
+        self.assertEqual(len(status.devices), 3)
+
+        by_mac = {d.macaddr.lower(): d for d in status.devices}
+        mlo = by_mac['aa-bb-cc-dd-ee-01']
+        self.assertEqual(mlo.type, Connection.HOST_MLO)
+        self.assertEqual(mlo.type.get_band(), 'MLO')
+        self.assertTrue(mlo.type.is_host_wifi())
+        self.assertEqual(mlo.hostname, 'laptop')
+        self.assertEqual(mlo.signal, -42)
+        self.assertEqual(mlo.tx_rate, 1208000)
+        self.assertEqual(mlo.rx_rate, 1441000)
+
+        sixg = by_mac['aa-bb-cc-dd-ee-02']
+        self.assertEqual(sixg.type, Connection.HOST_6G)
+        self.assertEqual(sixg.type.get_band(), '6G')
+
+        self.assertFalse(client._easymesh)
+
     def test_get_status_with_game_accelerator_fallback_values(self) -> None:
         response_status = '''
     {

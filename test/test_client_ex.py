@@ -1201,7 +1201,7 @@ class TestTPLinkEXClient(TestCase):
 
     def test_get_status_without_mem_proc(self) -> None:
         """EX920 leaves DEV2_MEM_STATUS / DEV2_PROC_STATUS empty; req_act
-        omits those slots. get_status must not IndexError (HA #393).
+        keeps None slots. get_status must not IndexError (HA #393).
         """
         DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
                         '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
@@ -1213,6 +1213,7 @@ class TestTPLinkEXClient(TestCase):
         DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"0","physAddress":"66-E2-02-BD-B5-1B",'
                            '"IPAddress":"192.168.30.10","hostName":"host1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
                            '"oid":"DEV2_HOST_ENTRY","success":true}')
+        EMPTY_OID = '{"success":true,"errorcode":0}'
 
         class TPLinkEXClientTest(TPLinkEXClient):
             self._token = True
@@ -1227,7 +1228,7 @@ class TestTPLinkEXClient(TestCase):
                 elif 'DEV2_HOST_ENTRY' in data_str:
                     return 200, DEV2_HOST_ENTRY
                 elif 'DEV2_MEM_STATUS' in data_str or 'DEV2_PROC_STATUS' in data_str:
-                    return 200, ''
+                    return 200, EMPTY_OID
                 raise ClientException()
 
         client = TPLinkEXClientTest('', '')
@@ -1238,6 +1239,72 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.clients_total, 1)
         self.assertIsNone(status.mem_usage)
         self.assertIsNone(status.cpu_usage)
+
+    def test_get_status_ex920_only_lan_wan(self) -> None:
+        """EX920: WIFI / HOST / MEM / PROC return success with no data key (HA #393)."""
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"192.168.30.55",'
+                        '"connIPv4Gateway":"192.168.30.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                elif any(oid in data_str for oid in (
+                        'DEV2_ADT_WIFI_COMMON', 'DEV2_HOST_ENTRY',
+                        'DEV2_MEM_STATUS', 'DEV2_PROC_STATUS')):
+                    return 200, EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
+        self.assertEqual(status.wan_ipv4_addr, '192.168.30.55')
+        self.assertIsNone(status.wifi_2g_enable)
+        self.assertEqual(status.clients_total, 0)
+        self.assertIsNone(status.mem_usage)
+        self.assertIsNone(status.cpu_usage)
+
+    def test_get_ipv4_reservations_empty_oid(self) -> None:
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_DHCPV4_POOL_STATICADDR' in data_str:
+                    return 200, '{"success":true,"errorcode":0}'
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        self.assertEqual(client.get_ipv4_reservations(), [])
+
+    def test_get_vpn_status_empty_oids(self) -> None:
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                return 200, '{"success":true,"errorcode":0}'
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_vpn_status()
+        self.assertFalse(status.openvpn_enable)
+        self.assertFalse(status.pptpvpn_enable)
+        self.assertEqual(status.openvpn_clients_total, 0)
+        self.assertEqual(status.pptpvpn_clients_total, 0)
+
+    def test_get_lte_serving_cells_empty_oid(self) -> None:
+        class TPLinkEXClientTest(TPLinkEXClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_LTE_SERVING_CELL_INFO' in data_str:
+                    return 200, '{"success":true,"errorcode":0}'
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        self.assertEqual(client.get_lte_serving_cells(), [])
 
     def test_gcm_oaep_client_uses_oaep_wrapper(self) -> None:
         client = TPLinkEXClientGCMOAEP('http://192.168.0.1', 'password')
