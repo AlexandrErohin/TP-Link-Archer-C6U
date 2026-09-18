@@ -245,7 +245,8 @@ may be another satellite in a multi-hop mesh. Fields absent from the router's an
 the main router reports no uplink, and the bar level / `support_reboot` are only sent by newer
 firmware (seen on BE series, absent on AX series).
 
-`signal_level` carries the 1 to 3 bar level of the uplink. Quality expressed in dBm belongs in
+`signal_level` carries the uplink quality as a firmware-dependent bar level (not dBm): observed
+as 1–3 on BE series and up to 5 on AX series. Quality expressed in dBm belongs in
 `signal_strength`, which this form does not report, so a caller never has to guess which unit a
 field holds.
 
@@ -268,7 +269,7 @@ field holds.
 | connect_type | uplink type - `wire` or `wireless` | str, None |
 | mesh_type | mesh flavour, like - easymesh | str, None |
 | client_num | amount of clients connected to this node | int, None |
-| signal_level | uplink quality as a 1 to 3 bar level, not a dBm value | int, None |
+| signal_level | uplink quality as a firmware-dependent bar level (not dBm; e.g. 1–3 on BE, up to 5 on AX) | int, None |
 | support_reboot | Can this node be rebooted from the main router | bool, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>

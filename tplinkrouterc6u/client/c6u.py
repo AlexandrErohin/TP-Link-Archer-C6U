@@ -576,12 +576,14 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             mesh_node.connect_type = item.get('connect_type')
             mesh_node.mesh_type = item.get('mesh_type')
             mesh_node.client_num = int(item['client_num']) if item.get('client_num') is not None else None
-            # The payload key is signal_strength but the value is a 1..3 bar level, so it
-            # lands in signal_level; signal_strength stays reserved for dBm. Absent on the
-            # main router, which has no uplink of its own.
+            # The payload key is signal_strength but the value is a firmware-dependent bar
+            # level (observed 1..3 on BE, up to 5 on AX), so it lands in signal_level;
+            # signal_strength stays reserved for dBm. Absent on the main router, which has
+            # no uplink of its own, and on older AX firmware that omits the key.
             mesh_node.signal_level = (
                 int(item['signal_strength']) if item.get('signal_strength') is not None else None)
-            mesh_node.support_reboot = item.get('support_reboot')
+            support_reboot = item.get('support_reboot')
+            mesh_node.support_reboot = None if support_reboot is None else bool(support_reboot)
             mesh_nodes.append(mesh_node)
 
         return mesh_nodes

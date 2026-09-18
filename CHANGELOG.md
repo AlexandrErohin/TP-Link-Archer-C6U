@@ -4,6 +4,7 @@
 
 ### Added
 
+- **C6U / SG:** `get_mesh_nodes()` returns EasyMesh nodes as `MeshNode` (topology via `parent_macaddr`, firmware-dependent `signal_level` bars, `support_reboot`); clients without the form raise `NotImplementedError` ([#218](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/218), [HA #212](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/212)).
 - **EX / EX920:** `TPLinkEXClientGCMOAEP` — AES-GCM session with RSA-OAEP (SHA-1) login signatures for firmwares whose `tpEncrypt.js` uses `encryptOAEP` (HA [#393](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/393)). Registered in the provider before `TPLinkEXClientGCM`. EX920 v1.0 added to the supported list.
 
 ### Fixed

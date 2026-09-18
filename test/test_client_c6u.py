@@ -1253,6 +1253,76 @@ class TestTPLinkClient(TestCase):
         # location is optional and absent for this node
         self.assertIsNone(wired.location)
 
+    def test_get_mesh_nodes_ax_payload_omits_signal_and_reboot(self) -> None:
+        """AX-series list has no signal_strength / support_reboot; those stay None."""
+        # From res/EasyMesh-device-list-responses.txt (AX55), same shape as get_status tests
+        response = """
+{
+    "success": true,
+    "data": [
+        {
+            "mac": "24-00-00-00-00-18",
+            "client_num": 28,
+            "ip": "10.1.1.251",
+            "role": "main_router",
+            "name": "AX55 main",
+            "model": "Archer AX55",
+            "status": "connected",
+            "location": "meals",
+            "vendor": "TP-Link",
+            "device_type": "WirelessRouter"
+        },
+        {
+            "mac": "60-00-00-00-00-F5",
+            "connect_type": "wire",
+            "client_num": 3,
+            "parent_mac": "24-00-00-00-00-18",
+            "ip": "10.1.1.5",
+            "mesh_type": "easymesh",
+            "name": "Archer AX23",
+            "model": "Archer AX23",
+            "status": "connected",
+            "role": "satellite_router",
+            "device_type": "WirelessRouter"
+        },
+        {
+            "mac": "A8-00-00-00-00-EE",
+            "connect_type": "wireless",
+            "client_num": 1,
+            "parent_mac": "24-00-00-00-00-18",
+            "name": "RE200",
+            "model": "RE200",
+            "status": "connected",
+            "ip": "10.1.1.36",
+            "role": "satellite_router",
+            "device_type": "RangeExtender"
+        }
+    ]
+}
+"""
+
+        router_class = self.router_class
+        easymesh_device_list_path = self.easymesh_device_list_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == easymesh_device_list_path:
+                    return loads(response)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        mesh_nodes = client.get_mesh_nodes()
+
+        self.assertEqual(len(mesh_nodes), 3)
+        self.assertTrue(mesh_nodes[0].is_main_router)
+        self.assertEqual(mesh_nodes[1].parent_macaddr, '24-00-00-00-00-18')
+        self.assertEqual(mesh_nodes[1].connect_type, 'wire')
+        self.assertEqual(mesh_nodes[2].device_type, 'RangeExtender')
+        for node in mesh_nodes:
+            self.assertIsNone(node.signal_level)
+            self.assertIsNone(node.support_reboot)
+
     def test_mesh_node_is_main_router_accepts_both_role_vocabularies(self) -> None:
         """One predicate serves every family: EasyMesh says main_router, Deco says master."""
         self.assertTrue(MeshNode(role='main_router').is_main_router)
