@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from html.parser import HTMLParser
+from ipaddress import IPv4Address
 from logging import Logger
 
 from requests import Session
@@ -46,6 +47,8 @@ class TPLinkSG108EClient(AbstractRouter):
         self._headers = {"Referer": f"{self.host}/"}
         self._lan_mac: EUI48 | None = None
         self._lan_mac_resolved = False
+        self._lan_ip: IPv4Address | None = None
+        self._lan_ip_resolved = False
 
     def supports(self) -> bool:
         try:
@@ -135,10 +138,7 @@ class TPLinkSG108EClient(AbstractRouter):
         status.guest_clients_total = 0
         status.devices = []
         status._lan_macaddr = self._resolve_lan_mac()
-        try:
-            status._lan_ipv4_addr = self._lan_ip_from_settings(self.ip_settings())
-        except Exception:
-            pass
+        status._lan_ipv4_addr = self._resolve_lan_ip()
 
         return status
 
@@ -152,6 +152,15 @@ class TPLinkSG108EClient(AbstractRouter):
                 pass
         self._lan_mac_resolved = True
         return self._lan_mac
+
+    def _resolve_lan_ip(self) -> IPv4Address | None:
+        if not self._lan_ip_resolved:
+            try:
+                self._lan_ip = self._lan_ip_from_settings(self.ip_settings())
+            except Exception:
+                pass
+        self._lan_ip_resolved = True
+        return self._lan_ip
 
     @staticmethod
     def _lan_ip_from_settings(settings: dict, default: str | None = None):
