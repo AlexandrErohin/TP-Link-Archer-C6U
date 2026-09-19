@@ -8,11 +8,12 @@ from tplinkrouterc6u.client.c50 import TPLinkC50Client
 from tplinkrouterc6u.client.wr841 import TPLinkWR841NClient
 from tplinkrouterc6u.client.mr200 import TPLinkMR200Client
 from tplinkrouterc6u.client.mr6400v7 import TPLinkMR6400v7Client
-from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM, TPLinkEXClientGCMOAEP
+from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM
 from tplinkrouterc6u.client.vr import TPLinkVRClient
 from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
+from tplinkrouterc6u.client.re813xe import TplinkRE813XERouter
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
@@ -30,7 +31,6 @@ from tplinkrouterc6u.common.dataclass import (
     Firmware,
     Status,
     Device,
-    MeshNode,
     IPv4Reservation,
     IPv4DHCPLease,
     IPv4Status,
