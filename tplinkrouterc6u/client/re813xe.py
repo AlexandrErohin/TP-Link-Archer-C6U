@@ -67,7 +67,6 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         )
 
     def supports(self) -> bool:
-        """Identify if the router is a RE813XE."""
         # Consistent with every other endpoint on this device: 'operation=' must be
         # present in the URL query string itself, not just the POST body, or the
         # router intermittently responds with a generic 'no such callback' error
@@ -342,8 +341,7 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
-        raise NotImplementedError()       endpoints that otherwise work fine. request() below adds it automatically.
-    """
+        raise NotImplementedError()
 
     def __init__(
         self,
@@ -393,7 +391,6 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         )
 
     def supports(self) -> bool:
-        """Identify if the router is a RE813XE."""
         # Consistent with every other endpoint on this device: 'operation=' must be
         # present in the URL query string itself, not just the POST body, or the
         # router intermittently responds with a generic 'no such callback' error
