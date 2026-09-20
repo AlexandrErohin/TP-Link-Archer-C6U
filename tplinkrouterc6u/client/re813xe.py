@@ -18,24 +18,6 @@ from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 
 class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
-    """
-    TP-Link RE813XE (and likely other RE-series Wi-Fi 6E extenders sharing this
-    firmware family) operating in access-point/extender mode.
-
-    Two firmware quirks distinguish it from full routers on the same general LuCI
-    JSON API family (e.g. TplinkC5400XRouter):
-
-    1. It doesn't implement the combined 'admin/status?form=all' endpoint full
-       routers use to fetch everything in one call - its Lua backend raises an
-       internal error (missing 'Apcfg' section) because it lacks full-router
-       features like a separate access-point config block. Its own web UI instead
-       queries several narrower, per-section endpoints (see get_status()).
-    2. Its minimal CGI backend requires 'operation=' to be present in the URL
-       query string itself, not just the POST body, for a 'form' callback to be
-       recognised - omitting it produces a generic
-       {"success": false, "errorcode": "no such callback"} response even for
-       endpoints that otherwise work fine. request() below adds it automatically.
-    """
 
     def __init__(
         self,
