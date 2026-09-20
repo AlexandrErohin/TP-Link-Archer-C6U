@@ -18,6 +18,25 @@ from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 
 class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
+    """
+    TP-Link RE813XE (and likely other RE-series Wi-Fi 6E extenders sharing this
+    firmware family) operating in access-point/extender mode.
+
+    The key firmware difference from full routers on the same general LuCI JSON
+    API family (e.g. TplinkC5400XRouter) is that it doesn't implement the
+    combined 'admin/status?form=all' endpoint full routers use to fetch
+    everything in one call - its Lua backend raises an internal error (missing
+    'Apcfg' section) because it lacks full-router features like a separate
+    access-point config block. Its own web UI instead queries several narrower,
+    per-section endpoints (see get_status()).
+
+    Request shape (headers, body, URL - never 'operation=' in the query string)
+    is matched exactly against a real packet capture of this device's own web
+    UI, rather than reusing another client class's request-building logic -
+    this device's minimal CGI backend has repeatedly proven sensitive to small
+    deviations (e.g. a missing Content-Type header appears to make its body
+    parser unreliable).
+    """
 
     def __init__(
         self,
@@ -30,13 +49,23 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
     ) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
-        referer = '{}/webpages/index.html'.format(self.host)
         self._url_firmware = 'admin/firmware?form=upgrade'
-        # Keep this minimal and matching exactly what was proven to work against
-        # the real device - extra headers (Content-Type, Accept, X-Requested-With,
-        # etc.) that other client classes in this library add were tried and
-        # caused 'no such callback' errors on this device's minimal CGI backend.
-        self._headers_request = {'Referer': referer, 'Origin': self.host}
+        # Matches a real browser session's headers exactly (captured via
+        # packet sniffing), for every authenticated request. The Referer used
+        # before login is different (see _headers_login) - the real UI's login
+        # page and its post-login pages are different URLs.
+        common_headers = {
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Origin': self.host,
+            'User-Agent': ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 '
+                            '(KHTML, like Gecko) Version/27.0 Safari/605.1.15'),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+        }
+        self._headers_login = dict(common_headers, Referer='{}/webpages/login.html'.format(self.host))
+        self._headers_request = dict(common_headers, Referer='{}/webpages/index.html'.format(self.host))
         # Not confirmed to exist on this device's firmware - no trace of a CPU/
         # memory endpoint in its own web UI or JS. Try once; if it's genuinely
         # unsupported, stop asking rather than hitting it every poll cycle.
@@ -67,17 +96,13 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         )
 
     def supports(self) -> bool:
-        # Consistent with every other endpoint on this device: 'operation=' must be
-        # present in the URL query string itself, not just the POST body, or the
-        # router intermittently responds with a generic 'no such callback' error
-        # (observed even for this specific pre-auth call, despite an earlier real
-        # browser capture not having it there - that apparently isn't reliable).
-        url = '{}/cgi-bin/luci/;stok=/locale?form=lang&operation=read'.format(self.host)
+        """Identify if the router is a RE813XE."""
+        url = '{}/cgi-bin/luci/;stok=/locale?form=lang'.format(self.host)
         response = None
         try:
             response = post(
                 url,
-                headers=self._headers_request,
+                headers=self._headers_login,
                 data='operation=read',
                 timeout=self.timeout,
                 verify=self._verify_ssl,
@@ -104,10 +129,10 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
 
         response = post(
             '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host),
-            data={'operation': 'login', 'password': self.password},
+            data='operation=login&password={}'.format(self.password),
             timeout=self.timeout,
             verify=self._verify_ssl,
-            headers=self._headers_request,
+            headers=self._headers_login,
         )
 
         text = response.text
@@ -131,18 +156,6 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
                 ignore_errors: bool = False) -> dict | None:
         if self._logged is False:
             raise Exception('Not authorised')
-
-        # This device requires 'operation=' in the URL query string itself, not
-        # just the POST body - add it automatically so every caller doesn't need
-        # to remember to. Only the 'operation=xxx' piece itself is duplicated into
-        # the URL, not the whole body, to avoid bloating the URL (or leaking
-        # sensitive fields like a Wi-Fi password into it) when the body carries
-        # more than just that one field.
-        if 'operation=' not in path:
-            match = search(r'operation=[^&]+', data)
-            operation_param = match.group(0) if match else data
-            sep = '&' if '?' in path else '?'
-            path = '{}{}{}'.format(path, sep, operation_param)
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
         response = post(
@@ -266,8 +279,9 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
             # networks, only the three host bands above.
             raise ValueError(f"Invalid or unsupported Wi-Fi connection type for RE813XE: {wifi}")
 
-        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
-                                    htmode, channel, txpower, disabled_all, portal_password]):
+        if all(v is None for v in [
+                enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                htmode, channel, txpower, disabled_all, portal_password]):
             raise ValueError("At least one wireless setting must be provided")
 
         # Reverse-engineered from a real packet capture of this device's own web
@@ -290,13 +304,13 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
             return override if override is not None else current.get(key)
 
         turning_on = enable if enable is not None else self._str2bool(current.get('enable'))
+        disabled_all_value = disabled_all if disabled_all is not None else ('off' if turning_on else 'on')
 
         data = {
             'twt': current.get('twt'),
             'ofdma': current.get('ofdma'),
             'mimo': current.get('mimo'),
             'enable': None if enable is None else ('on' if enable else 'off'),
-            'disabled_all': disabled_all if disabled_all is not None else ('off' if turning_on else 'on'),
         }
 
         if turning_on:
@@ -319,6 +333,12 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
                 data['txpower'] = cur('txpower', txpower)
             if portal_password is not None:
                 data['portal_password'] = portal_password
+
+        # Added last, matching the exact field order seen in real captured
+        # traffic - unlikely to matter for standard form parsing, but this
+        # device's backend has proven finicky enough elsewhere that it's not
+        # worth risking on an untested assumption.
+        data['disabled_all'] = disabled_all_value
 
         data = 'operation=write&' + urlencode({k: v for k, v in data.items() if v is not None}, quote_via=quote_plus)
         self.request(f'admin/wireless?form={value}', data)
