@@ -1,5 +1,6 @@
 from re import search
 from typing import List
+from urllib.parse import urlencode, quote_plus
 from requests import post
 from logging import Logger
 
@@ -54,6 +55,10 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         # etc.) that other client classes in this library add were tried and
         # caused 'no such callback' errors on this device's minimal CGI backend.
         self._headers_request = {'Referer': referer, 'Origin': self.host}
+        # Not confirmed to exist on this device's firmware - no trace of a CPU/
+        # memory endpoint in its own web UI or JS. Try once; if it's genuinely
+        # unsupported, stop asking rather than hitting it every poll cycle.
+        self._perf_status = True
 
     @staticmethod
     def _str2bool(v) -> bool | None:
@@ -148,10 +153,15 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
 
         # This device requires 'operation=' in the URL query string itself, not
         # just the POST body - add it automatically so every caller doesn't need
-        # to remember to.
+        # to remember to. Only the 'operation=xxx' piece itself is duplicated into
+        # the URL, not the whole body, to avoid bloating the URL (or leaking
+        # sensitive fields like a Wi-Fi password into it) when the body carries
+        # more than just that one field.
         if 'operation=' not in path:
+            match = search(r'operation=[^&]+', data)
+            operation_param = match.group(0) if match else data
             sep = '&' if '?' in path else '?'
-            path = '{}{}{}'.format(path, sep, data)
+            path = '{}{}{}'.format(path, sep, operation_param)
 
         url = '{}/cgi-bin/luci/;stok={}/{}'.format(self.host, self._stok, path)
         response = post(
@@ -223,6 +233,16 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
         status.wifi_clients_total = ap_status.get('wirelessCount', len(devices))
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
+        if self._perf_status:
+            try:
+                performance = self.request('admin/status?form=perf', 'operation=read')
+                status.mem_usage = performance.get('mem_usage')
+                status.cpu_usage = performance.get('cpu_usage')
+            except Exception:
+                # Not implemented on this firmware (no such page in its own web
+                # UI) - stop asking rather than failing every poll cycle.
+                self._perf_status = False
+
         return status
 
     def get_ipv4_reservations(self):
@@ -269,38 +289,36 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
                                     htmode, channel, txpower, disabled_all, portal_password]):
             raise ValueError("At least one wireless setting must be provided")
 
-        data = 'operation=write'
-        # The real device's own get_wifi() response for this endpoint uses plain
-        # field names ('enable', 'ssid', ...), not '{band}_enable' - match that
-        # on write too rather than the '{value}_...'-prefixed style some other
-        # client classes in this codebase use for their own wireless forms.
-        if enable is not None:
-            data += f"&enable={'on' if enable else 'off'}"
-        if ssid is not None:
-            data += f"&ssid={ssid}"
-        if hidden is not None:
-            data += f"&hidden={hidden}"
-        if encryption is not None:
-            data += f"&encryption={encryption}"
-        if psk_version is not None:
-            data += f"&psk_version={psk_version}"
-        if psk_cipher is not None:
-            data += f"&psk_cipher={psk_cipher}"
-        if psk_key is not None:
-            data += f"&psk_key={psk_key}"
-        if hwmode is not None:
-            data += f"&hwmode={hwmode}"
-        if htmode is not None:
-            data += f"&htmode={htmode}"
-        if channel is not None:
-            data += f"&channel={channel}"
-        if txpower is not None:
-            data += f"&txpower={txpower}"
-        if disabled_all is not None:
-            data += f"&disabled_all={disabled_all}"
-        if portal_password is not None:
-            data += f"&portal_password={portal_password}"
+        # This device's Lua backend appears to need the complete set of wireless
+        # fields when re-enabling a radio, not just 'enable' on its own - sending
+        # only 'enable=on' produced an internal crash ("arithmetic on a boolean
+        # value"), while 'enable=off' alone worked fine. Read the current full
+        # config and merge our requested changes into it, mirroring what the
+        # device's own web UI does when you submit its settings form.
+        current = self.request(f'admin/wireless?form={value}', 'operation=read') or {}
+        merged = dict(current)
 
+        overrides = {
+            'enable': None if enable is None else ('on' if enable else 'off'),
+            'ssid': ssid,
+            'hidden': hidden,
+            'encryption': encryption,
+            'psk_version': psk_version,
+            'psk_cipher': psk_cipher,
+            'psk_key': psk_key,
+            'hwmode': hwmode,
+            'htmode': htmode,
+            'channel': channel,
+            'txpower': txpower,
+            'disabled_all': disabled_all,
+            'portal_password': portal_password,
+        }
+        for k, v in overrides.items():
+            if v is not None:
+                merged[k] = v
+
+        data = 'operation=write&' + urlencode(
+            {k: v for k, v in merged.items() if v is not None}, quote_via=quote_plus)
         self.request(f'admin/wireless?form={value}', data)
 
     def get_wifi(self, wifi: Connection):
