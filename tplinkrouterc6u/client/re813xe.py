@@ -249,8 +249,76 @@ class TplinkRE813XERouter(AbstractRouter, TplinkRequest):
     def reboot(self) -> None:
         self.request('admin/system?form=reboot', 'operation=write', ignore_response=True)
 
-    def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        raise NotImplementedError()
+    _WIFI_FORMS = {
+        Connection.HOST_2G: 'wireless_2g',
+        Connection.HOST_5G: 'wireless_5g',
+        Connection.HOST_6G: 'wireless_6g',
+    }
+
+    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
+                 encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
+                 hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
+                 disabled_all: str = None, portal_password: str = None) -> None:
+        value = self._WIFI_FORMS.get(wifi)
+        if not value:
+            # This device is a simple AP/extender - it has no guest or IoT
+            # networks, only the three host bands above.
+            raise ValueError(f"Invalid or unsupported Wi-Fi connection type for RE813XE: {wifi}")
+
+        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                    htmode, channel, txpower, disabled_all, portal_password]):
+            raise ValueError("At least one wireless setting must be provided")
+
+        data = 'operation=write'
+        # The real device's own get_wifi() response for this endpoint uses plain
+        # field names ('enable', 'ssid', ...), not '{band}_enable' - match that
+        # on write too rather than the '{value}_...'-prefixed style some other
+        # client classes in this codebase use for their own wireless forms.
+        if enable is not None:
+            data += f"&enable={'on' if enable else 'off'}"
+        if ssid is not None:
+            data += f"&ssid={ssid}"
+        if hidden is not None:
+            data += f"&hidden={hidden}"
+        if encryption is not None:
+            data += f"&encryption={encryption}"
+        if psk_version is not None:
+            data += f"&psk_version={psk_version}"
+        if psk_cipher is not None:
+            data += f"&psk_cipher={psk_cipher}"
+        if psk_key is not None:
+            data += f"&psk_key={psk_key}"
+        if hwmode is not None:
+            data += f"&hwmode={hwmode}"
+        if htmode is not None:
+            data += f"&htmode={htmode}"
+        if channel is not None:
+            data += f"&channel={channel}"
+        if txpower is not None:
+            data += f"&txpower={txpower}"
+        if disabled_all is not None:
+            data += f"&disabled_all={disabled_all}"
+        if portal_password is not None:
+            data += f"&portal_password={portal_password}"
+
+        self.request(f'admin/wireless?form={value}', data)
+
+    def get_wifi(self, wifi: Connection):
+        from tplinkrouterc6u.common.dataclass import WifiStatus
+
+        value = self._WIFI_FORMS.get(wifi)
+        if not value:
+            raise ValueError(f"Invalid or unsupported Wi-Fi connection type for RE813XE: {wifi}")
+
+        data = self.request(f'admin/wireless?form={value}', 'operation=read')
+        status = WifiStatus()
+        status.enable = self._str2bool(data.get('enable'))
+        status.ssid = data.get('ssid')
+        status.hidden = self._str2bool(data.get('hidden'))
+        status.encryption = data.get('encryption')
+        status.psk_key = data.get('psk_key')
+        status.channel = int(data['channel']) if data.get('channel') else None
+        return status
 
     def get_ipv4_status(self) -> IPv4Status:
         raise NotImplementedError()
