@@ -549,12 +549,14 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             mesh_node.connect_type = ap.get('connect_type')
             mesh_node.mesh_type = ap.get('mesh_type')
             mesh_node.client_num = int(ap['client_num']) if ap.get('client_num') is not None else None
-            # The payload key is signal_strength but the value is a bar level indicator, so it
-            # lands in signal_level; signal_strength stays reserved for dBm. Absent on the
-            # main router, which has no wireless uplink of its own.
+            # The payload key is signal_strength but the value is a firmware-dependent bar
+            # level (observed 1..3 on BE, up to 5 on AX), so it lands in signal_level;
+            # signal_strength stays reserved for dBm. Absent on the main router, which has
+            # no wireless uplink of its own, and on older AX firmware that omits the key.
             mesh_node.signal_level = (
                 int(ap['signal_strength']) if ap.get('signal_strength') is not None else None)
-            mesh_node.support_reboot = ap.get('support_reboot')
+            support_reboot = ap.get('support_reboot')
+            mesh_node.support_reboot = None if support_reboot is None else bool(support_reboot)
             mesh_nodes.append(mesh_node)
 
             # Build client device list with AP association (and signal_strength if on satellite node).
