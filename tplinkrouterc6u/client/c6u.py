@@ -515,7 +515,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return status
 
-    def get_mesh_nodes(self) -> list[MeshNode]:
+    def get_mesh_nodes(self) -> tuple[list[MeshNode], list | None]:
         """Return the EasyMesh nodes reported by the main router,
         and ap_name for client network devices.
         Returns an empty list on routers that do not run EasyMesh: they answer
@@ -523,14 +523,14 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         """
                 
         if not self._easymesh:
-            return []
+            return [], []
 
         easymesh_device_list = None
         try:
             easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
         except Exception:
             self._easymesh = False
-            return []
+            return [], []
 
         mesh_nodes = []
         device_ap_assoc = []
