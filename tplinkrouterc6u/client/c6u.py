@@ -509,44 +509,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             except Exception:
                 self._wan_ipv4_dynamic = False
 
-        easymesh_device_list = None
-        if self._easymesh:
-            try:
-                easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
-            except Exception:
-                self._easymesh = False
-
-        if easymesh_device_list:
-            # Match EasyMesh MACs (often dash-uppercase) to devices keyed by other API formats
-            devices_by_mac = {device.macaddr: device for device in devices.values()}
-            for ap in easymesh_device_list:
-                try:
-                    # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                    sclient_detail = self.request(
-                        'admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac=' + ap['mac'],
-                        'operation=read&mac=' + ap['mac'])
-                except Exception:
-                    continue
-
-                if not sclient_detail:
-                    continue
-
-                for nclient in sclient_detail.get('mesh_nclient_list') or []:
-                    nclient_mac = nclient.get('mac')
-                    if not nclient_mac:
-                        continue
-                    device = devices_by_mac.get(str(get_mac(nclient_mac)))
-                    if device is None:
-                        continue
-                    if ap.get('role') == 'satellite_router':
-                        # Last satellite wins if the same client appears under multiple APs
-                        device.ap_name = ap.get('name')
-                        if nclient.get('signal_strength') is not None:
-                            device.signal = nclient['signal_strength']
-                    elif device.ap_name is None:
-                        # prefix * helps identify and sort main node devices for display
-                        device.ap_name = '*' + (ap.get('name') or '')
-
         status.devices = list(devices.values())
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (status.iot_clients_total or 0))
@@ -554,48 +516,66 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return status
 
     def get_mesh_nodes(self) -> list[MeshNode]:
-        """Return the EasyMesh nodes reported by the main router.
-
+        """Return the EasyMesh nodes reported by the main router,
+        and ap_name for client network devices.
         Returns an empty list on routers that do not run EasyMesh: they answer
-        the form with an error, which is the same signal get_status() already
-        uses to stop enriching clients with ap_name.
+        the form with an error.
         """
+                
         if not self._easymesh:
             return []
 
+        easymesh_device_list = None
         try:
-            data = self.request(self._url_easymesh_device_list, 'operation=read')
+            easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
         except Exception:
             self._easymesh = False
             return []
 
         mesh_nodes = []
-        for item in data or []:
+        device_ap_assoc = []
+        for ap in easymesh_device_list or []:
             mesh_node = MeshNode()
-            mesh_node._macaddr = get_mac(item['mac']) if item.get('mac') else None
-            mesh_node._ipaddr = get_ip(item['ip']) if item.get('ip') else None
-            mesh_node._parent_macaddr = get_mac(item['parent_mac']) if item.get('parent_mac') else None
-            mesh_node.name = item.get('name')
-            mesh_node.model = item.get('model')
-            mesh_node.role = item.get('role')
-            mesh_node.status = item.get('status')
-            mesh_node.device_type = item.get('device_type')
-            mesh_node.vendor = item.get('vendor')
-            mesh_node.location = item.get('location')
-            mesh_node.connect_type = item.get('connect_type')
-            mesh_node.mesh_type = item.get('mesh_type')
-            mesh_node.client_num = int(item['client_num']) if item.get('client_num') is not None else None
-            # The payload key is signal_strength but the value is a firmware-dependent bar
-            # level (observed 1..3 on BE, up to 5 on AX), so it lands in signal_level;
-            # signal_strength stays reserved for dBm. Absent on the main router, which has
-            # no uplink of its own, and on older AX firmware that omits the key.
+            mesh_node._macaddr = get_mac(ap['mac']) if ap.get('mac') else None
+            mesh_node._ipaddr = get_ip(ap['ip']) if ap.get('ip') else None
+            mesh_node._parent_macaddr = get_mac(ap['parent_mac']) if ap.get('parent_mac') else None
+            mesh_node.name = ap.get('name')
+            mesh_node.model = ap.get('model')
+            mesh_node.role = ap.get('role')
+            mesh_node.status = ap.get('status')
+            mesh_node.device_type = ap.get('device_type')
+            mesh_node.vendor = ap.get('vendor')
+            mesh_node.location = ap.get('location')
+            mesh_node.connect_type = ap.get('connect_type')
+            mesh_node.mesh_type = ap.get('mesh_type')
+            mesh_node.client_num = int(ap['client_num']) if ap.get('client_num') is not None else None
+            # The payload key is signal_strength but the value is a bar level indicator, so it
+            # lands in signal_level; signal_strength stays reserved for dBm. Absent on the
+            # main router, which has no wireless uplink of its own.
             mesh_node.signal_level = (
-                int(item['signal_strength']) if item.get('signal_strength') is not None else None)
-            support_reboot = item.get('support_reboot')
-            mesh_node.support_reboot = None if support_reboot is None else bool(support_reboot)
+                int(ap['signal_strength']) if ap.get('signal_strength') is not None else None)
+            mesh_node.support_reboot = ap.get('support_reboot')
             mesh_nodes.append(mesh_node)
 
-        return mesh_nodes
+            # Build client device list with AP association (and signal_strength if on satellite node).
+            try:
+                # 'sclient' is mesh main or satellite, 'nclient' is a network device
+                form_data = f'operation=read&mac={ap['mac']}'
+                sclient_detail = self.request(f'admin/easymesh_network?form=mesh_sclient_detail&{form_data}', form_data)
+            except Exception:
+                continue
+
+            for nclient in sclient_detail.get('mesh_nclient_list') or []:
+                nclient_mac = nclient.get('mac')
+                if not nclient_mac:
+                    continue
+                device_ap_assoc.append({
+                    "mac": nclient_mac,
+                    "ap_name": ap.get('name'), 
+                    "signal_strength": nclient.get('signal_strength'),
+                })
+
+        return mesh_nodes, device_ap_assoc
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
