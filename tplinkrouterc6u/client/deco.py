@@ -51,8 +51,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             'params': {'mac_list': [{"mac": item['mac']} for item in self.devices]}}))
 
     def get_firmware(self) -> Firmware:
-        self.devices = self.request('admin/device?form=device_list', dumps({"operation": "read"})).get(
-            'device_list', [])
+        self._fetch_devices()
 
         for item in self.devices:
             if item.get('role') != 'master' and len(self.devices) != 1:
@@ -64,13 +63,9 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         return firmware
 
     def get_mesh_nodes(self) -> list[MeshNode]:
-        """Return every unit of the mesh, master included.
-
-        Reuses the device list ``get_firmware()`` already fetches, which until
-        now kept only the master's firmware and discarded the rest.
-        """
-        if not self.devices:
-            self.get_firmware()
+        """Return every unit of the mesh, master included, as the router reports it now."""
+        # Always refetched: consumers poll this, and a cached list would freeze every metric.
+        self._fetch_devices()
 
         nodes = []
         for item in self.devices:
@@ -112,6 +107,10 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             return int(value)
         except (TypeError, ValueError):
             return None
+
+    def _fetch_devices(self) -> None:
+        self.devices = self.request('admin/device?form=device_list', dumps({"operation": "read"})).get(
+            'device_list', [])
 
     def get_status(self) -> Status:
         data = self.request('admin/network?form=wan_ipv4', dumps({'operation': 'read'}))
