@@ -84,6 +84,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
                 _macaddr=get_mac(item.get('mac')),
                 name=item.get('nickname', ''),
                 role=item.get('role', ''),
+                # The shared connection state; Deco reports it as group_status, in EasyMesh's vocabulary.
+                status=item.get('group_status'),
                 model=item.get('device_model', ''),
                 _ipaddr=get_ip(ip) if ip else None,
                 hardware_version=item.get('hardware_ver'),

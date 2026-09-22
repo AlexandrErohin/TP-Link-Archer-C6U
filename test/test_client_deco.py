@@ -852,6 +852,7 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(slave.firmware_version, '1.8.0 Build 25102213 Rel. 43970')
         self.assertEqual(slave.internet_status, 'online')
         self.assertEqual(slave.group_status, 'connected')
+        self.assertEqual(slave.status, 'connected')
         self.assertEqual(slave.signal_2g, -37)
         self.assertEqual(slave.signal_5g, -50)
         self.assertEqual(slave.rx_rate_2g, 412)
@@ -864,6 +865,7 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(master.name, 'Living Room')
         self.assertTrue(master.is_main_router)
         self.assertEqual(master.ipaddr, '192.168.68.1')
+        self.assertEqual(master.status, 'connected')
         # No uplink of its own, so no backhaul metrics and no parent.
         self.assertIsNone(master.signal_2g)
         self.assertIsNone(master.signal_5g)
