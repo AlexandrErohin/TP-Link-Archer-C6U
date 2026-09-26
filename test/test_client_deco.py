@@ -11,6 +11,7 @@ from tplinkrouterc6u import (
     Device,
     IPv4Status,
     LTEStatus,
+    ClientException,
 )
 
 
@@ -525,6 +526,13 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(check_data, '{"operation": "write", "params": {"band6": {"host": {"enable": true}}}}')
         client.set_wifi(Connection.GUEST_6G, True)
         self.assertEqual(check_data, '{"operation": "write", "params": {"band6": {"guest": {"enable": true}}}}')
+
+        check_data = ''
+        for wifi in (Connection.IOT_2G, Connection.IOT_5G, Connection.IOT_6G,
+                     Connection.HOST_MLO_2G, Connection.HOST_MLO_5G, Connection.HOST_MLO_6G):
+            with self.assertRaises(ClientException):
+                client.set_wifi(wifi, True)
+        self.assertEqual(check_data, '')
 
     def test_reboot_with_firmware(self) -> None:
         check_url = ''
