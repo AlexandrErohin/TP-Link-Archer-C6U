@@ -144,6 +144,11 @@ class MeshNode:
     level in ``signal_level``; Deco reports the backhaul per band in dBm, in
     ``signal_2g``/``signal_5g``. Backhaul fields are ``None`` on the main
     router, which has no uplink of its own.
+
+    Connection state lives in ``status`` (EasyMesh vocabulary, e.g.
+    ``connected``). On Deco the firmware exposes that value as
+    ``group_status``, so both fields are filled with the same string; callers
+    that only read ``status`` still work across families.
     """
     _macaddr: EUI48 | None = None
     _ipaddr: IPv4Address | None = None

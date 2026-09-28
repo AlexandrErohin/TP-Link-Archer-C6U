@@ -137,7 +137,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_status |   | Gets status about the router info including wifi statuses and connected devices info | [Status](#status) |
 | get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
-| get_mesh_nodes |   | Gets the EasyMesh nodes reported by the main router. Returns an empty list on routers without EasyMesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
+| get_mesh_nodes |   | Gets mesh nodes reported by the main router (EasyMesh on C6U/SG; Deco mesh units including the master). Returns an empty list on routers without mesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
 | delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
@@ -239,16 +239,19 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | frequency | frequency | str |
 
 ### <a id="MeshNode">MeshNode</a>
-One node of an EasyMesh network. The node whose `role` is `main_router` is the router itself; every
-other node is a satellite whose `parent_macaddr` points at the node it uplinks through - that parent
-may be another satellite in a multi-hop mesh. Fields absent from the router's answer stay `None`:
-the main router reports no uplink, and the bar level / `support_reboot` are only sent by newer
-firmware (seen on BE series, absent on AX series).
+One node of a mesh network as reported by the main router. Families populate different subsets of
+fields; values absent from the router's answer stay `None`.
 
-`signal_level` carries the uplink quality as a firmware-dependent bar level (not dBm): observed
-as 1–3 on BE series and up to 5 on AX series. Quality expressed in dBm belongs in
-`signal_strength`, which this form does not report, so a caller never has to guess which unit a
-field holds.
+**EasyMesh (C6U / SG).** The node whose `role` is `main_router` is the router itself; every other
+node is a satellite whose `parent_macaddr` points at the node it uplinks through - that parent may
+be another satellite in a multi-hop mesh. The main router reports no uplink; the bar level /
+`support_reboot` are only sent by newer firmware (seen on BE series, absent on AX series).
+`signal_level` is a firmware-dependent bar level (not dBm): observed as 1–3 on BE and up to 5 on AX.
+
+**Deco.** Roles are `master` / `slave` (`is_main_router` accepts both vocabularies). Backhaul quality
+is per-band dBm in `signal_2g` / `signal_5g` (plus rx/tx rates); connection state is in
+`group_status` and is also copied to shared `status` so callers that only read `status` work across
+families. `internet_status`, hardware/firmware versions and `wired_ports` are Deco-only.
 
 | Field | Description | Type |
 |---|---|---|
@@ -258,19 +261,27 @@ field holds.
 | ipaddress | node ip address | ipaddress.IPv4Address, None |
 | parent_macaddr | mac address of the node this one uplinks through | str, None |
 | parent_macaddress | mac address of the node this one uplinks through | macaddress.EUI48, None |
-| is_main_router | True when role is `main_router` | bool |
+| is_main_router | True when role is `main_router` (EasyMesh) or `master` (Deco) | bool |
 | name | node name | str, None |
-| model | node model, like - Archer AX55 | str, None |
-| role | `main_router` or `satellite_router` | str, None |
-| status | node status, like - connected | str, None |
+| model | node model, like - Archer AX55 / X50 | str, None |
+| role | EasyMesh: `main_router` / `satellite_router`; Deco: `master` / `slave` | str, None |
+| status | node status, like - connected (on Deco, mirrors `group_status`) | str, None |
 | device_type | node type, like - WirelessRouter, RangeExtender | str, None |
 | vendor | node vendor | str, None |
 | location | node location as set in the router UI | str, None |
 | connect_type | uplink type - `wire` or `wireless` | str, None |
 | mesh_type | mesh flavour, like - easymesh | str, None |
 | client_num | amount of clients connected to this node | int, None |
-| signal_level | uplink quality as a firmware-dependent bar level (not dBm; e.g. 1–3 on BE, up to 5 on AX) | int, None |
-| support_reboot | Can this node be rebooted from the main router | bool, None |
+| signal_level | EasyMesh uplink quality as a firmware-dependent bar level (not dBm) | int, None |
+| support_reboot | Can this node be rebooted from the main router (EasyMesh) | bool, None |
+| hardware_version | Deco hardware version | str, None |
+| firmware_version | Deco firmware version string | str, None |
+| internet_status | Deco internet reachability, like - online | str, None |
+| group_status | Deco mesh group state; same value as `status` | str, None |
+| signal_2g / signal_5g | Deco backhaul RSSI in dBm | int, None |
+| rx_rate_2g / rx_rate_5g | Deco backhaul RX rate | int, None |
+| tx_rate_2g / tx_rate_5g | Deco backhaul TX rate | int, None |
+| wired_ports | Deco wired port count | int, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |

@@ -44,8 +44,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
 
     def reboot(self) -> None:
-        if not self.devices:
-            self.get_firmware()
+        # Always refetched: a stale cache would reboot units that left the mesh.
+        self._fetch_devices()
         self.request('admin/device?form=system', dumps({
             'operation': 'reboot',
             'params': {'mac_list': [{"mac": item['mac']} for item in self.devices]}}))
