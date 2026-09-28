@@ -459,7 +459,6 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(result.hardware_version, '2.0')
         self.assertEqual(result.model, 'M4R')
         self.assertEqual(result.firmware_version, '1.6.1 Build 20231227 Rel. 80438')
-        self.assertEqual(response_firmware['result']['device_list'], client.devices)
 
     def test_get_firmware_two_devices(self) -> None:
         response_firmware = '''
@@ -495,7 +494,6 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(result.hardware_version, '2.0')
         self.assertEqual(result.model, 'M4R')
         self.assertEqual(result.firmware_version, '1.6.1 Build 20231227')
-        self.assertEqual(response_firmware['result']['device_list'], client.devices)
 
     def test_set_wifi(self) -> None:
         check_url = ''
@@ -526,8 +524,7 @@ class TestTPLinkDecoClient(TestCase):
         client.set_wifi(Connection.GUEST_6G, True)
         self.assertEqual(check_data, '{"operation": "write", "params": {"band6": {"guest": {"enable": true}}}}')
 
-    def test_reboot_refetches_stale_device_list(self) -> None:
-        """A prior get_firmware() cache must not decide which units are rebooted."""
+    def test_reboot_fetches_device_list(self) -> None:
         response = loads('''
 {"result": {"device_list": [
         {"role": "master", "mac": "84:a0:d0:37:c7:44", "device_model": "M4R",
@@ -549,47 +546,12 @@ class TestTPLinkDecoClient(TestCase):
                 check_data = data
 
         client = TPLinkRouterTest('', '')
-        # Stale unit that is no longer in the mesh; reboot must not include it.
-        client.devices = [{'mac': 'mac-left-the-mesh'}]
         result = client.reboot()
         self.assertIsNone(result)
         self.assertEqual(calls, ['admin/device?form=device_list', 'admin/device?form=system'])
         self.assertEqual(check_url, 'admin/device?form=system')
         self.assertEqual(check_data,
                          '{"operation": "reboot", "params": {"mac_list": [{"mac": "84:a0:d0:37:c7:44"}]}}')
-
-    def test_reboot_no_firmware(self) -> None:
-        response_firmware = '''
-        {"result": {"device_list": [
-                {"nand_flash": false, "hardware_ver": "2.0", "bssid_sta_2g": "",
-                "software_ver": "1.6.1 Build 20231227 Rel. 80438", "role": "master", "bssid_sta_5g": "",
-                "inet_status": "online", "nickname": "bedroom", "oversized_firmware": false,
-                "bssid_5g": "6b:3a:9b:93:f4:15", "set_gateway_support": true, "inet_error_msg": "well",
-                "group_status": "connected", "mac": "84:a0:d0:37:c7:44",  "bssid_2g": "5c:c6:06:e7:87:d9",
-                "support_plc": false, "oem_id": "fdfgdfgdgdfgdfg",
-                "signal_level": {"band5": "0", "band2_4": "0"}, "product_level": 100, "device_ip": "192.168.68.1",
-                "device_model": "M4R", "hw_id": "fgtrhxg43rgsdgbfdgbf", "device_type": "HOMEWIFISYSTEM"}]},
-        "error_code": 0}
-            '''
-        response_firmware = loads(response_firmware)
-        check_url = ''
-        check_data = ''
-
-        class TPLinkRouterTest(TPLinkDecoClient):
-            def request(self, path: str, data: str,
-                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
-                if path == 'admin/device?form=device_list':
-                    return response_firmware['result']
-                nonlocal check_url, check_data
-                check_url = path
-                check_data = data
-
-        client = TPLinkRouterTest('', '')
-        result = client.reboot()
-        self.assertIsNone(result)
-        self.assertEqual(check_url, 'admin/device?form=system')
-        self.assertEqual(check_data, '{"operation": "reboot", "params": {"mac_list": [{"mac": "84:a0:d0:37:c7:44"}]}}')
-        self.assertEqual(response_firmware['result']['device_list'], client.devices)
 
     def test_get_lte_status(self) -> None:
         response_internet = '''

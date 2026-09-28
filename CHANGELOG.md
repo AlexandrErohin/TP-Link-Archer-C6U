@@ -5,7 +5,7 @@
 ### Fixed
 
 - **Deco:** `get_mesh_nodes()` refetches `device_list` on every call (cached list from `get_firmware()` froze backhaul metrics for pollers) and fills shared `MeshNode.status` from `group_status` so node trackers that expect EasyMesh's `connected` vocabulary work ([#236](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/236)).
-- **Deco:** `reboot()` always refetches the device list so the MAC list is not taken from a stale `get_firmware()` / mesh cache.
+- **Deco:** drop the `self.devices` instance cache; `reboot()` / `get_firmware()` / `get_mesh_nodes()` each take a fresh list from `_fetch_devices()`.
 
 ## [5.35.0] - 2026-09-22
 

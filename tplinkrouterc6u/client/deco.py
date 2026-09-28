@@ -18,7 +18,6 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._headers_request = {'Content-Type': 'application/json'}
         self._headers_login = {'Content-Type': 'application/json'}
         self._data_block = 'result'
-        self.devices = []
 
     def logout(self) -> None:
         self.request('admin/system?form=logout', dumps({'operation': 'logout'}), True)
@@ -44,17 +43,16 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
 
     def reboot(self) -> None:
-        # Always refetched: a stale cache would reboot units that left the mesh.
-        self._fetch_devices()
+        devices = self._fetch_devices()
         self.request('admin/device?form=system', dumps({
             'operation': 'reboot',
-            'params': {'mac_list': [{"mac": item['mac']} for item in self.devices]}}))
+            'params': {'mac_list': [{"mac": item['mac']} for item in devices]}}))
 
     def get_firmware(self) -> Firmware:
-        self._fetch_devices()
+        devices = self._fetch_devices()
 
-        for item in self.devices:
-            if item.get('role') != 'master' and len(self.devices) != 1:
+        for item in devices:
+            if item.get('role') != 'master' and len(devices) != 1:
                 continue
             firmware = Firmware(item.get('hardware_ver', ''),
                                 item.get('device_model', ''),
@@ -64,11 +62,10 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
     def get_mesh_nodes(self) -> list[MeshNode]:
         """Return every unit of the mesh, master included, as the router reports it now."""
-        # Always refetched: consumers poll this, and a cached list would freeze every metric.
-        self._fetch_devices()
+        devices = self._fetch_devices()
 
         nodes = []
-        for item in self.devices:
+        for item in devices:
             signal = item.get('signal_strength') or {}
             rx = item.get('rx_rate_list') or {}
             tx = item.get('tx_rate_list') or {}
@@ -108,8 +105,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         except (TypeError, ValueError):
             return None
 
-    def _fetch_devices(self) -> None:
-        self.devices = self.request('admin/device?form=device_list', dumps({"operation": "read"})).get(
+    def _fetch_devices(self) -> list:
+        return self.request('admin/device?form=device_list', dumps({"operation": "read"})).get(
             'device_list', [])
 
     def get_status(self) -> Status:
