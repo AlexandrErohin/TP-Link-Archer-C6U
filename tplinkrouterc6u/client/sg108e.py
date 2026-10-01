@@ -285,6 +285,11 @@ class TPLinkSG108EClient(AbstractRouter):
 
 
 def _led_state(value) -> bool:
+    """Parse LED enable from the switch page; raise on anything but exact 0/1.
+
+    Stricter than ``_bool01``: rejects floats (``int(1.5) == 1``) and non-0/1
+    ints so a malformed ``led`` is never coerced to On/Off.
+    """
     if isinstance(value, str):
         if value == "0":
             return False

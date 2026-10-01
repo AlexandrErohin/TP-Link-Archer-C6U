@@ -1,5 +1,11 @@
 # Changelog
 
+## [UNRELEASED]
+
+### Fixed
+
+- **TL-SG108E:** `led_status()` / `set_led()` validate the `led` field (exact `0`/`1` or `"0"`/`"1"`) and raise `ClientError` on missing or malformed values instead of `bool(...)` coercion — e.g. quoted `"0"` no longer reads as On ([#238](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/238)).
+
 ## [5.35.1] - 2026-09-28
 
 ### Fixed
