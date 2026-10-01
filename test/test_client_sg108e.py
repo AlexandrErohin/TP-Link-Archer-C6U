@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 from tplinkrouterc6u import PortStatus, TPLinkSG108EClient
 from tplinkrouterc6u.client.sg108e import parse_script_variables
+from tplinkrouterc6u.common.exception import ClientError
 
 
 class TestSG108EParser(TestCase):
@@ -496,6 +497,199 @@ class TestTPLinkSG108EClient(TestCase):
             self.assertIsNone(port.tx_bad_packets)
             self.assertIsNone(port.rx_good_packets)
             self.assertIsNone(port.rx_bad_packets)
+
+    def test_led_status_on(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = 1;</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertTrue(client.led_status())
+        args, _kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/TurnOnLEDRpm.htm'))
+
+    def test_led_status_off(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = 0;</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertFalse(client.led_status())
+
+    def test_led_status_quoted_on(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = "1";</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertTrue(client.led_status())
+        args, _kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/TurnOnLEDRpm.htm'))
+
+    def test_led_status_quoted_off(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = "0";</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertFalse(client.led_status())
+
+    def test_led_status_rejects_invalid_values(self) -> None:
+        cases = [
+            """<html><script>var g_title = 'TL-SG108E';</script></html>""",
+            """<html><script>var led = 2;</script></html>""",
+            """<html><script>var led = 'yes';</script></html>""",
+            """<html><script>var led = 0.0;</script></html>""",
+            """<html><script>var led = 0.9;</script></html>""",
+            """<html><script>var led = 1.0;</script></html>""",
+            """<html><script>var led = 1.5;</script></html>""",
+            """<html><script>var led = true;</script></html>""",
+            """<html><script>var led = false;</script></html>""",
+            """<html><script>var led = [1];</script></html>""",
+            """<html><script>var led = {"a":1};</script></html>""",
+        ]
+        for html in cases:
+            with self.subTest(html=html):
+                client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+                client._session = Mock()
+                resp = Mock()
+                resp.status_code = 200
+                resp.text = html
+                client._session.get.return_value = resp
+
+                with self.assertRaises(ClientError) as ctx:
+                    client.led_status()
+                self.assertEqual(str(ctx.exception), 'Invalid response for LED status from router')
+
+    def test_set_led_on(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = 1;</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertTrue(client.set_led(True))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 1, 'led_cfg': 'Apply'})
+
+    def test_set_led_off(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = 0;</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertFalse(client.set_led(False))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 0, 'led_cfg': 'Apply'})
+
+    def test_set_led_quoted_on(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = "1";</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertTrue(client.set_led(True))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 1, 'led_cfg': 'Apply'})
+
+    def test_set_led_quoted_off(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = "0";</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertFalse(client.set_led(False))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 0, 'led_cfg': 'Apply'})
+
+    def test_set_led_returns_response_state(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 200
+        resp.text = """<html><script>var led = 0;</script></html>"""
+        client._session.get.return_value = resp
+
+        self.assertFalse(client.set_led(True))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 1, 'led_cfg': 'Apply'})
+
+        resp.text = """<html><script>var led = 1;</script></html>"""
+        self.assertTrue(client.set_led(False))
+        args, kwargs = client._session.get.call_args
+        self.assertTrue(args[0].endswith('/led_on_set.cgi'))
+        self.assertEqual(kwargs['params'], {'rd_led': 0, 'led_cfg': 'Apply'})
+
+    def test_set_led_rejects_invalid_values(self) -> None:
+        cases = [
+            """<html><script>var tip = '';</script></html>""",
+            """<html><script>var led = 2;</script></html>""",
+            """<html><script>var led = 'yes';</script></html>""",
+            """<html><script>var led = 0.0;</script></html>""",
+            """<html><script>var led = 0.9;</script></html>""",
+            """<html><script>var led = 1.0;</script></html>""",
+            """<html><script>var led = 1.5;</script></html>""",
+            """<html><script>var led = true;</script></html>""",
+            """<html><script>var led = false;</script></html>""",
+            """<html><script>var led = [1];</script></html>""",
+            """<html><script>var led = {"a":1};</script></html>""",
+        ]
+        for html in cases:
+            with self.subTest(html=html):
+                client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+                client._session = Mock()
+                resp = Mock()
+                resp.status_code = 200
+                resp.text = html
+                client._session.get.return_value = resp
+
+                with self.assertRaises(ClientError) as ctx:
+                    client.set_led(True)
+                self.assertEqual(str(ctx.exception), 'Invalid response for LED status from router')
+
+    def test_led_status_http_error_propagates(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 500
+        resp.text = ''
+        client._session.get.return_value = resp
+
+        with self.assertRaises(ClientError) as ctx:
+            client.led_status()
+        self.assertIn('Unexpected response: 500', str(ctx.exception))
+
+    def test_set_led_http_error_propagates(self) -> None:
+        client = TPLinkSG108EClient('http://192.0.2.23', 'password')
+        client._session = Mock()
+        resp = Mock()
+        resp.status_code = 404
+        resp.text = ''
+        client._session.get.return_value = resp
+
+        with self.assertRaises(ClientError) as ctx:
+            client.set_led(True)
+        self.assertIn('Unexpected response: 404', str(ctx.exception))
 
 
 if __name__ == '__main__':

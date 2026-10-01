@@ -262,11 +262,11 @@ class TPLinkSG108EClient(AbstractRouter):
 
     def led_status(self) -> bool:
         data = self._get_vars(_PATH_LED_STATUS)
-        return bool(data.get("led"))
+        return _led_state(data.get("led"))
 
     def set_led(self, enable: bool) -> bool:
         data = self._get_vars(_PATH_LED_SET, params={"rd_led": int(enable), "led_cfg": "Apply"})
-        return bool(data.get("led"))
+        return _led_state(data.get("led"))
 
     def _get_vars(self, path: str, params: dict | None = None) -> dict:
         r = self._session.get(
@@ -282,6 +282,20 @@ class TPLinkSG108EClient(AbstractRouter):
         vars = parse_script_variables(r.text)
         vars.pop("tip", None)
         return vars
+
+
+def _led_state(value) -> bool:
+    if isinstance(value, str):
+        if value == "0":
+            return False
+        if value == "1":
+            return True
+    elif isinstance(value, int) and not isinstance(value, bool):
+        if value == 0:
+            return False
+        if value == 1:
+            return True
+    raise ClientError("Invalid response for LED status from router")
 
 
 def _flatten_dict(data: dict) -> dict:
