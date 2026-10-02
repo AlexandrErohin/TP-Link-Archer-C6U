@@ -140,6 +140,12 @@ class TestTplinkRE813XERouter(TestCase):
                 }
             if path == 'admin/network?form=lan_ipv4':
                 return {'lan_macaddr': '11-22-33-44-55-66', 'lan_ip': '192.168.0.2'}
+            if path in (
+                'admin/status?form=status_device',
+                'admin/status?form=guest',
+                'admin/extend?form=guest_settings',
+            ):
+                raise ClientError('optional endpoint missing')
             if path == 'admin/status?form=perf':
                 raise ClientError('perf missing')
             raise AssertionError(path)
@@ -161,16 +167,102 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertFalse(client._perf_status)
         self.assertIn('admin/status?form=perf', calls)
 
+    def test_get_status_re700x_fixtures(self) -> None:
+        client = self._client()
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            if path == 'admin/status?form=ap_status':
+                return {
+                    'wireless_2g_enable': 'on',
+                    'wireless_5g_enable': 'on',
+                    'wirelessCount': 8,
+                    'wirelessGrid': [
+                        {
+                            'mac': '7C-2C-67-D9-E9-14',
+                            'type': '2.4GHz',
+                            'name': 'esp32c3-D9E914',
+                            'rxrate': 108,
+                            'txrate': 150,
+                            'ipaddr': '192.168.1.52',
+                        },
+                        {
+                            'mac': '26-96-9F-67-1E-C5',
+                            'type': '5GHz',
+                            'name': 'Mac',
+                            'rxrate': 648,
+                            'txrate': 960,
+                            'ipaddr': '192.168.1.55',
+                        },
+                    ],
+                }
+            if path == 'admin/status?form=status_device':
+                return {'wired_dhcp': '1', 'wired_ip': '192.168.1.4', 'wired_type': '0'}
+            if path == 'admin/network?form=lan_ipv4':
+                raise ClientError('no lan_ipv4')
+            if path == 'admin/status?form=guest':
+                return [
+                    {
+                        'mac': 'B0-4A-39-98-20-AD',
+                        'type': '2.4GHz',
+                        'name': 'roborock-vacuum-a51',
+                        'rxrate': 150,
+                        'txrate': 150,
+                        'ipaddr': '192.168.1.51',
+                    },
+                    {
+                        'mac': 'FC-3C-D7-2A-DE-10',
+                        'type': '2.4GHz',
+                        'name': 'wlan0',
+                        'rxrate': 52,
+                        'txrate': 65,
+                        'ipaddr': '192.168.1.54',
+                    },
+                ]
+            if path == 'admin/extend?form=guest_settings':
+                return {
+                    'enable_5g': 'off',
+                    'enable_2g': 'on',
+                    'ssid_2g': 'XYZ',
+                    'ssid_5g': 'TP-Link_Guest_5G',
+                    'hide_2g': 'off',
+                    'hide_5g': 'off',
+                    'password': '***',
+                    'sec': 'wpa2/wpa3',
+                }
+            if path == 'admin/status?form=perf':
+                raise ClientError('perf missing')
+            raise AssertionError(path)
+
+        client.request = request  # type: ignore[method-assign]
+        status = client.get_status()
+
+        self.assertEqual(status.lan_ipv4_addr, '192.168.1.4')
+        self.assertTrue(status.wifi_2g_enable)
+        self.assertTrue(status.wifi_5g_enable)
+        self.assertTrue(status.guest_2g_enable)
+        self.assertFalse(status.guest_5g_enable)
+        self.assertEqual(status.wifi_clients_total, 8)
+        self.assertEqual(status.guest_clients_total, 2)
+        self.assertEqual(status.clients_total, 10)
+        self.assertEqual(len(status.devices), 4)
+        guest = [d for d in status.devices if d.type.is_guest_wifi()]
+        self.assertEqual(len(guest), 2)
+        self.assertEqual(guest[0].type, Connection.GUEST_2G)
+        self.assertEqual(guest[0].down_speed, 150)
+
     def test_get_ipv4_status(self) -> None:
         client = self._client()
 
         def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
-            self.assertEqual(path, 'admin/network?form=lan_ipv4')
-            return {
-                'lan_macaddr': '11-22-33-44-55-66',
-                'lan_ip': '192.168.0.2',
-                'lan_netmask': '255.255.255.0',
-            }
+            if path == 'admin/network?form=lan_ipv4':
+                return {
+                    'lan_macaddr': '11-22-33-44-55-66',
+                    'lan_ip': '192.168.0.2',
+                    'lan_netmask': '255.255.255.0',
+                }
+            if path == 'admin/status?form=status_device':
+                raise ClientError('unused')
+            raise AssertionError(path)
 
         client.request = request  # type: ignore[method-assign]
         ipv4 = client.get_ipv4_status()
@@ -178,6 +270,20 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(ipv4.lan_macaddr, '11-22-33-44-55-66')
         self.assertEqual(ipv4.lan_ipv4_ipaddr, '192.168.0.2')
         self.assertEqual(ipv4.lan_ipv4_netmask, '255.255.255.0')
+
+    def test_get_ipv4_status_falls_back_to_status_device(self) -> None:
+        client = self._client()
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            if path == 'admin/network?form=lan_ipv4':
+                raise ClientError('missing')
+            if path == 'admin/status?form=status_device':
+                return {'wired_ip': '192.168.1.4'}
+            raise AssertionError(path)
+
+        client.request = request  # type: ignore[method-assign]
+        ipv4 = client.get_ipv4_status()
+        self.assertEqual(ipv4.lan_ipv4_ipaddr, '192.168.1.4')
 
     def test_get_ipv4_reservations_empty(self) -> None:
         client = self._client()
@@ -195,6 +301,24 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(len(leases), 1)
         self.assertEqual(leases[0].ipaddr, '192.168.0.20')
         self.assertEqual(leases[0].hostname, 'pc')
+
+    def test_get_ipv4_dhcp_leases_list_format(self) -> None:
+        client = self._client()
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            return [{
+                'leasetime': '00:00:38',
+                'macaddr': 'a8:46:74:46:14:f8',
+                'ipaddr': '192.168.1.59',
+                'name': 'bedroom-ble',
+            }]
+
+        client.request = request  # type: ignore[method-assign]
+        leases = client.get_ipv4_dhcp_leases()
+        self.assertEqual(len(leases), 1)
+        self.assertEqual(leases[0].hostname, 'bedroom-ble')
+        self.assertEqual(leases[0].ipaddr, '192.168.1.59')
+        self.assertEqual(leases[0].lease_time, '00:00:38')
 
     def test_set_wifi_enable_sends_full_payload(self) -> None:
         client = self._client()
@@ -291,10 +415,62 @@ class TestTplinkRE813XERouter(TestCase):
 
     def test_set_wifi_unsupported_raises(self) -> None:
         client = self._client()
-        for wifi in (Connection.GUEST_2G, Connection.IOT_5G, Connection.HOST_MLO_2G):
+        for wifi in (Connection.IOT_5G, Connection.HOST_MLO_2G, Connection.WIRED):
             with self.subTest(wifi=wifi):
                 with self.assertRaises(ValueError):
                     client.set_wifi(wifi, True)
+
+    def test_set_guest_wifi(self) -> None:
+        client = self._client()
+        writes = []
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            self.assertEqual(path, 'admin/extend?form=guest_settings')
+            if data == 'operation=read':
+                return {
+                    'enable_2g': 'off',
+                    'enable_5g': 'off',
+                    'ssid_2g': 'Guest',
+                    'ssid_5g': 'Guest5',
+                    'hide_2g': 'off',
+                    'password': 'old',
+                    'sec': 'wpa2/wpa3',
+                }
+            writes.append(data)
+            return {}
+
+        client.request = request  # type: ignore[method-assign]
+        client.set_wifi(Connection.GUEST_2G, True, ssid='NewGuest')
+        params = parse_qs(writes[0])
+        self.assertEqual(params['operation'], ['write'])
+        self.assertEqual(params['enable_2g'], ['on'])
+        self.assertEqual(params['ssid_2g'], ['NewGuest'])
+        self.assertEqual(params['enable_5g'], ['off'])
+
+    def test_get_guest_wifi(self) -> None:
+        client = self._client()
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            self.assertEqual(path, 'admin/extend?form=guest_settings')
+            return {
+                'enable_2g': 'on',
+                'ssid_2g': 'XYZ',
+                'hide_2g': 'off',
+                'password': 'secret',
+                'sec': 'wpa2/wpa3',
+            }
+
+        client.request = request  # type: ignore[method-assign]
+        wifi = client.get_wifi(Connection.GUEST_2G)
+        self.assertTrue(wifi.enable)
+        self.assertEqual(wifi.ssid, 'XYZ')
+        self.assertFalse(wifi.hidden)
+        self.assertEqual(wifi.psk_key, 'secret')
+        self.assertEqual(wifi.encryption, 'wpa2/wpa3')
+
+    def test_re700x_alias(self) -> None:
+        from tplinkrouterc6u import TplinkRe700XRouter
+        self.assertIs(TplinkRe700XRouter, TplinkRE813XERouter)
 
     def test_get_wifi(self) -> None:
         client = self._client()

@@ -52,6 +52,7 @@ from tplinkrouterc6u import (
     TPLinkWR841NClient,
     TplinkRE330Router,
     TplinkRE813XERouter,
+    TplinkRe700XRouter,  # alias of TplinkRE813XERouter
     TplinkC3200Router,
     Connection
 )
@@ -65,7 +66,7 @@ logger = Logger('test')
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
 # router = TplinkRouter('http://192.168.0.1', 'password', 'admin2', logger=logger)
-# C5400X / RE813XE / similar: use web encrypted password (see Web Encrypted Password below)
+# C5400X / RE813XE / RE700X / similar: use web encrypted password (see Web Encrypted Password below)
 # router = TplinkC5400XRouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 
@@ -122,7 +123,7 @@ So before action you need to authorize and after logout. You can also use `with 
 
 ### <a id="encrypted_pass">Web Encrypted Password</a>
 If you got exception - `use web encrypted password instead. Check the documentation!`
-or you have TP-link C5400X, RE813XE or similar device you need to get web encrypted password by these actions:
+or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get web encrypted password by these actions:
 1. Go to the login page of your router. (default: 192.168.0.1).
 2. Type in the password you use to login into the password field.
 3. Click somewhere else on the page so that the password field is not selected anymore.
@@ -587,6 +588,7 @@ Not all fields are filled by every client:
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
+- RE700X
 - RE813XE v1.6
 - TD-W9960 (v1, V1.20)
 - TL-7DR6430 1.0

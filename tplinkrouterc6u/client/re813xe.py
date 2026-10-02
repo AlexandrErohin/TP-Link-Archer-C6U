@@ -19,24 +19,17 @@ from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 class TplinkRE813XERouter(AbstractRouter):
     """
-    TP-Link RE813XE (and similar LuCI extenders/APs) in access-point mode.
+    TP-Link LuCI Wi-Fi extenders/APs in access-point mode (RE813XE, RE700X, …).
 
     ``supports()`` does not key off the marketing model name. It detects this
     firmware family by capability: web-encrypted password login works,
     ``admin/status?form=ap_status`` returns wireless AP data, and the full-router
     combined endpoint ``admin/status?form=all`` does not (missing ``Apcfg``).
 
-    The key firmware difference from full routers on the same general LuCI JSON
-    API family (e.g. TplinkC5400XRouter) is that missing combined status page;
-    the device web UI instead queries narrower per-section endpoints
-    (see get_status()).
-
-    Request shape (headers, body, URL - never 'operation=' in the query string)
-    is matched exactly against a real packet capture of this device's own web
-    UI, rather than reusing another client class's request-building logic -
-    this device's minimal CGI backend has repeatedly proven sensitive to small
-    deviations (e.g. a missing Content-Type header appears to make its body
-    parser unreliable).
+    RE813XE-oriented host Wi-Fi writes use ``disabled_all`` (packet-captured).
+    RE700X-style guest status uses ``admin/status?form=guest`` and
+    ``admin/extend?form=guest_settings`` when present; missing endpoints are
+    ignored so one client covers both firmwares.
     """
 
     def __init__(
@@ -80,16 +73,42 @@ class TplinkRE813XERouter(AbstractRouter):
         return str(v).lower() in ('yes', 'true', 'on') if v is not None else None
 
     @staticmethod
-    def _map_wire_type(data: str | None) -> Connection:
+    def _map_wire_type(data: str | None, host: bool = True) -> Connection:
         if data is None:
             return Connection.UNKNOWN
+        if data == 'wired':
+            return Connection.WIRED
         if data.startswith('2.4'):
-            return Connection.HOST_2G
+            return Connection.HOST_2G if host else Connection.GUEST_2G
         if data.startswith('5'):
-            return Connection.HOST_5G
+            return Connection.HOST_5G if host else Connection.GUEST_5G
         if data.startswith('6'):
-            return Connection.HOST_6G
+            return Connection.HOST_6G if host else Connection.GUEST_6G
+        if data.startswith('iot_2'):
+            return Connection.IOT_2G
+        if data.startswith('iot_5'):
+            return Connection.IOT_5G
+        if data.startswith('iot_6'):
+            return Connection.IOT_6G
         return Connection.UNKNOWN
+
+    def _request_optional(self, path: str, data: str = 'operation=read'):
+        try:
+            return self.request(path, data)
+        except ClientError:
+            return None
+
+    @staticmethod
+    def _device_from_item(conn: Connection, item: dict) -> Device:
+        device = Device(
+            conn,
+            get_mac(item.get('mac', '00-00-00-00-00-00')),
+            get_ip(item.get('ipaddr', item.get('ip', ''))),
+            item.get('name', ''),
+        )
+        device.down_speed = item.get('rxrate', item.get('rx_rate'))
+        device.up_speed = item.get('txrate', item.get('tx_rate'))
+        return device
 
     def get_firmware(self) -> Firmware:
         data = self.request(self._url_firmware, 'operation=read')
@@ -170,7 +189,7 @@ class TplinkRE813XERouter(AbstractRouter):
         return 'success' in data and data['success']
 
     def request(self, path: str, data: str, ignore_response: bool = False,
-                ignore_errors: bool = False) -> dict | None:
+                ignore_errors: bool = False) -> dict | list | None:
         if self._logged is False:
             raise ClientException('Not authorised')
 
@@ -194,7 +213,7 @@ class TplinkRE813XERouter(AbstractRouter):
             if self._is_valid_response(resp):
                 return resp.get('data')
             elif ignore_errors:
-                return resp
+                return resp.get('data', resp)
         except Exception as e:
             error = 'TplinkRouter - {} - An unknown response - {}; Request {} - Response {}'.format(
                 self.__class__.__name__, e, path, text)
@@ -218,30 +237,48 @@ class TplinkRE813XERouter(AbstractRouter):
                 self._sysauth = ''
 
     def get_status(self) -> Status:
-        ap_status = self.request('admin/status?form=ap_status', 'operation=read')
-        try:
-            lan_ipv4 = self.request('admin/network?form=lan_ipv4', 'operation=read')
-        except Exception:
-            lan_ipv4 = {}
+        ap_status = self.request('admin/status?form=ap_status', 'operation=read') or {}
+        lan_ipv4 = self._request_optional('admin/network?form=lan_ipv4') or {}
+        status_device = self._request_optional('admin/status?form=status_device') or {}
+        guest_status = self._request_optional('admin/status?form=guest') or []
+        guest_settings = self._request_optional('admin/extend?form=guest_settings') or {}
 
         status = Status()
-        status._lan_macaddr = get_mac(lan_ipv4['lan_macaddr']) if lan_ipv4.get('lan_macaddr') else None
-        status._lan_ipv4_addr = get_ip(lan_ipv4['lan_ip']) if lan_ipv4.get('lan_ip') else None
+        if lan_ipv4.get('lan_macaddr'):
+            status._lan_macaddr = get_mac(lan_ipv4['lan_macaddr'])
+        if lan_ipv4.get('lan_ip'):
+            status._lan_ipv4_addr = get_ip(lan_ipv4['lan_ip'])
+        elif status_device.get('wired_ip'):
+            # RE700X (and similar) expose the AP LAN address here instead of lan_ipv4.
+            status._lan_ipv4_addr = get_ip(status_device['wired_ip'])
+            status._wan_ipv4_addr = status._lan_ipv4_addr
+
         status.wifi_2g_enable = self._str2bool(ap_status.get('wireless_2g_enable'))
         status.wifi_5g_enable = self._str2bool(ap_status.get('wireless_5g_enable'))
         status.wifi_6g_enable = self._str2bool(ap_status.get('wireless_6g_enable'))
+        if isinstance(guest_settings, dict):
+            status.guest_2g_enable = self._str2bool(guest_settings.get('enable_2g'))
+            status.guest_5g_enable = self._str2bool(guest_settings.get('enable_5g'))
+            status.guest_6g_enable = self._str2bool(guest_settings.get('enable_6g'))
 
-        devices = []
+        devices_by_mac: dict[str, Device] = {}
         for item in ap_status.get('wirelessGrid', []) or []:
-            conn = self._map_wire_type(item.get('type'))
-            devices.append(Device(
-                conn,
-                get_mac(item.get('mac', '00-00-00-00-00-00')),
-                get_ip(item.get('ipaddr', item.get('ip', ''))),
-                item.get('name', ''),
-            ))
-        status.devices = devices
-        status.wifi_clients_total = ap_status.get('wirelessCount', len(devices))
+            if not isinstance(item, dict):
+                continue
+            mac = item.get('mac', '00-00-00-00-00-00')
+            devices_by_mac[mac] = self._device_from_item(self._map_wire_type(item.get('type')), item)
+
+        if isinstance(guest_status, list):
+            status.guest_clients_total = len(guest_status)
+            for item in guest_status:
+                if not isinstance(item, dict):
+                    continue
+                mac = item.get('mac', '00-00-00-00-00-00')
+                devices_by_mac[mac] = self._device_from_item(
+                    self._map_wire_type(item.get('type'), host=False), item)
+
+        status.devices = list(devices_by_mac.values())
+        status.wifi_clients_total = ap_status.get('wirelessCount', len(status.devices))
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
         if self._perf_status:
@@ -257,18 +294,19 @@ class TplinkRE813XERouter(AbstractRouter):
         return status
 
     def get_ipv4_reservations(self) -> list:
-        # This device acts as an access point/extender - DHCP is handled upstream,
-        # there's no reservation concept here.
+        # Access point/extender - DHCP is handled upstream.
         return []
 
     def get_ipv4_dhcp_leases(self) -> list[IPv4DHCPLease]:
-        # Same reasoning as get_ipv4_reservations - the endpoint exists but returns
-        # an empty object on this device, since DHCP is handled upstream. We still
-        # call it (rather than hardcoding []) in case a future firmware or a
-        # closely related model actually populates it.
+        # Endpoint exists on some firmwares (RE700X returns a list); others return {}.
         data = self.request('admin/dhcps?form=client', 'operation=load') or {}
         leases = []
-        clients = data.values() if isinstance(data, dict) else data
+        if isinstance(data, dict):
+            clients = data.values()
+        elif isinstance(data, list):
+            clients = data
+        else:
+            clients = []
         for client in clients:
             if not isinstance(client, dict):
                 continue
@@ -289,35 +327,40 @@ class TplinkRE813XERouter(AbstractRouter):
         Connection.HOST_6G: 'wireless_6g',
     }
 
+    _GUEST_ENABLE_KEYS = {
+        Connection.GUEST_2G: 'enable_2g',
+        Connection.GUEST_5G: 'enable_5g',
+        Connection.GUEST_6G: 'enable_6g',
+    }
+
+    _GUEST_SSID_KEYS = {
+        Connection.GUEST_2G: 'ssid_2g',
+        Connection.GUEST_5G: 'ssid_5g',
+        Connection.GUEST_6G: 'ssid_6g',
+    }
+
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
                  hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
                  disabled_all: str = None, portal_password: str = None) -> None:
+        if wifi in self._GUEST_ENABLE_KEYS:
+            self._set_guest_wifi(wifi, enable=enable, ssid=ssid, hidden=hidden, psk_key=psk_key)
+            return
+
         value = self._WIFI_FORMS.get(wifi)
         if not value:
-            # This device is a simple AP/extender - it has no guest or IoT
-            # networks, only the three host bands above.
-            raise ValueError(f"Invalid or unsupported Wi-Fi connection type for RE813XE: {wifi}")
+            raise ValueError(f'Invalid or unsupported Wi-Fi connection type for RE extender: {wifi}')
 
         if all(v is None for v in [
                 enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
                 htmode, channel, txpower, disabled_all, portal_password]):
-            raise ValueError("At least one wireless setting must be provided")
+            raise ValueError('At least one wireless setting must be provided')
 
-        # Reverse-engineered from a real packet capture of this device's own web
-        # UI toggling each radio, since blindly echoing the GET response back
-        # (an earlier version of this method) turned out to be wrong in two
-        # important ways:
-        #  1. The real toggle field is 'disabled_all', which is the *inverse* of
-        #     'enable' (enable=on pairs with disabled_all=off, and vice versa).
-        #     It never appears under that exact name in the GET response (only
-        #     as a differently-named, band-prefixed field), so echoing GET data
-        #     back never set it correctly - producing a Lua crash ("arithmetic
-        #     on a boolean value") observed when only 'enable=on' was sent.
-        #  2. Several GET-only fields (psk_cipher, all the wep_* fields) are
-        #     never sent by the real UI on write at all.
+        # Reverse-engineered from a real packet capture of RE813XE web UI toggles.
+        #  1. The real toggle field is 'disabled_all', inverse of 'enable'.
+        #  2. Several GET-only fields are never sent by the real UI on write.
         # Disabling only ever sends a minimal field set; enabling sends the full
-        # radio config. We mirror that here rather than echoing everything back.
+        # radio config.
         current = self.request(f'admin/wireless?form={value}', 'operation=read') or {}
 
         def cur(key, override):
@@ -344,9 +387,6 @@ class TplinkRE813XERouter(AbstractRouter):
                 'htmode': cur('htmode', htmode),
                 'channel': cur('channel', channel),
             })
-            # The real UI uses 'txpower' for 2.4/5 GHz and 'pscEnable' for 6 GHz -
-            # match whichever this band actually uses, pulled from GET if not
-            # explicitly overridden.
             if wifi == Connection.HOST_6G:
                 data['pscEnable'] = current.get('pscEnable', 'on')
             else:
@@ -354,19 +394,54 @@ class TplinkRE813XERouter(AbstractRouter):
             if portal_password is not None:
                 data['portal_password'] = portal_password
 
-        # Added last, matching the exact field order seen in real captured
-        # traffic - unlikely to matter for standard form parsing, but this
-        # device's backend has proven finicky enough elsewhere that it's not
-        # worth risking on an untested assumption.
         data['disabled_all'] = disabled_all_value
-
         data = 'operation=write&' + urlencode({k: v for k, v in data.items() if v is not None}, quote_via=quote_plus)
         self.request(f'admin/wireless?form={value}', data)
 
+    def _set_guest_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None,
+                        hidden: str = None, psk_key: str = None) -> None:
+        if all(v is None for v in [enable, ssid, hidden, psk_key]):
+            raise ValueError('At least one guest wireless setting must be provided')
+
+        current = self.request('admin/extend?form=guest_settings', 'operation=read')
+        if not isinstance(current, dict):
+            raise ClientException('Guest Wi-Fi settings are not available on this firmware')
+
+        enable_key = self._GUEST_ENABLE_KEYS[wifi]
+        ssid_key = self._GUEST_SSID_KEYS[wifi]
+        hide_key = enable_key.replace('enable_', 'hide_')
+
+        payload = dict(current)
+        if enable is not None:
+            payload[enable_key] = 'on' if enable else 'off'
+        if ssid is not None:
+            payload[ssid_key] = ssid
+        if hidden is not None:
+            payload[hide_key] = hidden if hidden in ('on', 'off') else ('on' if hidden else 'off')
+        if psk_key is not None:
+            payload['password'] = psk_key
+
+        data = 'operation=write&' + urlencode(
+            {k: v for k, v in payload.items() if v is not None}, quote_via=quote_plus)
+        self.request('admin/extend?form=guest_settings', data)
+
     def get_wifi(self, wifi: Connection) -> WifiStatus:
+        if wifi in self._GUEST_ENABLE_KEYS:
+            data = self.request('admin/extend?form=guest_settings', 'operation=read')
+            if not isinstance(data, dict):
+                raise ClientException('Guest Wi-Fi settings are not available on this firmware')
+            status = WifiStatus()
+            status.enable = self._str2bool(data.get(self._GUEST_ENABLE_KEYS[wifi]))
+            status.ssid = data.get(self._GUEST_SSID_KEYS[wifi])
+            hide_key = self._GUEST_ENABLE_KEYS[wifi].replace('enable_', 'hide_')
+            status.hidden = self._str2bool(data.get(hide_key))
+            status.encryption = data.get('sec')
+            status.psk_key = data.get('password')
+            return status
+
         value = self._WIFI_FORMS.get(wifi)
         if not value:
-            raise ValueError(f"Invalid or unsupported Wi-Fi connection type for RE813XE: {wifi}")
+            raise ValueError(f'Invalid or unsupported Wi-Fi connection type for RE extender: {wifi}')
 
         data = self.request(f'admin/wireless?form={value}', 'operation=read')
         status = WifiStatus()
@@ -379,12 +454,19 @@ class TplinkRE813XERouter(AbstractRouter):
         return status
 
     def get_ipv4_status(self) -> IPv4Status:
-        data = self.request('admin/network?form=lan_ipv4', 'operation=read') or {}
+        lan_ipv4 = self._request_optional('admin/network?form=lan_ipv4') or {}
+        status_device = self._request_optional('admin/status?form=status_device') or {}
         ipv4_status = IPv4Status()
-        if data.get('lan_macaddr'):
-            ipv4_status._lan_macaddr = get_mac(data['lan_macaddr'])
-        if data.get('lan_ip'):
-            ipv4_status._lan_ipv4_ipaddr = get_ip(data['lan_ip'])
-        if data.get('lan_netmask'):
-            ipv4_status._lan_ipv4_netmask = get_ip(data['lan_netmask'])
+        if lan_ipv4.get('lan_macaddr'):
+            ipv4_status._lan_macaddr = get_mac(lan_ipv4['lan_macaddr'])
+        if lan_ipv4.get('lan_ip'):
+            ipv4_status._lan_ipv4_ipaddr = get_ip(lan_ipv4['lan_ip'])
+        elif status_device.get('wired_ip'):
+            ipv4_status._lan_ipv4_ipaddr = get_ip(status_device['wired_ip'])
+        if lan_ipv4.get('lan_netmask'):
+            ipv4_status._lan_ipv4_netmask = get_ip(lan_ipv4['lan_netmask'])
         return ipv4_status
+
+
+# Alias for callers / docs that follow the RE700X naming from #95.
+TplinkRe700XRouter = TplinkRE813XERouter
