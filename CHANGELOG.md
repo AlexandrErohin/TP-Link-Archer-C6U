@@ -2,6 +2,10 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- **RE813XE:** `TplinkRE813XERouter` for RE813XE-class Wi-Fi 6E extenders/APs (web-encrypted password). Detected by capability probe (`ap_status` works, `status?form=all` does not) and registered before `TplinkC5400XRouter` so long passwords no longer mis-route to C5400X ([#234](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/234)).
+
 ### Fixed
 
 - **Deco:** `set_wifi` rejects unsupported networks (`IOT_*`, `HOST_MLO*`, `WIRED`, `UNKNOWN`) with `ClientException` instead of silently toggling the 2.4 GHz guest network ([#237](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/237)).
