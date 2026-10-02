@@ -36,8 +36,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
             Connection.GUEST_6G: ('band6', 'guest'),
         }
         if wifi not in bands:
-            # IoT and MLO networks are not mapped for Deco; writing them anywhere
-            # else would silently toggle a different network.
+            # Only host/guest × 2.4/5/6 GHz are mapped; anything else would
+            # previously fall through and silently toggle the 2.4 GHz guest network.
             raise ClientException(f'Unsupported wifi connection for Deco set_wifi: {wifi}')
         band, network = bands[wifi]
         params = {band: {network: {'enable': enable}}}

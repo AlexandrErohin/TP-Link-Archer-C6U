@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Deco:** `set_wifi` rejects unsupported networks (`IOT_*`, `HOST_MLO*`, `WIRED`, `UNKNOWN`) with `ClientException` instead of silently toggling the 2.4 GHz guest network ([#237](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/237)).
 - **TL-SG108E:** `led_status()` / `set_led()` validate the `led` field (exact `0`/`1` or `"0"`/`"1"`) and raise `ClientError` on missing or malformed values instead of `bool(...)` coercion — e.g. quoted `"0"` no longer reads as On ([#238](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/238)).
 
 ## [5.35.1] - 2026-09-28
