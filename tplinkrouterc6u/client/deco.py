@@ -8,6 +8,7 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus, MeshNode
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
+from tplinkrouterc6u.common.exception import ClientException
 
 
 class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
@@ -26,19 +27,20 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._logged = False
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
-        en = {'enable': enable}
-        if Connection.HOST_2G == wifi:
-            params = {'band2_4': {'host': en}}
-        elif Connection.HOST_5G == wifi:
-            params = {'band5_1': {'host': en}}
-        elif Connection.GUEST_5G == wifi:
-            params = {'band5_1': {'guest': en}}
-        elif Connection.HOST_6G == wifi:
-            params = {'band6': {'host': en}}
-        elif Connection.GUEST_6G == wifi:
-            params = {'band6': {'guest': en}}
-        else:
-            params = {'band2_4': {'guest': en}}
+        bands = {
+            Connection.HOST_2G: ('band2_4', 'host'),
+            Connection.GUEST_2G: ('band2_4', 'guest'),
+            Connection.HOST_5G: ('band5_1', 'host'),
+            Connection.GUEST_5G: ('band5_1', 'guest'),
+            Connection.HOST_6G: ('band6', 'host'),
+            Connection.GUEST_6G: ('band6', 'guest'),
+        }
+        if wifi not in bands:
+            # Only host/guest × 2.4/5/6 GHz are mapped; anything else would
+            # previously fall through and silently toggle the 2.4 GHz guest network.
+            raise ClientException(f'Unsupported wifi connection for Deco set_wifi: {wifi}')
+        band, network = bands[wifi]
+        params = {band: {network: {'enable': enable}}}
 
         self.request('admin/wireless?form=wlan', dumps({'operation': 'write', 'params': params}))
 
