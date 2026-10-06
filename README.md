@@ -525,6 +525,7 @@ Not all fields are filled by every client:
 - Archer BE230 (v1.0, v2.0)
 - Archer BE3600 (v1.0, v1.2, v1.6)
 - Archer BE400 v1.0
+- Archer BE450 v1.0
 - Archer BE550 (v1.0, V2)
 - Archer BE800 v1.0
 - Archer BE805 (v1.0, v1.20)
@@ -623,6 +624,7 @@ Not all fields are filled by every client:
 - Halo H47BE 2.0
 - Halo H60XR 1.0
 - Halo H80X 1.0
+- MB118-4G v1.0
 - ME30 1.0
 - MR47BE v1.0
 - MR50G 1.0
