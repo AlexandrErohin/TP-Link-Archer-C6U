@@ -577,6 +577,7 @@ Not all fields are filled by every client:
 - Deco XE75 (v1.0, v2.0)
 - Deco XE75PRO (v3.0)
 - EAP115 v2.0
+- EX220-G2u v1
 - EX511 v2.0
 - EX920 v1.0
 - HB810 v2.6
