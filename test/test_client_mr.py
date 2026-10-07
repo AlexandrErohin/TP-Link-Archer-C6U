@@ -352,6 +352,165 @@ X_TP_TotalPacketsReceived=467
         self.assertEqual(status.devices[0].packets_sent, 176)
         self.assertEqual(status.devices[0].packets_received, 467)
 
+    def test_get_status_cpu_and_memory(self) -> None:
+        # The MR/VR family reports CPU and memory through DAILY_PROC_STAT and
+        # DAILY_MEM_STAT. CPUUsage is a comma separated list with a trailing
+        # separator; the first value is the one the web UI displays.
+        # Captured from an Archer VR2100v.
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=6C:5A:B0:56:1E:00
+IPInterfaceIPAddress=192.168.1.1
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=1
+name=wlan1
+[error]0
+
+'''
+        usage_response = '''[0,0,0,0,0,0]0
+CPUUsage=3,4,2,0,8,
+[0,0,0,0,0,0]1
+total=236832
+free=79996
+[error]0
+
+'''
+        asked = []
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str is not None and 'DAILY_PROC_STAT' in data_str:
+                    asked.append(data_str)
+                    return 200, usage_response
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.cpu_usage, 0.03)
+        self.assertAlmostEqual(status.mem_usage, (236832 - 79996) / 236832)
+        # Guard the exact object names: a typo in either would otherwise still
+        # satisfy a substring based stub.
+        self.assertIn('[DAILY_PROC_STAT#', asked[0])
+        self.assertIn('[DAILY_MEM_STAT#', asked[0])
+
+    def test_get_status_cpu_and_memory_queried_once_when_unsupported(self) -> None:
+        # A firmware that does not know the DAILY_* objects must be asked only
+        # once: these devices have a fragile web server, so get_status() must
+        # not spend a doomed round trip on every poll. Same contract as the
+        # _ipv6_support probe.
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=6C:5A:B0:56:1E:00
+IPInterfaceIPAddress=192.168.1.1
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=1
+name=wlan1
+[error]0
+
+'''
+        calls = []
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str is not None and 'DAILY_' in data_str:
+                    calls.append(data_str)
+                    return 200, '[error]9804\n\n'
+                return 200, status_response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+        client.get_status()
+        client.get_status()
+
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(client._usage_support)
+        self.assertIsNone(status.cpu_usage)
+        self.assertIsNone(status.mem_usage)
+
+        # Same contract when the request fails outright rather than returning
+        # an empty result.
+        failing = []
+
+        class TPLinkMRClientRaising(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str is not None and 'DAILY_' in data_str:
+                    failing.append(data_str)
+                    return 500, ''
+                return 200, status_response
+
+        client = TPLinkMRClientRaising('', '')
+        client.get_status()
+        client.get_status()
+
+        self.assertEqual(len(failing), 1)
+        self.assertFalse(client._usage_support)
+
+    def test_get_status_memory_survives_unparsable_cpu(self) -> None:
+        # A CPUUsage value this client cannot parse must not discard the memory
+        # reading that came back in the same response.
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=6C:5A:B0:56:1E:00
+IPInterfaceIPAddress=192.168.1.1
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=1
+name=wlan1
+[error]0
+
+'''
+        usage_response = '''[0,0,0,0,0,0]0
+CPUUsage=n/a,4,2,0,8,
+[0,0,0,0,0,0]1
+total=236832
+free=79996
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str is not None and 'DAILY_PROC_STAT' in data_str:
+                    return 200, usage_response
+                return 200, status_response
+
+        status = TPLinkMRClientTest('', '').get_status()
+
+        self.assertIsNone(status.cpu_usage)
+        self.assertAlmostEqual(status.mem_usage, (236832 - 79996) / 236832)
+
+    def test_get_status_cpu_and_memory_absent(self) -> None:
+        # Firmwares without the DAILY_* objects must leave both fields at None
+        # rather than raising out of get_status().
+        response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=6C:5A:B0:56:1E:00
+IPInterfaceIPAddress=192.168.1.1
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=1
+name=wlan1
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        status = client.get_status()
+
+        self.assertIsNone(status.cpu_usage)
+        self.assertIsNone(status.mem_usage)
+
     def test_get_status_mr6400(self) -> None:
         response = '''
 [1,1,0,0,0,0]0

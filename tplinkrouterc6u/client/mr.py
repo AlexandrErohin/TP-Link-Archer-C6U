@@ -101,6 +101,7 @@ class TPLinkMRClientBase(AbstractRouter):
         self._ee = None
         self._seq = None
         self._ipv6_support = True
+        self._usage_support = True
         self._url_rsa_key = 'cgi/getParm'
 
         self._encryption = EncryptionWrapperMR()
@@ -245,6 +246,43 @@ class TPLinkMRClientBase(AbstractRouter):
                                                   int(item.get('totalBytesTx', 0)))
         except Exception:
             pass
+
+        # CPU and memory. The MR/VR family exposes these through the DAILY_*
+        # objects rather than the DEV2_* ones used by TPLinkEXClient, and older
+        # firmwares omit them entirely, so probe once and stop asking on
+        # failure, as the IPv6 block below does.
+        # CPUUsage is a comma separated list with a trailing separator; the
+        # first value is the one the router's own status page displays.
+        if self._usage_support:
+            try:
+                usage_acts = [
+                    self.ActItem(self.ActItem.GET, 'DAILY_PROC_STAT', attrs=['CPUUsage']),
+                    self.ActItem(self.ActItem.GET, 'DAILY_MEM_STAT', attrs=['total', 'free']),
+                ]
+                _, usage_values = self.req_act(usage_acts)
+                if not usage_values:
+                    self._usage_support = False
+                    usage_values = {}
+
+                cpu = self._to_list(usage_values.get('0'))
+                cpu = cpu[0] if cpu else {}
+                cores = str(cpu.get('CPUUsage', '')).split(',')
+                if cores and cores[0] != '':
+                    try:
+                        status.cpu_usage = int(cores[0]) / 100
+                    except ValueError:
+                        pass
+
+                mem = self._to_list(usage_values.get('1'))
+                mem = mem[0] if mem else {}
+                try:
+                    total = int(mem.get('total', 0))
+                    if total:
+                        status.mem_usage = (total - int(mem.get('free', 0))) / total
+                except ValueError:
+                    pass
+            except Exception:
+                self._usage_support = False
 
         # Separate WAN_IP_CONN request for IPv6 attrs: asking for them in the
         # main status batch breaks some firmwares that lack IPv6 support, so we
