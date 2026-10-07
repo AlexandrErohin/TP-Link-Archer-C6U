@@ -14,6 +14,7 @@ from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.c80 import TplinkC80Router
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.re813xe import TplinkRE813XERouter, TplinkRe700XRouter
+from tplinkrouterc6u.client.re605x import TplinkRE605XRouter
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient

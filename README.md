@@ -52,6 +52,7 @@ from tplinkrouterc6u import (
     TPLinkWR841NClient,
     TplinkRE330Router,
     TplinkRE813XERouter,
+    TplinkRE605XRouter,  # read-only RE605X v2; accepts the ordinary local password
     TplinkRe700XRouter,  # alias of TplinkRE813XERouter
     TplinkC3200Router,
     Connection
@@ -169,6 +170,37 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
 | get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
+
+### RE605X v2 read-only monitoring
+
+`TplinkRE605XRouter` reuses the LuCI extender backend. Tested on **RE605X v2.0 EU,
+1.0.6 Build 20240819 Rel. 59464**, in wireless repeater mode. Other revisions,
+firmware and access-point mode have not been verified. The provider identifies
+this model through the public `get_deviceInfo` endpoint without submitting a password.
+
+Use the ordinary local administrator password; the client fetches the RSA public
+key and encrypts it using PKCS#1 v1.5. Legacy web-encrypted passwords remain accepted.
+Always authorize before reads and logout afterwards, including on failure.
+Conservative polling (e.g. 120 seconds) is recommended; simultaneous web logins
+can interfere with polling sessions.
+
+`get_status()` returns clients, LAN address and CPU/memory usage. Client
+`rx_rate`/`tx_rate` are **PHY rates in Mbit/s**, not download/upload traffic;
+`down_speed`/`up_speed` remain `None`. Client RSSI, traffic bytes and retries are
+not present in the tested client payload. Absent clients disappear from `devices`.
+
+After a successful `get_status()`, `router.metrics` contains `internet_status`,
+`ip_status`, `mesh_enabled`, `high_speed_mode`, `backhaul_mode`, and
+`wifi_2g_enabled`/`wifi_5g_enabled`. For each band (`2g`/`5g`), it also contains
+`backhaul_<band>_status`, `_rssi` (dBm), `_rx_rate`/`_tx_rate` (Mbit/s),
+`_channel`, `_signal_level` (bars), `_ssid`, and `_bssid`. Disconnected bands
+have `None` for RSSI, rates and bar level; channel/SSID/BSSID remain reported
+configuration values. The local `mesh_enabled` flag is not proof of an active mesh topology.
+
+This client rejects configuration writes and reboot; logout is the only allowed
+authenticated write. `Status.wifi_*_enable` and `guest_*_enable` are `None` to
+avoid advertising unvalidated Wi-Fi controls. This library support does not itself
+create additional Home Assistant sensor entities.
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -590,6 +622,7 @@ Not all fields are filled by every client:
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
+- RE605X v2.0 EU (1.0.6 Build 20240819 Rel. 59464; read-only, wireless repeater mode)
 - RE700X
 - RE813XE v1.6
 - TD-W9960 (v1, V1.20)
