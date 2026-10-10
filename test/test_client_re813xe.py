@@ -1,6 +1,7 @@
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs
+from requests.exceptions import ConnectionError, Timeout
 
 from tplinkrouterc6u import TplinkRE813XERouter, Connection, Firmware, Status, IPv4Status, WifiStatus
 from tplinkrouterc6u.common.exception import ClientException, ClientError
@@ -164,8 +165,62 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(len(status.devices), 2)
         self.assertEqual(status.devices[0].type, Connection.HOST_2G)
         self.assertEqual(status.devices[1].type, Connection.HOST_5G)
-        self.assertFalse(client._perf_status)
+        self.assertIsNone(status.cpu_usage)
+        self.assertIsNone(status.mem_usage)
         self.assertIn('admin/status?form=perf', calls)
+
+    def test_performance_recovers_after_transient_failure(self) -> None:
+        for error in (ConnectionError('connection reset'), Timeout('timeout'), ClientError('temporary error')):
+            with self.subTest(error=type(error).__name__):
+                client = self._client()
+                performance = Mock(side_effect=[
+                    {'cpu_usage': 0.04, 'mem_usage': 0.53},
+                    error,
+                    {'cpu_usage': 0, 'mem_usage': 0.54},
+                ])
+
+                def request(path, data):
+                    if path == 'admin/status?form=perf':
+                        return performance()
+                    return {'wirelessCount': 2} if path.endswith('form=ap_status') else {}
+
+                client.request = request
+                initial = client.get_status()
+                failed = client.get_status()
+                recovered = client.get_status()
+                self.assertEqual(initial.cpu_usage, 0.04)
+                self.assertEqual(initial.mem_usage, 0.53)
+                self.assertIsNone(failed.cpu_usage)
+                self.assertIsNone(failed.mem_usage)
+                self.assertEqual(failed.wifi_clients_total, 2)
+                self.assertEqual(recovered.cpu_usage, 0)
+                self.assertEqual(recovered.mem_usage, 0.54)
+                self.assertEqual(performance.call_count, 3)
+
+    def test_performance_recovers_after_empty_or_malformed_response(self) -> None:
+        for response in (None, [], {}, 'invalid'):
+            with self.subTest(response=response):
+                client = self._client()
+                performance = Mock(side_effect=[response, {'cpu_usage': 0.09, 'mem_usage': 0.53}])
+                client.request = lambda path, data: performance() if path.endswith('form=perf') else {}
+                failed = client.get_status()
+                recovered = client.get_status()
+                self.assertIsNone(failed.cpu_usage)
+                self.assertIsNone(failed.mem_usage)
+                self.assertEqual(recovered.cpu_usage, 0.09)
+                self.assertEqual(recovered.mem_usage, 0.53)
+                self.assertEqual(performance.call_count, 2)
+
+    def test_unsupported_performance_does_not_fail_status(self) -> None:
+        client = self._client()
+        performance = Mock(side_effect=ClientError('unsupported endpoint'))
+        client.request = lambda path, data: performance() if path.endswith('form=perf') else {}
+        for _ in range(2):
+            status = client.get_status()
+            self.assertIsNone(status.cpu_usage)
+            self.assertIsNone(status.mem_usage)
+            self.assertEqual(status.wifi_clients_total, 0)
+        self.assertEqual(performance.call_count, 2)
 
     def test_get_status_re700x_fixtures(self) -> None:
         client = self._client()
