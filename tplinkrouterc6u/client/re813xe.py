@@ -63,10 +63,6 @@ class TplinkRE813XERouter(AbstractRouter):
         }
         self._headers_login = dict(common_headers, Referer='{}/webpages/login.html'.format(self.host))
         self._headers_request = dict(common_headers, Referer='{}/webpages/index.html'.format(self.host))
-        # Not confirmed to exist on this device's firmware - no trace of a CPU/
-        # memory endpoint in its own web UI or JS. Try once; if it's genuinely
-        # unsupported, stop asking rather than hitting it every poll cycle.
-        self._perf_status = True
 
     @staticmethod
     def _str2bool(v) -> bool | None:
@@ -281,15 +277,15 @@ class TplinkRE813XERouter(AbstractRouter):
         status.wifi_clients_total = ap_status.get('wirelessCount', len(status.devices))
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
-        if self._perf_status:
-            try:
-                performance = self.request('admin/status?form=perf', 'operation=read')
+        try:
+            performance = self.request('admin/status?form=perf', 'operation=read')
+            if isinstance(performance, dict):
                 status.mem_usage = performance.get('mem_usage')
                 status.cpu_usage = performance.get('cpu_usage')
-            except Exception:
-                # Not implemented on this firmware (no such page in its own web
-                # UI) - stop asking rather than failing every poll cycle.
-                self._perf_status = False
+        except Exception:
+            # Optional endpoint: leave metrics unavailable for this snapshot,
+            # but retry next poll. A transient error does not prove it is unsupported.
+            pass
 
         return status
 
