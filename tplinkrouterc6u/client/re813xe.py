@@ -4,6 +4,7 @@ from requests import post
 from logging import Logger
 
 from tplinkrouterc6u.client_abstract import AbstractRouter
+from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import (
@@ -120,7 +121,14 @@ class TplinkRE813XERouter(AbstractRouter):
 
     def supports(self) -> bool:
         """Detect LuCI AP/extender firmware that lacks full-router status?form=all."""
-        if len(self.password) < 200:
+        try:
+            self._get_encrypted_password()
+        except Exception as e:
+            # Not a web-encrypted LuCI device (or unreachable) — leave for the
+            # appropriate client; do not log a scary error during detection.
+            if self._logger:
+                self._logger.debug(
+                    'TplinkRouter - %s - web password probe failed: %s', self.__class__.__name__, e)
             return False
 
         try:
@@ -158,14 +166,38 @@ class TplinkRE813XERouter(AbstractRouter):
                 pass
             return False
 
+    def _get_encrypted_password(self) -> str:
+        """Return the web-encrypted form of ``self.password``.
+
+        The LuCI extenders/APs (RE505X, RE813XE, RE700X, …) only accept a
+        password that has been RSA-encrypted (PKCS#1 v1.5) with the device's
+        public key, and post that single 256-hex blob at login. The library
+        clients used to demand this value be sourced from the browser's
+        devtools; this computes it on the fly instead.
+
+        The device exposes its RSA public key (``[n, e]``) unauthenticated via
+        ``/login?form=login&operation=read``. An already-encrypted password
+        (>= 200 chars) is returned unchanged so the two encryption paths
+        compose without double-encrypting.
+        """
+        if len(self.password) >= 200:
+            return self.password
+
+        response = post(
+            '{}/cgi-bin/luci/;stok=/login?form=login&operation=read'.format(self.host),
+            headers=self._headers_login,
+            timeout=self.timeout,
+            verify=self._verify_ssl,
+        )
+        data = response.json()['data']['password']
+        return EncryptionWrapper.rsa_encrypt(self.password, data[0], data[1])
+
     def authorize(self) -> None:
-        if len(self.password) < 200:
-            raise ClientException(
-                'You need to use web encrypted password instead. Check the documentation!')
+        password = self._get_encrypted_password()
 
         response = post(
             '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host),
-            data='operation=login&password={}'.format(self.password),
+            data='operation=login&password={}'.format(password),
             timeout=self.timeout,
             verify=self._verify_ssl,
             headers=self._headers_login,
