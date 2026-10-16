@@ -357,6 +357,35 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(params['ssid'], ['RE813XE'])
         self.assertEqual(params['txpower'], ['high'])
 
+    def test_set_wifi_with_psk_cipher(self) -> None:
+        client = self._client()
+        writes = []
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            if data == 'operation=read':
+                return {
+                    'enable': 'off',
+                    'ssid': 'RE505X',
+                    'encryption': 'psk',
+                    'psk_version': 'rsn',
+                    'psk_cipher': 'aes',
+                    'psk_key': 'secret',
+                    'hwmode': 'anacax',
+                    'htmode': 'auto',
+                    'channel': 'auto',
+                }
+            writes.append((path, data))
+            return {}
+
+        client.request = request  # type: ignore[method-assign]
+        client.set_wifi(Connection.HOST_5G, True)
+
+        self.assertEqual(len(writes), 1)
+        params = parse_qs(writes[0][1])
+        self.assertEqual(params['enable'], ['on'])
+        self.assertEqual(params['disabled_all'], ['off'])
+        self.assertEqual(params['psk_cipher'], ['aes'])
+
     def test_set_wifi_disable_sends_minimal_payload(self) -> None:
         client = self._client()
         writes = []
@@ -469,8 +498,9 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(wifi.encryption, 'wpa2/wpa3')
 
     def test_re700x_alias(self) -> None:
-        from tplinkrouterc6u import TplinkRe700XRouter
+        from tplinkrouterc6u import TplinkRe700XRouter, TplinkRE505XRouter
         self.assertIs(TplinkRe700XRouter, TplinkRE813XERouter)
+        self.assertIs(TplinkRE505XRouter, TplinkRE813XERouter)
 
     def test_get_wifi(self) -> None:
         client = self._client()
