@@ -1,6 +1,7 @@
 from re import search
 from urllib.parse import urlencode, quote_plus
 from requests import post
+from requests.exceptions import ConnectionError, Timeout
 from logging import Logger
 
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -65,6 +66,13 @@ class TplinkRE813XERouter(AbstractRouter):
         }
         self._headers_login = dict(common_headers, Referer='{}/webpages/login.html'.format(self.host))
         self._headers_request = dict(common_headers, Referer='{}/webpages/index.html'.format(self.host))
+        # Optional CPU/memory endpoint (admin/status?form=perf). Probe while
+        # _perf_status is True; after the first successful dict response set
+        # _perf_ok so later transient errors do not permanently disable polling.
+        # Network failures never latch. ClientError before any success means
+        # the firmware likely lacks the endpoint — stop asking every poll.
+        self._perf_status = True
+        self._perf_ok = False
 
     @staticmethod
     def _str2bool(v) -> bool | None:
@@ -311,15 +319,22 @@ class TplinkRE813XERouter(AbstractRouter):
         status.wifi_clients_total = ap_status.get('wirelessCount', len(status.devices))
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
-        try:
-            performance = self.request('admin/status?form=perf', 'operation=read')
-            if isinstance(performance, dict):
-                status.mem_usage = performance.get('mem_usage')
-                status.cpu_usage = performance.get('cpu_usage')
-        except Exception:
-            # Optional endpoint: leave metrics unavailable for this snapshot,
-            # but retry next poll. A transient error does not prove it is unsupported.
-            pass
+        if self._perf_status or self._perf_ok:
+            try:
+                performance = self.request('admin/status?form=perf', 'operation=read')
+                if isinstance(performance, dict):
+                    self._perf_ok = True
+                    status.mem_usage = performance.get('mem_usage')
+                    status.cpu_usage = performance.get('cpu_usage')
+            except (ConnectionError, Timeout):
+                # Transient transport errors never prove the endpoint is missing.
+                pass
+            except Exception:
+                # Optional endpoint: leave metrics unavailable for this snapshot.
+                # Before the first success, treat ClientError (and similar) as
+                # unsupported and stop probing; after success, keep retrying.
+                if not self._perf_ok:
+                    self._perf_status = False
 
         return status
 

@@ -10,6 +10,10 @@
 
 - **RE500X / RE505X / RE813XE / RE700X:** routers RE500X/RE505X/RE813XE/RE700X family now accept the **plaintext** password directly ([#245](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/245)).
 
+### Fixed
+
+- **RE813XE / RE700X:** CPU/memory polling recovers after transient failures once `form=perf` has succeeded; network errors never latch; unsupported firmwares are probed once then skipped ([#244](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/244)).
+
 ## [5.36.0] - 2026-10-02
 
 ### Added
