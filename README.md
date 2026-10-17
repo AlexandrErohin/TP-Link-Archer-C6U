@@ -131,8 +131,6 @@ or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get we
 5. Type `document.getElementById("login-password").value;`
 6. Copy the returned value as password and use it.
 
-> **Note:** The `TplinkRE813XERouter` / `TplinkRe700XRouter` clients (RE500X/RE505X/RE813XE/RE700X family) now accept the **plaintext** password directly and auto-encrypt it with the device's RSA key on login. No more devtools capture needed for those. `TplinkC5400XRouter` still requires the web-encrypted value.
-
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
 

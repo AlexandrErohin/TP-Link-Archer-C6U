@@ -23,7 +23,8 @@ class TplinkRE813XERouter(AbstractRouter):
     TP-Link LuCI Wi-Fi extenders/APs in access-point mode (RE813XE, RE700X, …).
 
     ``supports()`` does not key off the marketing model name. It detects this
-    firmware family by capability: web-encrypted password login works,
+    firmware family by capability: login succeeds (plaintext is RSA-encrypted
+    on the fly, or a pre-encrypted web password is accepted as-is),
     ``admin/status?form=ap_status`` returns wireless AP data, and the full-router
     combined endpoint ``admin/status?form=all`` does not (missing ``Apcfg``).
 
@@ -122,16 +123,6 @@ class TplinkRE813XERouter(AbstractRouter):
     def supports(self) -> bool:
         """Detect LuCI AP/extender firmware that lacks full-router status?form=all."""
         try:
-            self._get_encrypted_password()
-        except Exception as e:
-            # Not a web-encrypted LuCI device (or unreachable) — leave for the
-            # appropriate client; do not log a scary error during detection.
-            if self._logger:
-                self._logger.debug(
-                    'TplinkRouter - %s - web password probe failed: %s', self.__class__.__name__, e)
-            return False
-
-        try:
             self.authorize()
             ap_status = self.request('admin/status?form=ap_status', 'operation=read')
             if not isinstance(ap_status, dict):
@@ -183,14 +174,25 @@ class TplinkRE813XERouter(AbstractRouter):
         if len(self.password) >= 200:
             return self.password
 
-        response = post(
-            '{}/cgi-bin/luci/;stok=/login?form=login&operation=read'.format(self.host),
-            headers=self._headers_login,
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
-        data = response.json()['data']['password']
-        return EncryptionWrapper.rsa_encrypt(self.password, data[0], data[1])
+        try:
+            # operation=read is passed in the query string (as the device UI does),
+            # not in the POST body.
+            response = post(
+                '{}/cgi-bin/luci/;stok=/login?form=login&operation=read'.format(self.host),
+                headers=self._headers_login,
+                timeout=self.timeout,
+                verify=self._verify_ssl,
+            )
+            data = response.json()['data']['password']
+            return EncryptionWrapper.rsa_encrypt(self.password, data[0], data[1])
+        except ClientException:
+            raise
+        except Exception as e:
+            error = ('TplinkRouter - {} - Cannot fetch RSA public key for password '
+                     'encryption! Error - {}'.format(self.__class__.__name__, e))
+            if self._logger:
+                self._logger.debug(error)
+            raise ClientException(error) from e
 
     def authorize(self) -> None:
         password = self._get_encrypted_password()

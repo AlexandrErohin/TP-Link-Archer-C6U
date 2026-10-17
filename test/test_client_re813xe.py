@@ -30,10 +30,6 @@ class TestTplinkRE813XERouter(TestCase):
         client.logout()
         self.assertFalse(client._logged)
 
-    def test_supports_false_for_short_password(self) -> None:
-        client = TplinkRE813XERouter('http://192.168.0.1', 'short')
-        self.assertFalse(client.supports())
-
     def test_supports_true_when_ap_status_ok_and_form_all_fails(self) -> None:
         client = TplinkRE813XERouter('http://192.168.0.1', 'x' * 200)
         client.authorize = Mock()  # type: ignore[method-assign]
@@ -82,11 +78,30 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertFalse(client.supports())
         client.logout.assert_called_once()
 
-    def test_authorize_requires_web_encrypted_password(self) -> None:
-        client = TplinkRE813XERouter('http://192.168.0.1', 'short')
+    def test_get_encrypted_password_passthrough_for_long_password(self) -> None:
+        password = 'x' * 200
+        client = TplinkRE813XERouter('http://192.168.0.1', password)
+        self.assertEqual(client._get_encrypted_password(), password)
+
+    @patch('tplinkrouterc6u.client.re813xe.EncryptionWrapper.rsa_encrypt', return_value='enc' * 70)
+    @patch('tplinkrouterc6u.client.re813xe.post')
+    def test_get_encrypted_password_encrypts_plaintext(self, mock_post, mock_rsa) -> None:
+        response = Mock()
+        response.json.return_value = {'data': {'password': ['nnhex', '10001']}}
+        mock_post.return_value = response
+
+        client = TplinkRE813XERouter('http://192.168.0.1', 'secret')
+        self.assertEqual(client._get_encrypted_password(), 'enc' * 70)
+        mock_post.assert_called_once()
+        self.assertIn('operation=read', mock_post.call_args.args[0])
+        mock_rsa.assert_called_once_with('secret', 'nnhex', '10001')
+
+    @patch('tplinkrouterc6u.client.re813xe.post', side_effect=OSError('unreachable'))
+    def test_get_encrypted_password_wraps_errors(self, _mock_post) -> None:
+        client = TplinkRE813XERouter('http://192.168.0.1', 'secret')
         with self.assertRaises(ClientException) as ctx:
-            client.authorize()
-        self.assertIn('web encrypted password', str(ctx.exception))
+            client._get_encrypted_password()
+        self.assertIn('RSA public key', str(ctx.exception))
 
     @patch('tplinkrouterc6u.client.re813xe.post')
     def test_authorize_sets_tokens(self, mock_post) -> None:
@@ -102,6 +117,28 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertTrue(client._logged)
         self.assertEqual(client._stok, 'abc123')
         self.assertEqual(client._sysauth, 'cookie-value')
+        mock_post.assert_called_once()
+        self.assertIn('password=' + 'x' * 200, mock_post.call_args.kwargs['data'])
+
+    @patch('tplinkrouterc6u.client.re813xe.EncryptionWrapper.rsa_encrypt', return_value='cipherhex')
+    @patch('tplinkrouterc6u.client.re813xe.post')
+    def test_authorize_encrypts_plaintext_before_login(self, mock_post, mock_rsa) -> None:
+        key_response = Mock()
+        key_response.json.return_value = {'data': {'password': ['nn', 'ee']}}
+        login_response = Mock()
+        login_response.text = '{"success":true}'
+        login_response.json.return_value = {'success': True, 'data': {'stok': 'tok'}}
+        login_response.headers = {'set-cookie': 'sysauth=cookie; Path=/'}
+        mock_post.side_effect = [key_response, login_response]
+
+        client = TplinkRE813XERouter('http://192.168.0.1', 'plaintext')
+        client.authorize()
+
+        self.assertTrue(client._logged)
+        self.assertEqual(client._stok, 'tok')
+        mock_rsa.assert_called_once_with('plaintext', 'nn', 'ee')
+        self.assertEqual(mock_post.call_count, 2)
+        self.assertEqual(mock_post.call_args.kwargs['data'], 'operation=login&password=cipherhex')
 
     def test_get_firmware(self) -> None:
         client = self._client()

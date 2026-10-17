@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **RE500X / RE505X / RE813XE / RE700X:** routers RE500X/RE505X/RE813XE/RE700X family now accept the **plaintext** password directly ([#245](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/245)).
+
 ## [5.36.0] - 2026-10-02
 
 ### Added
