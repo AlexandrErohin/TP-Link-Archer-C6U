@@ -260,9 +260,16 @@ class TPLinkMRClientBase(AbstractRouter):
                     self.ActItem(self.ActItem.GET, 'DAILY_MEM_STAT', attrs=['total', 'free']),
                 ]
                 _, usage_values = self.req_act(usage_acts)
+                # req_act unwraps a single-slot reply to the bare attribute dict
+                # (no '0'/'1' keys). Re-wrap so .get('0') / .get('1') stay
+                # consistent when only one of the DAILY_* objects is present.
                 if not usage_values:
                     self._usage_support = False
                     usage_values = {}
+                elif not isinstance(usage_values, dict):
+                    usage_values = {'0': usage_values}
+                elif '0' not in usage_values and '1' not in usage_values:
+                    usage_values = {'0': usage_values}
 
                 cpu = self._to_list(usage_values.get('0'))
                 cpu = cpu[0] if cpu else {}

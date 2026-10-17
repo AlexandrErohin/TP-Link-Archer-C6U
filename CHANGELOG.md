@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **MR / VR:** `get_status()` fills `cpu_usage` and `mem_usage` from `DAILY_PROC_STAT` / `DAILY_MEM_STAT` (probe-once latch, same contract as `_ipv6_support`) ([#242](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/242)).
+
 ### Changed
 
 - **RE500X / RE505X / RE813XE / RE700X:** routers RE500X/RE505X/RE813XE/RE700X family now accept the **plaintext** password directly ([#245](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/245)).

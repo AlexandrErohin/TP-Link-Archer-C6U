@@ -487,8 +487,9 @@ free=79996
 
     def test_get_status_cpu_and_memory_absent(self) -> None:
         # Firmwares without the DAILY_* objects must leave both fields at None
-        # rather than raising out of get_status().
-        response = '''[1,1,0,0,0,0]0
+        # rather than raising out of get_status(), and must clear the latch so
+        # later polls do not keep asking.
+        status_response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=6C:5A:B0:56:1E:00
 IPInterfaceIPAddress=192.168.1.1
 [1,1,0,0,0,0]2
@@ -500,15 +501,54 @@ name=wlan1
 [error]0
 
 '''
+        calls = []
 
         class TPLinkMRClientTest(TPLinkMRClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
-                return 200, response
+                if data_str is not None and 'DAILY_' in data_str:
+                    calls.append(data_str)
+                    return 200, '[error]9804\n\n'
+                return 200, status_response
 
         client = TPLinkMRClientTest('', '')
         status = client.get_status()
+        client.get_status()
 
         self.assertIsNone(status.cpu_usage)
+        self.assertIsNone(status.mem_usage)
+        self.assertFalse(client._usage_support)
+        self.assertEqual(len(calls), 1)
+
+    def test_get_status_cpu_survives_single_slot_unwrap(self) -> None:
+        # When only DAILY_PROC_STAT is present, req_act unwraps the single-slot
+        # reply to a bare dict; get_status must still read CPUUsage from it.
+        status_response = '''[1,1,0,0,0,0]0
+X_TP_MACAddress=6C:5A:B0:56:1E:00
+IPInterfaceIPAddress=192.168.1.1
+[1,1,0,0,0,0]2
+enable=1
+X_TP_Band=2.4GHz
+[1,1,0,0,0,0]3
+enable=1
+name=wlan1
+[error]0
+
+'''
+        usage_response = '''[0,0,0,0,0,0]0
+CPUUsage=7,1,0,
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                if data_str is not None and 'DAILY_PROC_STAT' in data_str:
+                    return 200, usage_response
+                return 200, status_response
+
+        status = TPLinkMRClientTest('', '').get_status()
+
+        self.assertEqual(status.cpu_usage, 0.07)
         self.assertIsNone(status.mem_usage)
 
     def test_get_status_mr6400(self) -> None:
