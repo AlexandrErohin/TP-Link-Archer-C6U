@@ -18,6 +18,7 @@ from tplinkrouterc6u import (
     LTEStatus,
     VPNStatus,
     VPN,
+    DSLStatus,
 )
 
 
@@ -550,6 +551,152 @@ CPUUsage=7,1,0,
 
         self.assertEqual(status.cpu_usage, 0.07)
         self.assertIsNone(status.mem_usage)
+
+    def test_get_dsl_status(self) -> None:
+        # WAN_DSL_INTF_CFG returns one entry per WAN interface slot; only the
+        # DSL one carries data. Captured from an Archer VR2100v on VDSL2.
+        # Noise margin and attenuation arrive in tenths of a dB.
+        response = '''[1,0,0,0,0,0]0
+status=Up
+modulationType=VDSL2
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=10799
+downstreamCurrRate=32864
+upstreamMaxRate=11503
+downstreamMaxRate=43643
+upstreamNoiseMargin=63
+downstreamNoiseMargin=58
+upstreamAttenuation=25
+downstreamAttenuation=182
+X_TP_UpTime=318046
+[2,0,0,0,0,0]0
+status=Disabled
+modulationType=
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=0
+downstreamCurrRate=0
+upstreamMaxRate=0
+downstreamMaxRate=0
+upstreamNoiseMargin=0
+downstreamNoiseMargin=0
+upstreamAttenuation=0
+downstreamAttenuation=0
+X_TP_UpTime=0
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        dsl = client.get_dsl_status()
+
+        self.assertIsInstance(dsl, DSLStatus)
+        self.assertEqual(dsl.status, 'Up')
+        self.assertTrue(dsl.is_up)
+        self.assertEqual(dsl.modulation, 'VDSL2')
+        self.assertEqual(dsl.annex, 'Annex auto')
+        self.assertEqual(dsl.upstream_curr_rate, 10799)
+        self.assertEqual(dsl.downstream_curr_rate, 32864)
+        self.assertEqual(dsl.upstream_max_rate, 11503)
+        self.assertEqual(dsl.downstream_max_rate, 43643)
+        self.assertEqual(dsl.upstream_noise_margin, 6.3)
+        self.assertEqual(dsl.downstream_noise_margin, 5.8)
+        self.assertEqual(dsl.upstream_attenuation, 2.5)
+        self.assertEqual(dsl.downstream_attenuation, 18.2)
+        self.assertEqual(dsl.uptime, 318046)
+
+    def test_get_dsl_status_no_dsl_interface(self) -> None:
+        # Cellular-only and Ethernet-WAN models report every slot as Disabled.
+        response = '''[1,0,0,0,0,0]0
+status=Disabled
+modulationType=
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=0
+downstreamCurrRate=0
+upstreamMaxRate=0
+downstreamMaxRate=0
+upstreamNoiseMargin=0
+downstreamNoiseMargin=0
+upstreamAttenuation=0
+downstreamAttenuation=0
+X_TP_UpTime=0
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        client = TPLinkMRClientTest('', '')
+        dsl = client.get_dsl_status()
+
+        self.assertIsInstance(dsl, DSLStatus)
+        self.assertIsNone(dsl.status)
+        self.assertFalse(dsl.is_up)
+        self.assertIsNone(dsl.downstream_curr_rate)
+
+    def test_get_dsl_status_line_not_in_first_slot(self) -> None:
+        # The DSL slot is not guaranteed to come first; every slot must be scanned.
+        response = '''[1,0,0,0,0,0]0
+status=Disabled
+modulationType=
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=0
+downstreamCurrRate=0
+upstreamMaxRate=0
+downstreamMaxRate=0
+upstreamNoiseMargin=0
+downstreamNoiseMargin=0
+upstreamAttenuation=0
+downstreamAttenuation=0
+X_TP_UpTime=0
+[2,0,0,0,0,0]0
+status=Up
+modulationType=VDSL2
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=10799
+downstreamCurrRate=32864
+upstreamMaxRate=11503
+downstreamMaxRate=43643
+upstreamNoiseMargin=63
+downstreamNoiseMargin=58
+upstreamAttenuation=25
+downstreamAttenuation=182
+X_TP_UpTime=318046
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        dsl = TPLinkMRClientTest('', '').get_dsl_status()
+
+        self.assertTrue(dsl.is_up)
+        self.assertEqual(dsl.modulation, 'VDSL2')
+        self.assertEqual(dsl.downstream_curr_rate, 32864)
+        self.assertEqual(dsl.downstream_noise_margin, 5.8)
+
+    def test_get_dsl_status_no_instances(self) -> None:
+        # A firmware with no WAN_DSL_INTF_CFG instance answers with no slots at all.
+        response = '''[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        dsl = TPLinkMRClientTest('', '').get_dsl_status()
+
+        self.assertIsInstance(dsl, DSLStatus)
+        self.assertIsNone(dsl.status)
+        self.assertFalse(dsl.is_up)
 
     def test_get_status_mr6400(self) -> None:
         response = '''

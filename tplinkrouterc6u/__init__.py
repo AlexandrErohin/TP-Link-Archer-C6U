@@ -41,6 +41,7 @@ from tplinkrouterc6u.common.dataclass import (
     ServingCell,
     VPNStatus,
     WifiStatus,
+    DSLStatus,
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,
