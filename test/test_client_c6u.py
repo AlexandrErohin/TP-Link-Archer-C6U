@@ -1673,6 +1673,205 @@ class TestTPLinkClient(TestCase):
         with self.assertRaises(ClientException):
             client.delete_ipv4_reservation('00:11:22:33:44:55')
 
+    def test_get_ipv4_port_forwards(self) -> None:
+        """AX23 v2 fw 1.1.2 returns a bare row list from admin/nat?form=vs."""
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return [
+                    {'internal_port': '54535', 'name': 'qb', 'enable': 'on',
+                     'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL'},
+                    {'internal_port': '443', 'name': 'https', 'enable': 'off',
+                     'external_port': '443-445', 'ipaddr': '192.168.0.4', 'protocol': 'TCP'},
+                ]
+
+        client = TPLinkRouterTest('', '')
+        forwards = client.get_ipv4_port_forwards()
+
+        self.assertEqual(len(forwards), 2)
+        self.assertEqual(forwards[0].name, 'qb')
+        self.assertEqual(forwards[0].ipaddr, '192.168.0.18')
+        self.assertEqual(forwards[0].external_port, '54535')
+        self.assertEqual(forwards[0].internal_port, '54535')
+        self.assertEqual(forwards[0].protocol, 'ALL')
+        self.assertTrue(forwards[0].enabled)
+        self.assertEqual(forwards[1].external_port, '443-445')
+        self.assertFalse(forwards[1].enabled)
+
+    def test_get_ipv4_port_forwards_data_envelope(self) -> None:
+        """Some models wrap the vs load as {"data": [...], "others": {...}}."""
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return {
+                    'data': [
+                        {'internal_port': '80', 'name': 'web', 'enable': 'on',
+                         'external_port': '8080', 'ipaddr': '10.0.0.7', 'protocol': 'UDP'},
+                    ],
+                    'others': {'max_rules': 64},
+                }
+
+        client = TPLinkRouterTest('', '')
+        forwards = client.get_ipv4_port_forwards()
+
+        self.assertEqual(len(forwards), 1)
+        self.assertEqual(forwards[0].name, 'web')
+        self.assertEqual(forwards[0].protocol, 'UDP')
+
+    def test_get_ipv4_port_forwards_empty(self) -> None:
+        """An empty table is {} (AX23 v2 port triggering / IPv6 firewall)."""
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return {}
+
+        client = TPLinkRouterTest('', '')
+        self.assertEqual(client.get_ipv4_port_forwards(), [])
+
+    def test_get_ipv4_port_forwards_malformed(self) -> None:
+        """An object without a usable row list raises ClientError."""
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return {'unexpected': 1}
+
+        client = TPLinkRouterTest('', '')
+        with self.assertRaises(ClientError):
+            client.get_ipv4_port_forwards()
+
+    def test_add_ipv4_port_forward(self) -> None:
+        check_url = ''
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                nonlocal check_url, check_data
+                check_url = path
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.add_ipv4_port_forward('game', 25565, 25565, '10.0.0.30', 'udp')
+        self.assertEqual(check_url, 'admin/nat?form=vs')
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(body['operation'], 'insert')
+        self.assertEqual(
+            loads(body['new']),
+            {'name': 'game', 'ipaddr': '10.0.0.30', 'external_port': '25565',
+             'internal_port': '25565', 'protocol': 'UDP', 'enable': 'on'})
+
+        # external port ranges and disabled rules are sent verbatim
+        client.add_ipv4_port_forward('range', '8000-9000', 8000, '10.0.0.30',
+                                     protocol='TCP', enable=False)
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(
+            loads(body['new']),
+            {'name': 'range', 'ipaddr': '10.0.0.30', 'external_port': '8000-9000',
+             'internal_port': '8000', 'protocol': 'TCP', 'enable': 'off'})
+
+    def test_add_ipv4_port_forward_invalid(self) -> None:
+        client = self.router_class('', '')
+
+        with self.assertRaises(ClientException):
+            client.add_ipv4_port_forward('', 80, 80, '10.0.0.30')
+        with self.assertRaises(ClientException):
+            client.add_ipv4_port_forward('x', '99999', 80, '10.0.0.30')
+        with self.assertRaises(ClientException):
+            client.add_ipv4_port_forward('x', 80, 'abc', '10.0.0.30')
+        with self.assertRaises(ClientException):
+            client.add_ipv4_port_forward('x', 80, 80, '10.0.0.30', protocol='ICMP')
+
+    def test_update_ipv4_port_forward(self) -> None:
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                nonlocal check_data
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return [
+                        {'internal_port': '54535', 'name': 'qb', 'enable': 'on',
+                         'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL'},
+                    ]
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.update_ipv4_port_forward('qb', internal_port=54546, enable=False)
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(body['operation'], 'update')
+        self.assertEqual(body['key'], 'qb')
+        self.assertEqual(
+            loads(body['old']),
+            {'name': 'qb', 'ipaddr': '192.168.0.18', 'external_port': '54535',
+             'internal_port': '54535', 'protocol': 'ALL', 'enable': 'on'})
+        self.assertEqual(
+            loads(body['new']),
+            {'name': 'qb', 'ipaddr': '192.168.0.18', 'external_port': '54535',
+             'internal_port': '54546', 'protocol': 'ALL', 'enable': 'off'})
+
+    def test_update_ipv4_port_forward_not_found(self) -> None:
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return []
+
+        client = TPLinkRouterTest('', '')
+        with self.assertRaises(ClientException):
+            client.update_ipv4_port_forward('missing', enable=False)
+
+    def test_delete_ipv4_port_forward(self) -> None:
+        calls = []
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                calls.append((path, data))
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return [
+                        {'internal_port': '54535', 'name': 'qb', 'enable': 'on',
+                         'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL'},
+                        {'internal_port': '443', 'name': 'https', 'enable': 'on',
+                         'external_port': '443', 'ipaddr': '192.168.0.4', 'protocol': 'TCP'},
+                    ]
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.delete_ipv4_port_forward('https')
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][0], 'admin/nat?form=vs')
+        body = dict(parse_qsl(calls[1][1]))
+        self.assertEqual(body['operation'], 'remove')
+        self.assertEqual(body['key'], 'https')
+        self.assertEqual(body['index'], '1')
+
+    def test_delete_ipv4_port_forward_not_found(self) -> None:
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return {}
+
+        client = TPLinkRouterTest('', '')
+        with self.assertRaises(ClientException):
+            client.delete_ipv4_port_forward('missing')
+
     def test_set_ipv4_dhcps(self) -> None:
         """Read-modify-write of admin/dhcps?form=setting (AX55 capture from PR #199)."""
         setting = {

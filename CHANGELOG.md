@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **C6U / V1_11 / SG (new-gen LuCI clients):** IPv4 port forwarding (virtual servers, `admin/nat?form=vs`) support — `get_ipv4_port_forwards()`, `add_ipv4_port_forward()`, `update_ipv4_port_forward()`, `delete_ipv4_port_forward()`. Read is verified on Archer AX23 v2.0 fw 1.1.2 Build 20250814 (SG_L1_S2); insert/update/remove use the same wire format the router's own web UI sends (`insert` with `new=<json>`, `update` with `key`/`new`/`old`, `remove` with `key`/`index`).
+
 ## [5.37.0] - 2026-10-17
 
 ### Added

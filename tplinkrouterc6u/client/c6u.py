@@ -16,6 +16,7 @@ from tplinkrouterc6u.common.dataclass import (
     MeshNode,
     IPv4Reservation,
     IPv4DHCPLease,
+    IPv4PortForward,
     IPv4Status,
     IPv6Status,
     VPNStatus,
@@ -257,6 +258,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client&operation=load'
         self._url_ipv4_dhcps = 'admin/dhcps?form=setting&operation=read'
         self._url_ipv4_dhcps_write = 'admin/dhcps?form=setting&operation=write'
+        self._url_ipv4_port_forwards = 'admin/nat?form=vs&operation=load'
         self._url_wan_ipv4_dynamic = 'admin/network?form=wan_ipv4_dynamic'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
         self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
@@ -722,6 +724,140 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self.request(path, urlencode({
             'operation': 'remove',
             'key': target_mac,
+            'index': target_idx,
+        }))
+
+    def get_ipv4_port_forwards(self) -> [IPv4PortForward]:
+        """Get the IPv4 virtual-server (port forwarding) rules.
+
+        Verified on SG-class routers (Archer AX23 v2 fw 1.1.2, AX53-era UI);
+        the response is a bare list of rows on that firmware, while some
+        models wrap rows in a ``data``/``list`` envelope and an empty table
+        is ``{}``.
+        """
+        ipv4_port_forwards = []
+        data = self.request(self._url_ipv4_port_forwards, 'operation=load')
+
+        for item in self._as_list(data, 'data', 'IPv4 port forward'):
+            ipv4_port_forwards.append(
+                IPv4PortForward(item['name'], get_ip(item['ipaddr']),
+                                str(item['external_port']), str(item['internal_port']),
+                                item['protocol'], self._str2bool(item['enable'])))
+
+        return ipv4_port_forwards
+
+    @staticmethod
+    def _normalize_port_forward(name: str, external_port, internal_port,
+                                ipaddr: str, protocol: str) -> dict:
+        """Validate and build one virtual-server row payload.
+
+        ``external_port`` accepts a single port ("443") or a range
+        ("8000-9000"); ``internal_port`` is a single port. ``protocol`` is
+        one of TCP/UDP/ALL (case-insensitive), matching the web UI.
+        """
+        if not name or not str(name).strip():
+            raise ClientException('Port forward name must not be empty')
+
+        def port(v, allow_range: bool) -> str:
+            text = str(v).strip()
+            parts = text.split('-') if allow_range else [text]
+            if not 1 <= len(parts) <= (2 if allow_range else 1):
+                raise ClientException('Invalid port format: {}'.format(v))
+            for part in parts:
+                if not part.isdigit() or not 1 <= int(part) <= 65535:
+                    raise ClientException('Invalid port: {}'.format(v))
+            return text
+
+        protocol = str(protocol).upper()
+        if protocol not in ('TCP', 'UDP', 'ALL'):
+            raise ClientException(
+                'protocol must be one of TCP/UDP/ALL, got: {}'.format(protocol))
+
+        return {
+            'name': str(name).strip(),
+            'ipaddr': str(get_ip(ipaddr)),
+            'external_port': port(external_port, allow_range=True),
+            'internal_port': port(internal_port, allow_range=False),
+            'protocol': protocol,
+        }
+
+    def add_ipv4_port_forward(self, name: str, external_port, internal_port,
+                              ipaddr: str, protocol: str = 'TCP',
+                              enable: bool = True) -> None:
+        """Add an IPv4 port forwarding (virtual server) rule.
+
+        ``external_port`` accepts a single port or a "start-end" range;
+        ``protocol`` is TCP, UDP or ALL (case-insensitive).
+        """
+        row = self._normalize_port_forward(name, external_port, internal_port,
+                                           ipaddr, protocol)
+        row['enable'] = 'on' if enable else 'off'
+        path = self._url_ipv4_port_forwards.split('&operation=')[0]
+        self.request(path, urlencode({'operation': 'insert', 'new': dumps(row)}))
+
+    def update_ipv4_port_forward(self, name: str, new_name: str | None = None,
+                                 external_port=None, internal_port=None,
+                                 ipaddr: str | None = None,
+                                 protocol: str | None = None,
+                                 enable: bool | None = None) -> None:
+        """Update an IPv4 port forwarding rule identified by its name.
+
+        The router matches the row by the ``old`` payload, so both the
+        previous and the new row contents are sent (same wire format the
+        web UI uses). Raises ClientException when no rule with ``name``
+        exists.
+        """
+        raw = self.request(self._url_ipv4_port_forwards, 'operation=load')
+        items = self._as_list(raw, 'data', 'IPv4 port forward')
+        target = None
+        for item in items:
+            if item.get('name') == name:
+                target = item
+                break
+        if target is None:
+            raise ClientException('Port forward not found: {}'.format(name))
+
+        merged = self._normalize_port_forward(
+            new_name if new_name is not None else name,
+            external_port if external_port is not None else target['external_port'],
+            internal_port if internal_port is not None else target['internal_port'],
+            ipaddr if ipaddr is not None else target['ipaddr'],
+            protocol if protocol is not None else target['protocol'])
+        enable = enable if enable is not None else self._str2bool(target.get('enable'))
+        merged['enable'] = 'on' if enable else 'off'
+
+        old = {field: target.get(field) for field in ('name', 'ipaddr', 'external_port',
+                                                      'internal_port', 'protocol', 'enable')}
+        path = self._url_ipv4_port_forwards.split('&operation=')[0]
+        self.request(path, urlencode({
+            'operation': 'update',
+            'key': name,
+            'new': dumps(merged),
+            'old': dumps(old),
+        }))
+
+    def delete_ipv4_port_forward(self, name: str) -> None:
+        """Delete an IPv4 port forwarding rule by name.
+
+        The list is loaded then removed in two requests; if the table
+        changes between them, the wrong row could be targeted.
+        Duplicate names are not possible in the web UI; when they exist on
+        the router the first match is removed.
+        """
+        raw = self.request(self._url_ipv4_port_forwards, 'operation=load')
+        items = self._as_list(raw, 'data', 'IPv4 port forward')
+        target_idx = None
+        for i, item in enumerate(items):
+            if item.get('name') == name:
+                target_idx = i
+                break
+        if target_idx is None:
+            raise ClientException('Port forward not found: {}'.format(name))
+
+        path = self._url_ipv4_port_forwards.split('&operation=')[0]
+        self.request(path, urlencode({
+            'operation': 'remove',
+            'key': name,
             'index': target_idx,
         }))
 

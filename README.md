@@ -144,6 +144,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
 | delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
+| get_ipv4_port_forwards |   | Gets IPv4 port forwarding (virtual server) rules (Archer / LuCI clients) | [[IPv4PortForward]](#IPv4PortForward) |
+| add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
+| update_ipv4_port_forward | name: str, new_name: str = None, external_port = None, internal_port = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
+| delete_ipv4_port_forward | name: str | Deletes an IPv4 port forwarding rule by name (Archer / LuCI clients) |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
@@ -305,6 +309,17 @@ families. `internet_status`, hardware/firmware versions and `wired_ports` are De
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | lease_time | ip address lease time | str |
+
+### <a id="IPv4PortForward">IPv4PortForward</a>
+| Field | Description | Type |
+| --- |---|---|
+| name | rule name (unique per router, used as the rule identifier) | str |
+| ipaddr | internal (LAN) ip address the ports forward to | str |
+| ipaddress | internal ip address | ipaddress |
+| external_port | WAN-side port, single (`443`) or range (`8000-9000`) | str |
+| internal_port | LAN-side port | str |
+| protocol | `TCP`, `UDP` or `ALL` | str |
+| enabled | rule enabled | bool |
 
 ### <a id="IPv4Status">IPv4Status</a>
 | Field | Description | Type |
