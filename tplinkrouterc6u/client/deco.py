@@ -8,7 +8,7 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus, MeshNode
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 
 class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
@@ -19,6 +19,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._headers_request = {'Content-Type': 'application/json'}
         self._headers_login = {'Content-Type': 'application/json'}
         self._data_block = 'result'
+        self._empty_reply = False
 
     def logout(self) -> None:
         self.request('admin/system?form=logout', dumps({'operation': 'logout'}), True)
@@ -250,7 +251,25 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._retry_request(super().authorize)
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+        try:
+            response = self._send(path, data, ignore_response, ignore_errors)
+            if not self._empty_reply:
+                return response
+        except ClientError:
+            if not self._empty_reply:
+                raise
+        # Deco allows one admin session at a time: a login elsewhere (web UI, app, another client)
+        # replaces ours, and the router then answers every request with an empty data block.
+        self.authorize()
+        return self._send(path, data, ignore_response, ignore_errors)
+
+    def _send(self, path: str, data: str, ignore_response: bool, ignore_errors: bool) -> dict | None:
+        self._empty_reply = False
         return self._retry_request(super().request, path, data, ignore_response, ignore_errors)
+
+    def _decrypt_response(self, data: dict) -> dict:
+        self._empty_reply = not data.get('data')
+        return super()._decrypt_response(data)
 
     def _retry_request(self, callback: Callable, *args):
         retries = 0

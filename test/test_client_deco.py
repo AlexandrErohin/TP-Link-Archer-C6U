@@ -1,5 +1,6 @@
 from unittest import main, TestCase
-from json import loads
+from unittest.mock import patch, Mock
+from json import loads, dumps
 from macaddress import EUI48
 from ipaddress import IPv4Address
 from tplinkrouterc6u import (
@@ -12,6 +13,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     LTEStatus,
     ClientException,
+    ClientError,
 )
 
 
@@ -914,6 +916,64 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(calls, ['admin/device?form=device_list'] * 2)
         self.assertEqual(first.signal_5g, -47)
         self.assertEqual(second.signal_5g, -49)
+
+    @staticmethod
+    def _logged_in_client() -> TPLinkDecoClient:
+        client = TPLinkDecoClient('https://192.168.68.1', 'password')
+        client._logged = True
+        client._stok = 'stok'
+        client._sysauth = 'sysauth'
+        return client
+
+    @staticmethod
+    def _reply(data: str) -> Mock:
+        response = Mock()
+        response.json.return_value = {'data': data}
+        return response
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_logs_in_again_after_empty_reply(self, mock_post) -> None:
+        """A login elsewhere replaces the Deco's single admin session; the stale one gets {"data": ""}."""
+        client = self._logged_in_client()
+        mock_post.side_effect = [self._reply(''), self._reply('ciphertext')]
+
+        with patch.object(client, '_prepare_data', return_value='prepared'), \
+                patch.object(client._encryption, 'aes_decrypt',
+                             return_value='{"error_code": 0, "result": {"cpu_usage": 0.1}}'), \
+                patch.object(client, 'authorize') as authorize:
+            result = client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+
+        self.assertEqual(result, {'cpu_usage': 0.1})
+        authorize.assert_called_once()
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_logs_in_again_only_once(self, mock_post) -> None:
+        client = self._logged_in_client()
+        mock_post.side_effect = [self._reply(''), self._reply('')]
+
+        with patch.object(client, '_prepare_data', return_value='prepared'), \
+                patch.object(client, 'authorize') as authorize:
+            with self.assertRaises(ClientError):
+                client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+
+        authorize.assert_called_once()
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_error_reply_does_not_log_in_again(self, mock_post) -> None:
+        client = self._logged_in_client()
+        mock_post.return_value = self._reply('ciphertext')
+
+        with patch.object(client, '_prepare_data', return_value='prepared'), \
+                patch.object(client._encryption, 'aes_decrypt',
+                             return_value='{"error_code": 1, "msg": "no such callback"}'), \
+                patch.object(client, 'authorize') as authorize:
+            with self.assertRaises(ClientError):
+                client.request('admin/wireless?form=channel', dumps({'operation': 'read'}))
+
+        authorize.assert_not_called()
+        self.assertEqual(mock_post.call_count, 1)
 
 
 if __name__ == '__main__':
