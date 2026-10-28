@@ -70,12 +70,14 @@ class Status:
     clients_total: int = 0
     guest_2g_enable: bool | None = None
     guest_5g_enable: bool | None = None
+    guest_5g_2_enable: bool | None = None
     guest_6g_enable: bool | None = None
     iot_2g_enable: bool | None = None
     iot_5g_enable: bool | None = None
     iot_6g_enable: bool | None = None
     wifi_2g_enable: bool | None = None
     wifi_5g_enable: bool | None = None
+    wifi_5g_2_enable: bool | None = None
     wifi_6g_enable: bool | None = None
     wifi_mlo_2g_enable: bool | None = None
     wifi_mlo_5g_enable: bool | None = None

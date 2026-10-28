@@ -202,12 +202,14 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | iot_clients_total | Total amount of all iot connected clients | int, None |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool, None |
 | guest_5g_enable | Is guest wifi 5G enabled | bool, None |
+| guest_5g_2_enable | Is guest wifi on the second 5G band enabled (tri-band) | bool, None |
 | guest_6g_enable | Is guest wifi 6G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | iot_6g_enable | Is IoT wifi 6G enabled | bool, None |
 | wifi_2g_enable | Is host wifi 2.4G enabled | bool, None |
 | wifi_5g_enable | Is host wifi 5G enabled | bool, None |
+| wifi_5g_2_enable | Is host wifi on the second 5G band enabled (tri-band) | bool, None |
 | wifi_6g_enable | Is host wifi 6G enabled | bool, None |
 | wifi_mlo_2g_enable | Is MLO enabled on 2.4G (EX / C6U-SG when `mlo_host_2g_enable` is present) | bool, None |
 | wifi_mlo_5g_enable | Is MLO enabled on 5G (EX / C6U-SG when `mlo_host_5g_enable` is present) | bool, None |
@@ -464,6 +466,7 @@ Not all fields are filled by every client:
 ### <a id="connection">Connection</a>
 - Connection.HOST_2G - host wifi 2.4G
 - Connection.HOST_5G - host wifi 5G
+- Connection.HOST_5G_2 - host wifi second 5G band (tri-band C5400X `set_wifi`)
 - Connection.HOST_6G - host wifi 6G
 - Connection.HOST_MLO - host MLO client connection (EX; multi-link)
 - Connection.HOST_MLO_2G - MLO enable switch for 2.4G (EX `set_wifi` only)
@@ -471,6 +474,7 @@ Not all fields are filled by every client:
 - Connection.HOST_MLO_6G - MLO enable switch for 6G (EX `set_wifi` only)
 - Connection.GUEST_2G - guest wifi 2.4G
 - Connection.GUEST_5G - guest wifi 5G
+- Connection.GUEST_5G_2 - guest wifi second 5G band (tri-band C5400X `set_wifi`)
 - Connection.GUEST_6G - guest wifi 6G
 - Connection.IOT_2G - IoT wifi 2.4G
 - Connection.IOT_5G - IoT wifi 5G

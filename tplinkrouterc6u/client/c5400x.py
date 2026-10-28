@@ -94,9 +94,11 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         values = {
             Connection.HOST_2G: 'wireless_2g',
             Connection.HOST_5G: 'wireless_5g',
+            Connection.HOST_5G_2: 'wireless_5g_2',
             Connection.HOST_6G: 'wireless_6g',
             Connection.GUEST_2G: 'guest_2g',
             Connection.GUEST_5G: 'guest_5g',
+            Connection.GUEST_5G_2: 'guest_5g_2',
             Connection.GUEST_6G: 'guest_6g',
             Connection.IOT_2G: 'iot_2g',
             Connection.IOT_5G: 'iot_5g',

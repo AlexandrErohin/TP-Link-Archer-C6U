@@ -190,6 +190,38 @@ class TestTPLinkC1200Client(TestCase):
         client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5", "conn_type": "0"}
         self.assertEqual(client.get_status().conn_type, "0")
 
+    def test_get_status_second_5g_band(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/status?form=all&operation=read":
+                    return dict(self.status_data)
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.status_data = {
+            "lan_macaddr": "06-E6-97-9E-23-F5",
+            "wireless_5g_enable": "on",
+            "wireless_5g_2_enable": "off",
+            "guest_5g_enable": "off",
+            "guest_5g_2_enable": "on",
+        }
+        status = client.get_status()
+        self.assertTrue(status.wifi_5g_enable)
+        self.assertFalse(status.wifi_5g_2_enable)
+        self.assertFalse(status.guest_5g_enable)
+        self.assertTrue(status.guest_5g_2_enable)
+
+        client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5"}
+        status = client.get_status()
+        self.assertIsNone(status.wifi_5g_2_enable)
+        self.assertIsNone(status.guest_5g_2_enable)
+
     def test_led_night_mode(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(
@@ -306,6 +338,27 @@ class TestTPLinkC1200Client(TestCase):
 
         self.assertEqual(client.captured_path, expected_path)
         self.assertEqual(client.captured_data, expected_data)
+
+    def test_set_wifi_second_5g_band(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.set_wifi(Connection.HOST_5G_2, True)
+        client.set_wifi(Connection.GUEST_5G_2, False)
+
+        self.assertEqual(client.calls, [
+            ("admin/wireless?form=wireless_5g_2", "operation=write&enable=on"),
+            ("admin/wireless?form=guest_5g_2", "operation=write&enable=off"),
+        ])
 
     def test_vpn_status(self) -> None:
         response_openvpn_read = """
