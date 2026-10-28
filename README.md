@@ -135,9 +135,9 @@ or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get we
 6. Copy the returned value as password and use it.
 
 ### <a id="tplink_id">TP-Link ID Login</a>
-Some routers can be bound to a TP-Link ID for remote management with the Tether app. Once bound, the login page only asks for the TP-Link ID email and password, and the local password login no longer works with those credentials. Unbinding brings back the old local password, but you lose remote management, and if you don't remember that password the only way back in is a factory reset.
+Some routers can be bound to a TP-Link ID for remote management with the Tether app. Once bound, the login page only asks for the TP-Link ID email and password.
 
-`TplinkCloudLoginRouter` logs in the same way the web page does for the TP-Link ID form, so you can keep the router bound:
+`TplinkCloudLoginRouter` logs in the same way the web page does for that form, so you can use the TP-Link ID credentials directly and keep the router bound:
 - Use your TP-Link ID email as username and your TP-Link ID password as password (plain, not the web encrypted one)
 - `TplinkRouterProvider.get_client` picks it automatically when the username is an email
 
