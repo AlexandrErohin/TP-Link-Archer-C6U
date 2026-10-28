@@ -16,6 +16,7 @@ from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.re813xe import TplinkRE813XERouter, TplinkRe700XRouter
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
+from tplinkrouterc6u.client.cloud_login import TplinkCloudLoginRouter
 from tplinkrouterc6u.client.xdr import TPLinkXDRClient
 from tplinkrouterc6u.client.wdr import TplinkWDRRouter
 from tplinkrouterc6u.client.r import TPLinkRClient
