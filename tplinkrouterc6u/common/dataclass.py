@@ -551,3 +551,32 @@ class PortModes:
     wan_aggregation: bool | None = None
     link_aggregation: bool | None = None
     iptv: bool | None = None
+
+
+@dataclass
+class UsbStorage:
+    disks: int | None = None
+    # Bytes, summed over the volumes of every disk (None when no size could be read)
+    capacity: int | None = None
+    used: int | None = None
+    free: int | None = None
+
+
+@dataclass
+class UsbSharing:
+    samba: bool | None = None
+    ftp: bool | None = None
+    ftp_internet: bool | None = None
+    media_sharing: bool | None = None
+    time_machine: bool | None = None
+
+
+@dataclass
+class VpnServerSettings:
+    openvpn_enabled: bool | None = None
+    openvpn_protocol: str | None = None
+    openvpn_port: int | None = None
+    openvpn_access: str | None = None
+    pptp_enabled: bool | None = None
+    pptp_unencrypted_access: bool | None = None
+    pptp_samba_access: bool | None = None

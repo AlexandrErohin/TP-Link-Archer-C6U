@@ -46,5 +46,8 @@ from tplinkrouterc6u.common.dataclass import (
     VpnClientDevice,
     PortStatus,
     PortModes,
+    UsbStorage,
+    UsbSharing,
+    VpnServerSettings,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

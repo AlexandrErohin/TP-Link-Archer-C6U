@@ -1,9 +1,9 @@
 from logging import Logger
-from re import search
-from urllib.parse import urlencode
+from re import IGNORECASE, search
+from urllib.parse import quote, urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import PortModes, Status
+from tplinkrouterc6u.common.dataclass import PortModes, Status, UsbSharing, UsbStorage, VpnServerSettings
 from tplinkrouterc6u.common.helper import get_mac
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
@@ -213,3 +213,84 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             data += f"&disabled_all={disabled_all}"
 
         self.request(f"admin/wireless?form={value}", data)
+
+    def get_usb_storage(self) -> UsbStorage:
+        # USB disks (USB Settings > Sharing Access). With no disk the list is an empty object. The size of each disk
+        # comes from its volumes (contents&serial=...), as the web page reads them: not checked with a disk yet
+        data = self.request('admin/disk_setting?form=metadata&operation=read', 'operation=read')
+        disks = data.get('list')
+        disks = [disk for disk in disks if isinstance(disk, dict)] if isinstance(disks, list) else []
+        try:
+            count = int(data['number'])
+        except (KeyError, TypeError, ValueError):
+            count = len(disks) if 'list' in data else None
+        storage = UsbStorage(disks=count)
+
+        capacity = used = free = 0
+        sized = False
+        for disk in disks:
+            if not disk.get('serial'):
+                continue
+            try:
+                volumes = self.request('admin/disk_setting?form=contents&serial={}&operation=load'
+                                       .format(quote(str(disk['serial']), safe='')), 'operation=load')
+            except Exception:
+                continue
+            for volume in volumes if isinstance(volumes, list) else []:
+                size, left = _usb_size(volume.get('capacity')), _usb_size(volume.get('free'))
+                if size is None or left is None:
+                    continue
+                taken = _usb_size(volume.get('used'))
+                capacity, free = capacity + size, free + left
+                used += taken if taken is not None else max(size - left, 0)
+                sized = True
+        if sized:
+            storage.capacity, storage.used, storage.free = capacity, used, free
+        return storage
+
+    def get_usb_sharing(self) -> UsbSharing:
+        # Which USB services are on: Samba, FTP and FTP via internet (one row per protocol), Media Sharing and
+        # Time Machine. Leaves out each row's internal key and the server name
+        rows = self.request('admin/folder_sharing?form=settings&operation=read', 'operation=read')
+        media = self.request('admin/folder_sharing?form=media&operation=read', 'operation=read')
+        time_machine = self.request('admin/time_machine?form=settings&operation=read', 'operation=read')
+        on_off = {'on': True, 'off': False}
+        enabled = {str(row.get('protocol')).lower(): on_off.get(row.get('enable'))
+                   for row in (rows if isinstance(rows, list) else []) if isinstance(row, dict)}
+        return UsbSharing(
+            samba=enabled.get('samba'),
+            ftp=enabled.get('ftp'),
+            ftp_internet=enabled.get('ftpex'),
+            media_sharing=on_off.get(media.get('media_sharing')) if isinstance(media, dict) else None,
+            time_machine=on_off.get(time_machine.get('enable')) if isinstance(time_machine, dict) else None,
+        )
+
+    def print_server_status(self) -> bool | None:
+        # Not checked on this firmware yet: the web page reads admin/print_server (no form) and shows enable,
+        # name and printer_count
+        data = self.request('admin/print_server', 'operation=read')
+        return {'on': True, 'off': False}.get(data.get('enable')) if isinstance(data, dict) else None
+
+    def get_vpn_server_settings(self) -> VpnServerSettings:
+        # OpenVPN and PPTP server settings. Leaves out cert_exist, netbios_pass and the client address ranges
+        openvpn = self.request('admin/openvpn?form=config&operation=read', 'operation=read')
+        pptp = self.request('admin/pptpd?form=config&operation=read', 'operation=read')
+        on_off = {'on': True, 'off': False}
+        port = str(openvpn.get('port', ''))
+        return VpnServerSettings(
+            openvpn_enabled=on_off.get(openvpn.get('enabled')),
+            openvpn_protocol=openvpn.get('proto') or None,
+            openvpn_port=int(port) if port.isdigit() else None,
+            openvpn_access=openvpn.get('access') or None,
+            pptp_enabled=on_off.get(pptp.get('enabled')),
+            pptp_unencrypted_access=on_off.get(pptp.get('unencrypted_access')),
+            pptp_samba_access=on_off.get(pptp.get('samba_access')),
+        )
+
+
+def _usb_size(value) -> int | None:
+    # Disk sizes come as text like "16GB" or "14.8G"; the web page counts K, M, G, T as powers of 1000
+    match = search(r'^\s*(\d+(?:\.\d+)?)\s*([KMGTP])', str(value), IGNORECASE) if value is not None else None
+    if not match:
+        return None
+    return int(float(match.group(1)) * 1000 ** ('KMGTP'.index(match.group(2).upper()) + 1))

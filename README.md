@@ -151,6 +151,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
+| get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
+| get_usb_sharing |   | Whether Samba, FTP, FTP via internet, Media Sharing and Time Machine are on (Archer C5400X) | [UsbSharing](#usb_sharing) |
+| print_server_status |   | Is the USB print server on (Archer C5400X; read format taken from the web page, not yet checked) | bool, None |
+| get_vpn_server_settings |   | OpenVPN and PPTP server settings without certificates or accounts (Archer C5400X) | [VpnServerSettings](#vpn_server_settings) |
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
@@ -474,6 +478,34 @@ Not all fields are filled by every client:
 | wan_aggregation | A LAN port works as a second WAN port | bool, None |
 | link_aggregation | Two LAN ports are aggregated | bool, None |
 | iptv | IPTV/VLAN port setup is on | bool, None |
+
+### <a id="usb_storage">UsbStorage</a>
+| Field | Description | Type |
+| --- |---|---|
+| disks | USB disks connected | int, None |
+| capacity | Total size of every volume, in bytes (K/M/G/T read as powers of 1000, like the web page) | int, None |
+| used | Used space, in bytes | int, None |
+| free | Free space, in bytes | int, None |
+
+### <a id="usb_sharing">UsbSharing</a>
+| Field | Description | Type |
+| --- |---|---|
+| samba | Samba (Network Neighborhood) sharing is on | bool, None |
+| ftp | FTP server is on | bool, None |
+| ftp_internet | FTP via internet is on | bool, None |
+| media_sharing | Media Sharing (DLNA) is on | bool, None |
+| time_machine | Time Machine backups are on | bool, None |
+
+### <a id="vpn_server_settings">VpnServerSettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| openvpn_enabled | OpenVPN server is on | bool, None |
+| openvpn_protocol | OpenVPN service type (`udp` / `tcp`) | str, None |
+| openvpn_port | OpenVPN service port | int, None |
+| openvpn_access | What OpenVPN clients reach (`home` = home network only, `internet` = internet and home network) | str, None |
+| pptp_enabled | PPTP server is on | bool, None |
+| pptp_unencrypted_access | PPTP allows unencrypted connections | bool, None |
+| pptp_samba_access | PPTP clients may reach Samba (Network Place) | bool, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

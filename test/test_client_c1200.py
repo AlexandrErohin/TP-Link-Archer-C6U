@@ -583,6 +583,150 @@ class TestTPLinkC1200Client(TestCase):
         self.assertEqual(vpn_status.openvpn_clients_total, 2)
         self.assertEqual(vpn_status.pptpvpn_clients_total, 3)
 
+    def test_get_usb_storage(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append((path, data))
+                if path not in self.responses:
+                    raise ClientException()
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.responses = {"admin/disk_setting?form=metadata&operation=read": {"number": 0, "list": {}}}
+        storage = client.get_usb_storage()
+        self.assertEqual(storage.disks, 0)
+        self.assertIsNone(storage.capacity)
+        self.assertIsNone(storage.used)
+        self.assertIsNone(storage.free)
+        self.assertEqual(client.paths, [("admin/disk_setting?form=metadata&operation=read", "operation=read")])
+
+        client.responses = {
+            "admin/disk_setting?form=metadata&operation=read": {
+                "number": 2, "list": [{"serial": "AB 12", "name": "Disk"}, {"serial": "CD34", "name": "Disk"}]},
+            "admin/disk_setting?form=contents&serial=AB%2012&operation=load": [
+                {"volumn": "Volume1", "capacity": "16GB", "enable": "on", "free": "10GB", "uuid": "0001"},
+                {"volumn": "Volume2", "capacity": "1.5T", "used": "0.5T", "free": "1T", "uuid": "0002"},
+                {"volumn": "Volume3", "capacity": "---", "free": "", "uuid": "0003"},
+            ],
+        }
+        storage = client.get_usb_storage()
+        self.assertEqual(storage.disks, 2)
+        self.assertEqual(storage.capacity, 16 * 10 ** 9 + 15 * 10 ** 11)
+        self.assertEqual(storage.used, 6 * 10 ** 9 + 5 * 10 ** 11)
+        self.assertEqual(storage.free, 10 * 10 ** 9 + 10 ** 12)
+
+        client.responses = {"admin/disk_setting?form=metadata&operation=read": {}}
+        storage = client.get_usb_storage()
+        self.assertIsNone(storage.disks)
+        self.assertIsNone(storage.capacity)
+
+    def test_get_usb_sharing(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/folder_sharing?form=settings&operation=read": [
+                {"port": "---", "key": 1, "edit": False, "enable": "on", "protocol": "samba", "link": "\\MyShare"},
+                {"port": 21, "key": 2, "edit": False, "enable": "off", "protocol": "ftp",
+                 "link": "ftp://192.168.0.1:21"},
+                {"port": "21", "key": 3, "edit": True, "enable": "on", "protocol": "ftpex", "link": "ftp://0.0.0.0:21"},
+            ],
+            "admin/folder_sharing?form=media&operation=read": {"media_sharing": "off"},
+            "admin/time_machine?form=settings&operation=read": {
+                "mntdir": "", "disk_status": "1", "enable": "on", "free": 0, "capacity": 0, "limitsize": "0"},
+        }
+        sharing = client.get_usb_sharing()
+        self.assertTrue(sharing.samba)
+        self.assertFalse(sharing.ftp)
+        self.assertTrue(sharing.ftp_internet)
+        self.assertFalse(sharing.media_sharing)
+        self.assertTrue(sharing.time_machine)
+
+        client.responses = {path: {} for path in client.responses}
+        sharing = client.get_usb_sharing()
+        self.assertIsNone(sharing.samba)
+        self.assertIsNone(sharing.ftp)
+        self.assertIsNone(sharing.ftp_internet)
+        self.assertIsNone(sharing.media_sharing)
+        self.assertIsNone(sharing.time_machine)
+
+    def test_print_server_status(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.sent = (path, data)
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.response = {"enable": "on", "name": "\\MyPrinter", "printer_count": 1}
+        self.assertTrue(client.print_server_status())
+        self.assertEqual(client.sent, ("admin/print_server", "operation=read"))
+        client.response = {"enable": "off"}
+        self.assertFalse(client.print_server_status())
+        client.response = {}
+        self.assertIsNone(client.print_server_status())
+
+    def test_get_vpn_server_settings(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/openvpn?form=config&operation=read": {
+                "enabled": "on", "proto": "udp", "access": "home", "cert_exist": True, "mask": "255.255.255.0",
+                "port": "1194", "serverip": "10.8.0.0"},
+            "admin/pptpd?form=config&operation=read": {
+                "enabled": "off", "unencrypted_access": "on", "samba_access": "off", "netbios_pass": "on",
+                "remoteip": "10.0.0.11-20"},
+        }
+        settings = client.get_vpn_server_settings()
+        self.assertTrue(settings.openvpn_enabled)
+        self.assertEqual(settings.openvpn_protocol, "udp")
+        self.assertEqual(settings.openvpn_port, 1194)
+        self.assertEqual(settings.openvpn_access, "home")
+        self.assertFalse(settings.pptp_enabled)
+        self.assertTrue(settings.pptp_unencrypted_access)
+        self.assertFalse(settings.pptp_samba_access)
+        self.assertFalse(hasattr(settings, "netbios_pass"))
+        self.assertFalse(hasattr(settings, "cert_exist"))
+
+        client.responses = {path: {} for path in client.responses}
+        settings = client.get_vpn_server_settings()
+        self.assertIsNone(settings.openvpn_enabled)
+        self.assertIsNone(settings.openvpn_protocol)
+        self.assertIsNone(settings.openvpn_port)
+        self.assertIsNone(settings.openvpn_access)
+        self.assertIsNone(settings.pptp_enabled)
+        self.assertIsNone(settings.pptp_unencrypted_access)
+        self.assertIsNone(settings.pptp_samba_access)
+
 
 if __name__ == "__main__":
     main()
