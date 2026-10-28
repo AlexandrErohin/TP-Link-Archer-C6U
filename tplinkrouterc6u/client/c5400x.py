@@ -3,7 +3,8 @@ from re import search
 from urllib.parse import urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import PortModes
+from tplinkrouterc6u.common.dataclass import PortModes, Status
+from tplinkrouterc6u.common.helper import get_mac
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
 
@@ -15,6 +16,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # This firmware ignores the POST body without a form Content-Type: insert/remove fail with
         # "no such callback" and write parameters (e.g. enable=on) are dropped
         self._headers_request['Content-Type'] = 'application/x-www-form-urlencoded'
+        self._traffic_lists = True
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
         # Once the body is read, a parameter that is also in the URL arrives twice ("no such callback" for
@@ -54,6 +56,36 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             if self._logger:
                 self._logger.debug(error)
             raise ClientException(error)
+
+    def get_status(self) -> Status:
+        status = super().get_status()
+        if not self._traffic_lists:
+            return status
+        try:
+            rows = self.request('admin/traffic?form=lists&operation=load', 'operation=load')
+        except Exception:
+            self._traffic_lists = False
+            return status
+
+        # There is no game_accelerator list here; the Traffic Monitor page's list has, per MAC and IP (rows of
+        # old IPs stay), the live bytes/s the client receives (rerx_byte) and sends (retx_byte) and its total_byte.
+        # It counts internet traffic (checked against a ~90 Mbit/s download) and traffic between local clients
+        traffic = {}
+        rows = rows if isinstance(rows, list) else []
+        status.clients_down_speed = sum(int(row.get('rerx_byte') or 0) for row in rows)
+        status.clients_up_speed = sum(int(row.get('retx_byte') or 0) for row in rows)
+        for row in rows:
+            if not row.get('mac'):
+                continue
+            mac = str(get_mac(row['mac']))
+            down, up, total = traffic.get(mac, (0, 0, 0))
+            traffic[mac] = (down + int(row.get('rerx_byte') or 0), up + int(row.get('retx_byte') or 0),
+                            total + int(row.get('total_byte') or 0))
+        for device in status.devices:
+            if device.macaddr in traffic and device.down_speed is None:
+                device.down_speed, device.up_speed, device.traffic_usage = traffic[device.macaddr]
+
+        return status
 
     def _status_conn_type(self, data: dict) -> str | None:
         # conn_type here is the USB modem connection ("0" = none); the WAN type is wan_ipv4_conntype

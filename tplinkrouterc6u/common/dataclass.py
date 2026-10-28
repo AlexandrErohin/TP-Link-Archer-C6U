@@ -86,6 +86,8 @@ class Status:
     mem_usage: float | None = None
     cpu_usage: float | None = None
     conn_type: str | None = None
+    clients_down_speed: int | None = None
+    clients_up_speed: int | None = None
     devices: list[Device] = field(default_factory=list)
 
     @property

@@ -223,6 +223,61 @@ class TestTPLinkC1200Client(TestCase):
         self.assertIsNone(status.wifi_5g_2_enable)
         self.assertIsNone(status.guest_5g_2_enable)
 
+    def test_get_status_client_traffic(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append(path)
+                if path == "admin/status?form=all&operation=read":
+                    return {
+                        "lan_macaddr": "06-E6-97-9E-23-F5",
+                        "access_devices_wired": [
+                            {"macaddr": "02-00-00-00-00-01", "ipaddr": "192.168.0.10", "hostname": "pc",
+                             "wire_type": "wired"},
+                        ],
+                        "access_devices_wireless_host": [
+                            {"macaddr": "02-00-00-00-00-02", "ipaddr": "192.168.0.11", "hostname": "phone",
+                             "wire_type": "5G"},
+                        ],
+                    }
+                if path == "admin/traffic?form=lists&operation=load":
+                    if self.traffic is None:
+                        raise ClientException("no such callback")
+                    return self.traffic
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.traffic = [
+            {"mac": "02-00-00-00-00-01", "ip": "192.168.0.10", "total_byte": 1000, "retx_byte": 10,
+             "rerx_byte": 200},
+            {"mac": "02-00-00-00-00-01", "ip": "192.168.0.99", "total_byte": 500, "retx_byte": 0, "rerx_byte": 0},
+            {"mac": "02-00-00-00-00-09", "ip": "192.168.0.12", "total_byte": 7, "retx_byte": 1, "rerx_byte": 1},
+        ]
+        status = client.get_status()
+        self.assertEqual(status.clients_down_speed, 201)
+        self.assertEqual(status.clients_up_speed, 11)
+        devices = {device.hostname: device for device in status.devices}
+        self.assertEqual(devices["pc"].down_speed, 200)
+        self.assertEqual(devices["pc"].up_speed, 10)
+        self.assertEqual(devices["pc"].traffic_usage, 1500)
+        self.assertIsNone(devices["phone"].down_speed)
+        self.assertIsNone(devices["phone"].traffic_usage)
+
+        client.traffic = None
+        client._traffic_lists = True
+        status = client.get_status()
+        self.assertIsNone(status.devices[0].down_speed)
+        self.assertIsNone(status.clients_down_speed)
+        client.paths = []
+        client.get_status()
+        self.assertNotIn("admin/traffic?form=lists&operation=load", client.paths)
+
     def test_led_night_mode(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

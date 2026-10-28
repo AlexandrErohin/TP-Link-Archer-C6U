@@ -221,6 +221,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
 | conn_type | Connection type | str, None |
+| clients_down_speed | What all clients receive, bytes/s (Archer C5400X, Traffic Monitor list). It includes traffic between local clients, so it is not exactly the internet speed | int, None |
+| clients_up_speed | What all clients send, bytes/s, counted the same way as clients_down_speed | int, None |
 | devices | List of all connected devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
@@ -234,8 +236,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | hostname | client hostname | str |
 | packets_sent | total packets sent | int, None |
 | packets_received | total packets received | int, None |
-| down_speed | download speed | int, None |
-| up_speed | upload speed | int, None |
+| down_speed | download speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
+| up_speed | upload speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
 | tx_rate | transmit rate (Mbps) | int, None |
 | rx_rate | receive rate (Mbps) | int, None |
 | online_time | client online time (seconds) | float, None |
