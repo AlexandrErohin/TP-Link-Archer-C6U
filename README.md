@@ -148,6 +148,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | get_port_modes |   | Whether WAN aggregation, link aggregation and IPTV are on (Archer C5400X) | [PortModes](#port_modes) |
+| nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | reboot |   | reboot router |

@@ -445,6 +445,26 @@ class TestTPLinkC1200Client(TestCase):
         self.assertIsNone(modes.link_aggregation)
         self.assertIsNone(modes.iptv)
 
+    def test_nat_boost_status(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.response = {"hw_enable": "off", "boost_support": "yes", "enable": "on",
+                           "boost_traffic_compatible": "yes", "boost_qos_compatible": "no", "reboot_time": 45}
+        self.assertFalse(client.nat_boost_status())
+        client.response = dict(client.response, hw_enable="on")
+        self.assertTrue(client.nat_boost_status())
+        client.response = {"enable": "on"}
+        self.assertIsNone(client.nat_boost_status())
+
     def test_smart_connect(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

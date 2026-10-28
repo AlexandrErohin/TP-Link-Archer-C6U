@@ -131,6 +131,14 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             iptv={'on': True, 'off': False}.get(iptv.get('enable')),
         )
 
+    def nat_boost_status(self) -> bool | None:
+        # Hardware NAT acceleration (System Parameters). While it is off the Traffic Monitor counters see every
+        # client's traffic; None when the firmware has no NAT Boost
+        data = self.request('admin/nat?form=setting&operation=read', 'operation=read')
+        if data.get('boost_support') != 'yes':
+            return None
+        return {'on': True, 'off': False}.get(data.get('hw_enable'))
+
     def smart_connect_status(self) -> bool | None:
         data = self.request('admin/wireless?form=smart_connect&operation=read', 'operation=read')
         return {'on': True, 'off': False}.get(data.get('smart_enable'))
