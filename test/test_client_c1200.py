@@ -189,6 +189,35 @@ class TestTPLinkC1200Client(TestCase):
         client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5", "conn_type": "0"}
         self.assertEqual(client.get_status().conn_type, "0")
 
+    def test_led_night_mode(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/ledpm?form=setting&operation=read":
+                    return {"enable": self.state, "time_start": "00:00", "time_end": "23:59", "ledpm_support": "yes"}
+                if path == "admin/ledpm?form=setting&operation=write":
+                    self.writes.append(data)
+                    return {}
+                raise ClientException()
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+        client.state = "on"
+        self.assertTrue(client.led_night_mode_status())
+        client.state = "off"
+        self.assertFalse(client.led_night_mode_status())
+        client.state = ""
+        self.assertIsNone(client.led_night_mode_status())
+
+        client.set_led_night_mode(True)
+        client.set_led_night_mode(False)
+        self.assertEqual(client.writes, ["operation=write&enable=on", "operation=write&enable=off"])
+
     def test_set_wifi(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

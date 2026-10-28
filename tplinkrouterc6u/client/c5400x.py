@@ -60,6 +60,15 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         else:
             return None
 
+    def led_night_mode_status(self) -> bool | None:
+        data = self.request('admin/ledpm?form=setting&operation=read', 'operation=read')
+        return {'on': True, 'off': False}.get(data.get('enable'))
+
+    def set_led_night_mode(self, enable: bool) -> None:
+        # Only enable: the router keeps time_start / time_end as they are
+        self.request('admin/ledpm?form=setting&operation=write',
+                     'operation=write&enable={}'.format('on' if enable else 'off'))
+
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
                  hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
