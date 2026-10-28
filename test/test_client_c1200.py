@@ -617,6 +617,169 @@ class TestTPLinkC1200Client(TestCase):
                 self.assertEqual(sent.pop("{}_{}".format(band, key)), value)
         self.assertEqual(sent, {})
 
+    def test_get_wifi_networks(self) -> None:
+        main_5g = {
+            "disabled": "off", "disabled_all": "off", "current_channel": "48", "disabled_by": "0", "hidden": "off",
+            "macaddr": "06-E6-97-9E-23-F5", "encryption": "psk", "enable": "on", "hwmode": "anac_5", "htmode": "auto",
+            "wps_state": "configured", "wpa_key": "", "ssid": "MyNetwork-5G", "txpower": "high",
+            "psk_key": "secret&key", "wep_key1": "", "channel": "auto", "airtime_fairness": "on", "mu_mimo": "on",
+        }
+        guest = {"ssid": "MyGuest", "disabled_by": "0", "enable": "off", "hidden": "off", "disabled": "off",
+                 "encryption": "none", "psk_key": "secret"}
+
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append(path)
+                form = path.split("form=", 1)[1].split("&", 1)[0]
+                if form in self.responses:
+                    return self.responses[form]
+                raise ClientException("no such form")
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.responses = {
+            "wireless_2g": {"enable": "on", "ssid": "MyNetwork", "channel": "6", "current_channel": "6",
+                            "hwmode": "bgn", "mu_mimo": "off"},
+            "wireless_5g": main_5g,
+            "guest_2g": guest,
+            "guest_5g": {"wireless": "unknown"},
+        }
+        networks = client.get_wifi_networks()
+
+        self.assertEqual(client.paths[0], "admin/wireless?form=wireless_2g&operation=read")
+        self.assertEqual(len(client.paths), 6)
+        # wireless_5g_2 and guest_5g_2 fail (dual-band): left out
+        self.assertEqual(list(networks), ["wireless_2g", "wireless_5g", "guest_2g", "guest_5g"])
+        five = networks["wireless_5g"]
+        self.assertTrue(five.enable)
+        self.assertEqual(five.ssid, "MyNetwork-5G")
+        self.assertFalse(five.hidden)
+        self.assertEqual(five.encryption, "psk")
+        self.assertEqual(five.channel, "auto")
+        self.assertEqual(five.current_channel, 48)
+        self.assertEqual((five.hwmode, five.htmode, five.txpower), ("anac_5", "auto", "high"))
+        self.assertTrue(five.airtime_fairness)
+        self.assertTrue(five.mu_mimo)
+        for network in networks.values():
+            self.assertNotIn("secret", str(network))
+            self.assertFalse(hasattr(network, "psk_key"))
+        self.assertEqual(networks["wireless_2g"].channel, "6")
+        self.assertIsNone(networks["wireless_2g"].txpower)
+        self.assertFalse(networks["wireless_2g"].mu_mimo)
+        self.assertEqual((networks["guest_2g"].ssid, networks["guest_2g"].enable), ("MyGuest", False))
+        self.assertEqual(networks["guest_2g"].encryption, "none")
+        self.assertIsNone(networks["guest_2g"].current_channel)
+        self.assertIsNone(networks["guest_2g"].mu_mimo)
+        self.assertIsNone(networks["guest_5g"].ssid)
+        self.assertIsNone(networks["guest_5g"].enable)
+
+        # Prefixed keys (multi-form answer) are read too
+        client.responses = {"wireless_5g_2": {"wireless_5g_2_ssid": "MyNetwork", "wireless_5g_2_enable": "off",
+                                              "wireless_5g_2_current_channel": "149"}}
+        networks = client.get_wifi_networks()
+        self.assertEqual(list(networks), ["wireless_5g_2"])
+        self.assertEqual((networks["wireless_5g_2"].ssid, networks["wireless_5g_2"].enable), ("MyNetwork", False))
+        self.assertEqual(networks["wireless_5g_2"].current_channel, 149)
+
+        # Nothing could be read: the error goes up
+        client.responses = {}
+        with self.assertRaises(ClientException):
+            client.get_wifi_networks()
+
+    def test_wifi_schedule(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if data.startswith("operation=write"):
+                    self.writes.append((path, data))
+                    return {}
+                if path == "admin/wireless?form=wireless_schedule&operation=read":
+                    return self.schedule
+                if path == "admin/wireless?form=wireless_schedule_wifi_disable&operation=read":
+                    if self.now is None:
+                        raise ClientException("no such callback")
+                    return self.now
+                raise ClientException()
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+        client.schedule = {"enable": "off", "list": {}}
+        client.now = {"disable_52g": False, "disable_2g": False, "disable_5g": False}
+        schedule = client.wifi_schedule_status()
+        self.assertFalse(schedule.enable)
+        self.assertEqual(schedule.off_periods, 0)
+        self.assertEqual((schedule.off_now_2g, schedule.off_now_5g, schedule.off_now_5g_2), (False, False, False))
+
+        client.schedule = {"enable": "on", "list": ["eve:[0,6]", "1,2:[22,24]"]}
+        client.now = {"disable_2g": True, "disable_5g": "off"}
+        schedule = client.wifi_schedule_status()
+        self.assertTrue(schedule.enable)
+        self.assertEqual(schedule.off_periods, 2)
+        self.assertEqual((schedule.off_now_2g, schedule.off_now_5g, schedule.off_now_5g_2), (True, False, None))
+
+        client.schedule = {}
+        client.now = None
+        schedule = client.wifi_schedule_status()
+        self.assertIsNone(schedule.enable)
+        self.assertIsNone(schedule.off_periods)
+        self.assertIsNone(schedule.off_now_2g)
+
+        client.set_wifi_schedule(True)
+        client.set_wifi_schedule(False)
+        self.assertEqual(client.writes, [
+            ("admin/wireless?form=wireless_schedule", "operation=write&enable=on"),
+            ("admin/wireless?form=wireless_schedule", "operation=write&enable=off"),
+        ])
+
+    def test_wps_and_guest_network_access(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/wireless?form=syspara_wps&operation=read": {"wps": "off"},
+            "admin/wireless?form=guest&operation=read": {"isolate": "on", "access": "off"},
+        }
+        self.assertFalse(client.wps_status())
+        access = client.guest_network_access()
+        self.assertTrue(access.each_other)
+        self.assertFalse(access.local_network)
+
+        client.responses = {
+            "admin/wireless?form=syspara_wps&operation=read": {"wps": "on"},
+            "admin/wireless?form=guest&operation=read": {"access": "on"},
+        }
+        self.assertTrue(client.wps_status())
+        access = client.guest_network_access()
+        self.assertIsNone(access.each_other)
+        self.assertTrue(access.local_network)
+
+        client.responses = {
+            "admin/wireless?form=syspara_wps&operation=read": {},
+            "admin/wireless?form=guest&operation=read": {},
+        }
+        self.assertIsNone(client.wps_status())
+        self.assertEqual((client.guest_network_access().each_other, client.guest_network_access().local_network),
+                         (None, None))
+
     def test_vpn_status(self) -> None:
         response_openvpn_read = """
         {

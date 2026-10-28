@@ -157,6 +157,11 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_usb_sharing |   | Whether Samba, FTP, FTP via internet, Media Sharing and Time Machine are on (Archer C5400X) | [UsbSharing](#usb_sharing) |
 | print_server_status |   | Is the USB print server on (Archer C5400X; read format taken from the web page, not yet checked) | bool, None |
 | get_vpn_server_settings |   | OpenVPN and PPTP server settings without certificates or accounts (Archer C5400X) | [VpnServerSettings](#vpn_server_settings) |
+| get_wifi_networks |   | Every WiFi network by form name (`wireless_2g`, `wireless_5g`, `wireless_5g_2`, `guest_2g`, `guest_5g`, `guest_5g_2`), without passwords; networks the router does not have are left out (Archer C5400X) | dict[str, [WifiNetwork](#wifi_network)] |
+| wifi_schedule_status |   | Wireless Off Time Schedule: on or off, number of off periods and which bands it has off right now (Archer C5400X) | [WifiSchedule](#wifi_schedule) |
+| set_wifi_schedule | enable: bool | Turn the Wireless Off Time Schedule on or off, keeping its off periods (Archer C5400X) |   |
+| wps_status |   | Is WPS on (Archer C5400X) | bool, None |
+| guest_network_access |   | Whether guests may access each other and the local network (Archer C5400X) | [GuestNetworkAccess](#guest_network_access) |
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
@@ -524,6 +529,38 @@ Not all fields are filled by every client:
 | uploads | Bytes uploaded per day, same order | list[int, None] |
 | download_today | downloads[0] | int, None |
 | upload_today | uploads[0] | int, None |
+
+### <a id="wifi_network">WifiNetwork</a>
+Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is no password field.
+
+| Field | Description | Type |
+| --- |---|---|
+| enable | The network is on | bool, None |
+| ssid | Network name | str, None |
+| hidden | The name is hidden | bool, None |
+| encryption | Security: `psk`, `none`… | str, None |
+| channel | Configured channel: `auto` or a number | str, None |
+| current_channel | Channel in use | int, None |
+| hwmode | Wireless mode, e.g. `bgn`, `anac_5` | str, None |
+| htmode | Channel width, e.g. `auto`, `20`, `40`, `80` | str, None |
+| txpower | Transmit power: `low`, `middle`, `high` | str, None |
+| airtime_fairness | Airtime Fairness is on | bool, None |
+| mu_mimo | MU-MIMO is on | bool, None |
+
+### <a id="wifi_schedule">WifiSchedule</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | The Wireless Off Time Schedule is on | bool, None |
+| off_periods | Number of off periods in the schedule | int, None |
+| off_now_2g | The schedule has the 2.4 GHz band off right now | bool, None |
+| off_now_5g | The schedule has the 5 GHz band off right now | bool, None |
+| off_now_5g_2 | The schedule has the second 5 GHz band off right now | bool, None |
+
+### <a id="guest_network_access">GuestNetworkAccess</a>
+| Field | Description | Type |
+| --- |---|---|
+| each_other | Guests may access each other | bool, None |
+| local_network | Guests may access the local network | bool, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

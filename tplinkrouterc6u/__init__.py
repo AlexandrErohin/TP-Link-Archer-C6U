@@ -51,5 +51,8 @@ from tplinkrouterc6u.common.dataclass import (
     VpnServerSettings,
     ClientsPerBand,
     DailyTraffic,
+    WifiNetwork,
+    WifiSchedule,
+    GuestNetworkAccess,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

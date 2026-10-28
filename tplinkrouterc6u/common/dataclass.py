@@ -603,3 +603,38 @@ class DailyTraffic:
     @property
     def upload_today(self) -> int | None:
         return self.uploads[0] if self.uploads else None
+
+
+@dataclass
+class WifiNetwork:
+    """One WiFi network as its settings page reads it, without the password.
+
+    Guest networks only fill enable, ssid, hidden and encryption: the radio fields belong to the main network of
+    each band.
+    """
+    enable: bool | None = None
+    ssid: str | None = None
+    hidden: bool | None = None
+    encryption: str | None = None
+    channel: str | None = None
+    current_channel: int | None = None
+    hwmode: str | None = None
+    htmode: str | None = None
+    txpower: str | None = None
+    airtime_fairness: bool | None = None
+    mu_mimo: bool | None = None
+
+
+@dataclass
+class WifiSchedule:
+    enable: bool | None = None
+    off_periods: int | None = None
+    off_now_2g: bool | None = None
+    off_now_5g: bool | None = None
+    off_now_5g_2: bool | None = None
+
+
+@dataclass
+class GuestNetworkAccess:
+    each_other: bool | None = None
+    local_network: bool | None = None

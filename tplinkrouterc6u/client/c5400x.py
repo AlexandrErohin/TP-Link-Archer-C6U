@@ -6,15 +6,25 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import (
     ClientsPerBand,
     DailyTraffic,
+    GuestNetworkAccess,
     PortModes,
     Status,
     UsbSharing,
     UsbStorage,
     VpnServerSettings,
+    WifiNetwork,
+    WifiSchedule,
 )
 from tplinkrouterc6u.common.helper import get_mac
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
+
+
+def _flag(value) -> bool | None:
+    # 'on' / 'off' in most forms; JSON true / false in wireless_schedule_wifi_disable
+    if isinstance(value, bool):
+        return value
+    return {'on': True, 'off': False, 'true': True, 'false': False}.get(str(value).lower())
 
 
 class TplinkC5400XRouter(TplinkBaseRouter):
@@ -214,6 +224,82 @@ class TplinkC5400XRouter(TplinkBaseRouter):
                 values['wireless_5g_' + key] = value
                 values['wireless_5g_2_' + key] = value
         self.request('admin/wireless?form=wireless_5g&form=wireless_5g_2', urlencode({'operation': 'write', **values}))
+
+    # Every WiFi network by its form name: main and guest, 2.4 GHz and both 5 GHz bands (tri-band)
+    WIFI_NETWORK_FORMS = ('wireless_2g', 'wireless_5g', 'wireless_5g_2', 'guest_2g', 'guest_5g', 'guest_5g_2')
+
+    def get_wifi_networks(self) -> dict[str, WifiNetwork]:
+        # One read per network. A network the router does not have (the second 5 GHz band on a dual-band model)
+        # is left out. Never the password: psk_key, wpa_key and wep_key* are not copied
+        networks = {}
+        error = None
+        for form in self.WIFI_NETWORK_FORMS:
+            try:
+                data = self.request('admin/wireless?form={}&operation=read'.format(form), 'operation=read')
+            except ClientException as e:
+                error = e
+                continue
+            if isinstance(data, dict):
+                networks[form] = self._wifi_network(form, data)
+        if not networks and error is not None:
+            raise error
+        return networks
+
+    @staticmethod
+    def _wifi_network(form: str, data: dict) -> WifiNetwork:
+        # A single-form read has unprefixed keys (ssid); a multi-form one, prefixed keys (wireless_2g_ssid)
+        def get(key):
+            value = data.get('{}_{}'.format(form, key), data.get(key))
+            return None if value == '' else value
+
+        current = get('current_channel')
+        return WifiNetwork(
+            enable=_flag(get('enable')),
+            ssid=get('ssid'),
+            hidden=_flag(get('hidden')),
+            encryption=get('encryption'),
+            channel=None if get('channel') is None else str(get('channel')),
+            current_channel=int(current) if str(current).isdigit() else None,
+            hwmode=get('hwmode'),
+            htmode=get('htmode'),
+            txpower=get('txpower'),
+            airtime_fairness=_flag(get('airtime_fairness')),
+            mu_mimo=_flag(get('mu_mimo')),
+        )
+
+    def wifi_schedule_status(self) -> WifiSchedule:
+        # Wireless Off Time Schedule: whether it is on, how many off periods it has and which bands it has off now
+        data = self.request('admin/wireless?form=wireless_schedule&operation=read', 'operation=read')
+        periods = data.get('list')
+        schedule = WifiSchedule(
+            enable=_flag(data.get('enable')),
+            # The router sends {} when there is none; the web page reads a list of "days:[from,to]" strings
+            off_periods=len(periods) if isinstance(periods, (list, dict)) else None,
+        )
+        try:
+            now = self.request('admin/wireless?form=wireless_schedule_wifi_disable&operation=read', 'operation=read')
+        except ClientException:
+            return schedule
+        schedule.off_now_2g = _flag(now.get('disable_2g'))
+        schedule.off_now_5g = _flag(now.get('disable_5g'))
+        schedule.off_now_5g_2 = _flag(now.get('disable_52g'))
+        return schedule
+
+    def set_wifi_schedule(self, enable: bool) -> None:
+        # What the switch of the Wireless Schedule page sends; the off periods (list) stay as they are
+        self.request('admin/wireless?form=wireless_schedule',
+                     'operation=write&enable={}'.format('on' if enable else 'off'))
+
+    def wps_status(self) -> bool | None:
+        # WPS switch of System Parameters
+        data = self.request('admin/wireless?form=syspara_wps&operation=read', 'operation=read')
+        return _flag(data.get('wps'))
+
+    def guest_network_access(self) -> GuestNetworkAccess:
+        # Guest Network settings shared by every band. In the web page, isolate is the box "Allow guests to access
+        # each other" and access is "Allow guests to access my local network" (on = allowed)
+        data = self.request('admin/wireless?form=guest&operation=read', 'operation=read')
+        return GuestNetworkAccess(each_other=_flag(data.get('isolate')), local_network=_flag(data.get('access')))
 
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
