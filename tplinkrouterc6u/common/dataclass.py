@@ -723,3 +723,38 @@ class IpMacBinding:
     enable: bool | None = None
     arp_entries: int | None = None
     bindings: int | None = None
+
+
+@dataclass
+class FirmwareUpdate:
+    installed_version: str | None = None
+    latest_version: str | None = None
+    update_available: bool | None = None
+    release_notes: str | None = None
+
+
+@dataclass
+class RebootSchedule:
+    enable: bool | None = None
+    time: str | None = None
+    cycle: str | None = None
+    day: str | None = None
+
+
+@dataclass
+class RouterTime:
+    time: datetime | None = None
+    read_at: datetime | None = None
+    automatic: bool | None = None
+    timezone: str | None = None
+    ntp_servers: list[str] = field(default_factory=list)
+    dst_enable: bool | None = None
+    dst_active: bool | None = None
+    dst_start: str | None = None
+    dst_end: str | None = None
+
+
+@dataclass
+class SystemLog:
+    entries: int | None = None
+    levels: dict[str, int] = field(default_factory=dict)

@@ -62,5 +62,9 @@ from tplinkrouterc6u.common.dataclass import (
     HomeCareStatus,
     BlockedThreats,
     IpMacBinding,
+    FirmwareUpdate,
+    RebootSchedule,
+    RouterTime,
+    SystemLog,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

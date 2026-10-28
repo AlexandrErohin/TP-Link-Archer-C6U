@@ -885,6 +885,210 @@ class TestTPLinkC1200Client(TestCase):
         self.assertIsNone(binding.arp_entries)
         self.assertIsNone(binding.bindings)
 
+    def test_get_firmware_update(self) -> None:
+        installed = "1.2.1 Build 20250928 rel.12879(5553)"
+        newer = "1.2.2 Build 20260301 rel.13000(5553)"
+
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+                response = self.responses.get(path)
+                if response is None:
+                    raise ClientError("no such callback")
+                return response
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.responses = {
+            "admin/firmware?form=upgrade&operation=read": {"hardware_version": "ArcherC5400X v1.0",
+                                                           "model": "ArcherC5400X", "totaltime": 45,
+                                                           "is_default": False, "firmware_version": installed},
+            "admin/cloud_account?form=check_upgrade&operation=read": {"update_number": 1},
+            "admin/cloud_account?form=cloud_upgrade&operation=load": {
+                "latest_version": newer, "detail": "Modifications:\\n1. Fixes.\\tMore", "latest_flag": False,
+                "note_flag": False},
+        }
+        update = client.get_firmware_update()
+        self.assertEqual(update.installed_version, installed)
+        self.assertEqual(update.latest_version, newer)
+        self.assertTrue(update.update_available)
+        self.assertEqual(update.release_notes, "Modifications:\n1. Fixes.\tMore")
+        # Read only: never the upgrade operation
+        self.assertEqual([data for _, data in client.calls], ["operation=read", "operation=read", "operation=load"])
+
+        client.responses["admin/cloud_account?form=check_upgrade&operation=read"] = {"update_number": 0}
+        client.responses["admin/cloud_account?form=cloud_upgrade&operation=load"] = {
+            "latest_version": installed, "detail": "", "latest_flag": True, "note_flag": False}
+        update = client.get_firmware_update()
+        self.assertFalse(update.update_available)
+        self.assertEqual(update.latest_version, installed)
+        self.assertIsNone(update.release_notes)
+
+        # No answer from the cloud: the installed version is still known
+        del client.responses["admin/cloud_account?form=check_upgrade&operation=read"]
+        del client.responses["admin/cloud_account?form=cloud_upgrade&operation=load"]
+        update = client.get_firmware_update()
+        self.assertEqual(update.installed_version, installed)
+        self.assertIsNone(update.latest_version)
+        self.assertIsNone(update.update_available)
+
+        client.responses = {"admin/firmware?form=upgrade&operation=read": {},
+                            "admin/cloud_account?form=check_upgrade&operation=read": {},
+                            "admin/cloud_account?form=cloud_upgrade&operation=load": {}}
+        update = client.get_firmware_update()
+        self.assertIsNone(update.installed_version)
+        self.assertIsNone(update.update_available)
+
+    def test_reboot_schedule(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/reboot?form=set&operation=read":
+                    return self.response
+                self.writes.append((path, data))
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+        client.response = {"enable": "off", "cycle": "week", "time": "03:00", "day": "Mon"}
+        schedule = client.get_reboot_schedule()
+        self.assertFalse(schedule.enable)
+        self.assertEqual((schedule.time, schedule.cycle, schedule.day), ("03:00", "week", "Mon"))
+
+        client.set_reboot_schedule(True)
+        path, data = client.writes[0]
+        self.assertEqual(path, "admin/reboot?form=set")
+        self.assertEqual(dict(parse_qsl(data)),
+                         {"operation": "write", "enable": "on", "time": "03:00", "cycle": "week", "day": "Mon"})
+
+        client.writes = []
+        client.set_reboot_schedule(False, time="04:30", cycle="day")
+        self.assertEqual(dict(parse_qsl(client.writes[0][1])),
+                         {"operation": "write", "enable": "off", "time": "04:30", "cycle": "day", "day": "Mon"})
+
+        client.response = {}
+        schedule = client.get_reboot_schedule()
+        self.assertIsNone(schedule.enable)
+        self.assertIsNone(schedule.time)
+
+    def test_get_router_time(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/time?form=settings&operation=read": {
+                "hour24_support": "yes", "type": "auto", "hour24_enable": "on", "ntp_svr2": "time-nw.nist.gov",
+                "date": "10/28/2026", "ntp_svr1": "time.nist.gov", "timezone": "20", "time": "15:02:05",
+                "time_format": "UN_FORMAT", "quicksetup": "no", "day": "Wed"},
+            "admin/time?form=dst&operation=read": {
+                "end_month": "Nov", "start_hour": "2am", "end_week": "1st", "date": "10/28/2026",
+                "start_month": "Mar", "end_hour": "2am", "time": "15:02:05", "start_day": "Sun",
+                "dst_status": "up", "dst_enable": "on", "start_week": "2nd", "end_day": "Sun"},
+        }
+        router_time = client.get_router_time()
+        self.assertEqual(router_time.time, datetime(2026, 10, 28, 15, 2, 5))
+        self.assertIsNotNone(router_time.read_at.tzinfo)
+        self.assertTrue(router_time.automatic)
+        self.assertEqual(router_time.timezone, "20")
+        self.assertEqual(router_time.ntp_servers, ["time.nist.gov", "time-nw.nist.gov"])
+        self.assertTrue(router_time.dst_enable)
+        self.assertTrue(router_time.dst_active)
+        self.assertEqual(router_time.dst_start, "2nd Sun Mar 2am")
+        self.assertEqual(router_time.dst_end, "1st Sun Nov 2am")
+
+        client.responses["admin/time?form=settings&operation=read"] = {
+            "date": "28/10/2026", "time": "15:02:05", "time_format": "BR_FORMAT", "type": "manual"}
+        router_time = client.get_router_time()
+        self.assertEqual(router_time.time, datetime(2026, 10, 28, 15, 2, 5))
+        self.assertFalse(router_time.automatic)
+
+        client.responses = {path: {} for path in client.responses}
+        router_time = client.get_router_time()
+        self.assertIsNone(router_time.time)
+        self.assertIsNone(router_time.read_at)
+        self.assertIsNone(router_time.automatic)
+        self.assertEqual(router_time.ntp_servers, [])
+        self.assertIsNone(router_time.dst_active)
+        self.assertIsNone(router_time.dst_start)
+
+    def test_get_system_log(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.response = [
+            {"time": "2026-10-28 15:00:01", "type": "DHCPD", "level": "INFO", "content": "DHCPS: ..."},
+            {"time": "2026-10-28 15:00:02", "type": "DHCPD", "level": "INFO", "content": "DHCPS: ..."},
+            {"time": "2026-10-28 15:00:03", "type": "WIRELESS", "level": "WARNING", "content": "..."},
+            {"time": "2026-10-28 15:00:04", "type": "NAT", "content": "..."},
+        ]
+        log = client.get_system_log()
+        self.assertEqual(client.calls, [("admin/syslog?form=log&operation=load", "operation=load")])
+        self.assertEqual(log.entries, 4)
+        self.assertEqual(log.levels, {"info": 2, "warning": 1, "unknown": 1})
+
+        client.response = []
+        self.assertEqual(client.get_system_log().entries, 0)
+        client.response = {}
+        log = client.get_system_log()
+        self.assertIsNone(log.entries)
+        self.assertEqual(log.levels, {})
+
+    def test_traffic_monitor(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.response = {"enable": "off"}
+        self.assertFalse(client.traffic_monitor_status())
+        client.response = {"enable": "on"}
+        self.assertTrue(client.traffic_monitor_status())
+        client.response = {}
+        self.assertIsNone(client.traffic_monitor_status())
+
+        client.calls = []
+        client.set_traffic_monitor(True)
+        client.set_traffic_monitor(False)
+        self.assertEqual(client.calls, [("admin/traffic?form=status", "operation=write&enable=on"),
+                                        ("admin/traffic?form=status", "operation=write&enable=off")])
+
     def test_smart_connect(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

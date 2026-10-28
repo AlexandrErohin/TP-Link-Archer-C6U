@@ -9,15 +9,19 @@ from tplinkrouterc6u.common.dataclass import (
     BlockedThreats,
     ClientsPerBand,
     DailyTraffic,
+    FirmwareUpdate,
     GuestNetworkAccess,
     HomeCareStatus,
     IpMacBinding,
     PortModes,
     PortStatus,
     QoSSettings,
+    RebootSchedule,
+    RouterTime,
     SecuritySettings,
     SpeedTest,
     Status,
+    SystemLog,
     UsbSharing,
     UsbStorage,
     VpnServerSettings,
@@ -436,6 +440,110 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             arp_entries=None if arp is None else len(arp),
             bindings=None if bindings is None else len(bindings),
         )
+
+    def get_firmware_update(self) -> FirmwareUpdate:
+        # Read only. The installed version, then what the web UI shows about TP-Link's cloud: the update count of
+        # its top bar (check_upgrade) and the newest version on the Firmware Upgrade page (cloud_upgrade, load).
+        # operation=upgrade on that same cloud_upgrade form starts the online upgrade: it is never sent here
+        data = self.request('admin/firmware?form=upgrade&operation=read', 'operation=read')
+        update = FirmwareUpdate(installed_version=data.get('firmware_version') or None)
+        check = self._read_or_empty('admin/cloud_account?form=check_upgrade', 'read')
+        cloud = self._read_or_empty('admin/cloud_account?form=cloud_upgrade', 'load')
+
+        update.latest_version = cloud.get('latest_version') or None
+        if cloud.get('detail'):
+            update.release_notes = (cloud['detail'].replace('\\n', '\n').replace('\\t', '\t')
+                                    .replace("\\'", "'").strip() or None)
+        answers = []
+        try:
+            answers.append(int(check['update_number']) > 0)
+        except (KeyError, TypeError, ValueError):
+            pass
+        # latest_flag: the installed firmware is already the newest one
+        latest_flag = {True: True, False: False, 'true': True, 'false': False}.get(cloud.get('latest_flag'))
+        if latest_flag is True or (update.latest_version and update.latest_version == update.installed_version):
+            answers.append(False)
+        elif latest_flag is False and update.latest_version:
+            answers.append(True)
+        update.update_available = any(answers) if answers else None
+        return update
+
+    def _read_or_empty(self, path: str, operation: str) -> dict:
+        # Answers that depend on TP-Link's cloud fail without internet or a TP-Link ID: {} instead of an error
+        try:
+            data = self.request('{}&operation={}'.format(path, operation), 'operation={}'.format(operation))
+        except ClientError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def get_reboot_schedule(self) -> RebootSchedule:
+        data = self.request('admin/reboot?form=set&operation=read', 'operation=read')
+        return RebootSchedule(
+            enable={'on': True, 'off': False}.get(data.get('enable')),
+            time=data.get('time') or None,
+            cycle=data.get('cycle') or None,
+            day=data.get('day') or None,
+        )
+
+    def set_reboot_schedule(self, enable: bool, time: str = None, cycle: str = None, day: str = None) -> None:
+        # The web page sends the whole form: what is not given keeps its current value
+        data = self.request('admin/reboot?form=set&operation=read', 'operation=read')
+        values = {'operation': 'write', 'enable': 'on' if enable else 'off'}
+        for key, value in (('time', time), ('cycle', cycle), ('day', day)):
+            value = data.get(key) if value is None else value
+            if value is not None:
+                values[key] = value
+        self.request('admin/reboot?form=set', urlencode(values))
+
+    def get_router_time(self) -> RouterTime:
+        data = self.request('admin/time?form=settings&operation=read', 'operation=read')
+        dst = self.request('admin/time?form=dst&operation=read', 'operation=read')
+        read_at = datetime.now(timezone.utc)
+        clock = None
+        if data.get('date') and data.get('time'):
+            # BR_FORMAT dates are DD/MM/YYYY; the default (UN_FORMAT) is MM/DD/YYYY
+            date_format = '%d/%m/%Y' if str(data.get('time_format')).upper() == 'BR_FORMAT' else '%m/%d/%Y'
+            try:
+                clock = datetime.strptime('{} {}'.format(data['date'], data['time']), date_format + ' %H:%M:%S')
+            except ValueError:
+                pass
+
+        def dst_rule(edge: str) -> str | None:
+            parts = [dst.get('{}_{}'.format(edge, key)) for key in ('week', 'day', 'month', 'hour')]
+            return ' '.join(parts) if all(parts) else None
+
+        return RouterTime(
+            time=clock,
+            read_at=read_at if clock else None,
+            # auto = from the NTP servers; pc / manual = set from a browser or by hand
+            automatic=data['type'] == 'auto' if data.get('type') else None,
+            timezone=data.get('timezone') or None,
+            ntp_servers=[data[key] for key in ('ntp_svr1', 'ntp_svr2') if data.get(key)],
+            dst_enable={'on': True, 'off': False}.get(dst.get('dst_enable')),
+            dst_active={'up': True, 'down': False}.get(dst.get('dst_status')),
+            dst_start=dst_rule('start'),
+            dst_end=dst_rule('end'),
+        )
+
+    def get_system_log(self) -> SystemLog:
+        # Only how many entries there are, per level: the entries themselves name clients (MAC, IP). The list
+        # follows the type / level filter chosen on the System Log page
+        rows = self.request('admin/syslog?form=log&operation=load', 'operation=load')
+        if not isinstance(rows, list):
+            return SystemLog()
+        levels = {}
+        for row in rows:
+            level = str(row.get('level') or 'unknown').lower()
+            levels[level] = levels.get(level, 0) + 1
+        return SystemLog(entries=len(rows), levels=levels)
+
+    def traffic_monitor_status(self) -> bool | None:
+        data = self.request('admin/traffic?form=status&operation=read', 'operation=read')
+        return {'on': True, 'off': False}.get(data.get('enable'))
+
+    def set_traffic_monitor(self, enable: bool) -> None:
+        # What the switch on the Traffic Monitor page sends (no Save button)
+        self.request('admin/traffic?form=status', 'operation=write&enable={}'.format('on' if enable else 'off'))
 
     def smart_connect_status(self) -> bool | None:
         data = self.request('admin/wireless?form=smart_connect&operation=read', 'operation=read')

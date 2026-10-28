@@ -155,6 +155,13 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_speed_test |   | Result of the router's own speed test, Mbit/s (Archer C5400X) | [SpeedTest](#speed_test) |
 | get_wan_port_speed |   | Internet port Speed & Duplex value (`auto`, `1000F`, …) and the choices the router offers (Archer C5400X) | [WanPortSpeed](#wan_port_speed) |
 | get_qos |   | Whether QoS is on and the total bandwidth it shares out, Mbit/s (Archer C5400X) | [QoSSettings](#qos_settings) |
+| get_firmware_update |   | Installed firmware and, from TP-Link's cloud as the web UI shows it, the newest version and whether it is newer (Archer C5400X). Read only: it never starts the upgrade. The cloud part is None without internet or a TP-Link ID | [FirmwareUpdate](#firmware_update) |
+| get_reboot_schedule |   | The scheduled reboot: on/off, time, every day / week / month and which day (Archer C5400X) | [RebootSchedule](#reboot_schedule) |
+| set_reboot_schedule | enable: bool, time: str = None, cycle: str = None, day: str = None | Turn the scheduled reboot on or off (Archer C5400X); what is not given keeps its current value. The router applies it only when its time comes from the internet |   |
+| get_router_time |   | The router clock, its time zone, NTP servers and daylight saving time (Archer C5400X) | [RouterTime](#router_time) |
+| get_system_log |   | How many entries the system log has, per level; never their content, which names clients (Archer C5400X). The list follows the filter chosen on the System Log page | [SystemLog](#system_log) |
+| traffic_monitor_status |   | Is the Traffic Monitor on (Archer C5400X) | bool, None |
+| set_traffic_monitor | enable: bool | Turn the Traffic Monitor on or off (Archer C5400X) |   |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
@@ -652,6 +659,41 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 | enable | IP & MAC Binding is on | bool, None |
 | arp_entries | Entries in the ARP list | int, None |
 | bindings | IP & MAC bindings | int, None |
+
+### <a id="firmware_update">FirmwareUpdate</a>
+| Field | Description | Type |
+| --- |---|---|
+| installed_version | Returns like - 1.2.1 Build 20250928 rel.12879(5553) | str, None |
+| latest_version | Newest version TP-Link's cloud has for the router; the installed one when it is up to date | str, None |
+| update_available | The newest version is not the installed one | bool, None |
+| release_notes | What the newest version changes | str, None |
+
+### <a id="reboot_schedule">RebootSchedule</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | The scheduled reboot is on | bool, None |
+| time | Router time of the reboot, like 03:00 | str, None |
+| cycle | day, week or month | str, None |
+| day | Mon ... Sun when weekly, 1 ... 28 when monthly | str, None |
+
+### <a id="router_time">RouterTime</a>
+| Field | Description | Type |
+| --- |---|---|
+| time | Router clock, in its own time zone (naive) | datetime, None |
+| read_at | This computer's clock (UTC) when the router clock was read, to measure its offset | datetime, None |
+| automatic | The time comes from the NTP servers (not set by hand or from a browser) | bool, None |
+| timezone | Router time zone code, like 20 | str, None |
+| ntp_servers | NTP servers | list[str] |
+| dst_enable | Daylight saving time is on | bool, None |
+| dst_active | Daylight saving time applies now | bool, None |
+| dst_start | When it starts, like 2nd Sun Mar 2am | str, None |
+| dst_end | When it ends, like 1st Sun Nov 2am | str, None |
+
+### <a id="system_log">SystemLog</a>
+| Field | Description | Type |
+| --- |---|---|
+| entries | Entries in the system log | int, None |
+| levels | Entries per level (lower case), like {"info": 140, "warning": 3} | dict[str, int] |
 
 ## Enum
 ### <a id="connection">Connection</a>
