@@ -114,6 +114,50 @@ class TestTPLinkC1200Client(TestCase):
         led_status = client.get_led()
         self.assertTrue(led_status)
 
+    def test_set_led_sends_enable_value(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/ledgeneral?form=setting&operation=read":
+                    return {"enable": self.state, "ledst_support": "yes"}
+                if path == "admin/ledgeneral?form=setting&operation=write":
+                    self.writes.append(data)
+                    return {}
+                raise ClientException()
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+
+        client.state = "off"
+        client.set_led(True)
+        client.state = "on"
+        client.set_led(False)
+        client.set_led(True)
+
+        self.assertEqual(client.writes, ["operation=write&enable=on", "operation=write&enable=off"])
+
+    def test_led_status_method(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/ledgeneral?form=setting&operation=read":
+                    return {"enable": "off", "ledst_support": "yes"}
+                raise ClientException()
+
+        client = TPLinkRouterTest("", "")
+
+        self.assertFalse(client.led_status())
+
     def test_set_wifi(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

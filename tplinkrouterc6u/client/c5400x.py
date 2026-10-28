@@ -39,7 +39,11 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         current_state = (self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
                          .get('enable', 'off') == 'on')
         if current_state != enable:
-            self.request('admin/ledgeneral?form=setting&operation=write', 'operation=write')
+            self.request('admin/ledgeneral?form=setting&operation=write',
+                         'operation=write&enable={}'.format('on' if enable else 'off'))
+
+    def led_status(self) -> bool | None:
+        return self.get_led()
 
     def get_led(self) -> bool | None:
 
