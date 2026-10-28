@@ -1,5 +1,6 @@
 from logging import Logger
 from re import search
+from urllib.parse import urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
@@ -86,6 +87,26 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # Only enable: the router keeps time_start / time_end as they are
         self.request('admin/ledpm?form=setting&operation=write',
                      'operation=write&enable={}'.format('on' if enable else 'off'))
+
+    def smart_connect_status(self) -> bool | None:
+        data = self.request('admin/wireless?form=smart_connect&operation=read', 'operation=read')
+        return {'on': True, 'off': False}.get(data.get('smart_enable'))
+
+    def set_smart_connect(self, enable: bool) -> None:
+        self.request('admin/wireless?form=smart_connect',
+                     'operation=write&smart_enable={}'.format('on' if enable else 'off'))
+        if not enable:
+            return
+        # Like the web page: Smart Connect is one network on every band, so the 5 GHz bands get the 2.4 GHz
+        # name and security. Turning it off does not bring their old settings back.
+        data = self.request('admin/wireless?form=wireless_2g', 'operation=read')
+        values = {}
+        for key in ('enable', 'ssid', 'hidden', 'encryption', 'psk_version', 'psk_cipher', 'psk_key', 'disabled_all'):
+            value = data.get('wireless_2g_' + key, data.get(key))
+            if value is not None:
+                values['wireless_5g_' + key] = value
+                values['wireless_5g_2_' + key] = value
+        self.request('admin/wireless?form=wireless_5g&form=wireless_5g_2', urlencode({'operation': 'write', **values}))
 
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,

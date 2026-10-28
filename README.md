@@ -147,6 +147,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
+| smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
+| set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |

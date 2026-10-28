@@ -1,6 +1,7 @@
 from unittest import main, TestCase
 from unittest.mock import Mock, patch
 from json import loads
+from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
     TplinkC1200Router,
     Connection,
@@ -359,6 +360,59 @@ class TestTPLinkC1200Client(TestCase):
             ("admin/wireless?form=wireless_5g_2", "operation=write&enable=on"),
             ("admin/wireless?form=guest_5g_2", "operation=write&enable=off"),
         ])
+
+    def test_smart_connect(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/wireless?form=smart_connect&operation=read":
+                    return {"smart_enable": self.state}
+                if path == "admin/wireless?form=wireless_2g":
+                    return {
+                        "wireless_2g_enable": "on",
+                        "wireless_2g_ssid": "Home",
+                        "wireless_2g_hidden": "off",
+                        "wireless_2g_encryption": "psk",
+                        "wireless_2g_psk_version": "rsn",
+                        "wireless_2g_psk_cipher": "auto",
+                        "wireless_2g_psk_key": "secret&key",
+                        "wireless_2g_disabled_all": "off",
+                        "wireless_2g_channel": "auto",
+                    }
+                self.writes.append((path, data))
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+        client.state = "on"
+        self.assertTrue(client.smart_connect_status())
+        client.state = "off"
+        self.assertFalse(client.smart_connect_status())
+        client.state = ""
+        self.assertIsNone(client.smart_connect_status())
+
+        client.set_smart_connect(False)
+        self.assertEqual(client.writes, [("admin/wireless?form=smart_connect", "operation=write&smart_enable=off")])
+
+        client.writes = []
+        client.set_smart_connect(True)
+        self.assertEqual(client.writes[0], ("admin/wireless?form=smart_connect", "operation=write&smart_enable=on"))
+        path, data = client.writes[1]
+        self.assertEqual(path, "admin/wireless?form=wireless_5g&form=wireless_5g_2")
+        sent = dict(parse_qsl(data))
+        self.assertEqual(sent.pop("operation"), "write")
+        for band in ("wireless_5g", "wireless_5g_2"):
+            self.assertEqual(sent.pop(band + "_ssid"), "Home")
+            self.assertEqual(sent.pop(band + "_psk_key"), "secret&key")
+            for key, value in (("enable", "on"), ("hidden", "off"), ("encryption", "psk"),
+                               ("psk_version", "rsn"), ("psk_cipher", "auto"), ("disabled_all", "off")):
+                self.assertEqual(sent.pop("{}_{}".format(band, key)), value)
+        self.assertEqual(sent, {})
 
     def test_vpn_status(self) -> None:
         response_openvpn_read = """
