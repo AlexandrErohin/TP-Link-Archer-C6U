@@ -1,4 +1,5 @@
 from unittest import main, TestCase
+from unittest.mock import Mock, patch
 from json import loads
 from tplinkrouterc6u import (
     TplinkC1200Router,
@@ -218,6 +219,55 @@ class TestTPLinkC1200Client(TestCase):
         client.set_led_night_mode(False)
         self.assertEqual(client.writes, ["operation=write&enable=on", "operation=write&enable=off"])
 
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_sends_form_content_type(self, mock_post) -> None:
+        response = Mock()
+        response.json.return_value = {'success': True, 'data': {'enable': 'off'}}
+        mock_post.return_value = response
+
+        client = TplinkC1200Router('http://192.168.0.1', 'secret')
+        client._logged = True
+        client._stok = 'stok'
+        client._sysauth = 'sysauth'
+        client.request('admin/dhcps?form=reservation', 'operation=remove&key=k&index=0')
+
+        headers = mock_post.call_args.kwargs['headers']
+        self.assertEqual(headers['Content-Type'], 'application/x-www-form-urlencoded')
+        self.assertEqual(headers['Referer'], 'http://192.168.0.1/webpages/index.html')
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_request_sends_parameters_only_once(self, mock_post) -> None:
+        response = Mock()
+        response.json.return_value = {'success': True, 'data': {'enable': 'off'}}
+        mock_post.return_value = response
+
+        client = TplinkC1200Router('http://192.168.0.1', 'secret')
+        client._logged = True
+        client._stok = 'stok'
+        client._sysauth = 'sysauth'
+
+        client.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
+        self.assertEqual(mock_post.call_args.args[0],
+                         'http://192.168.0.1/cgi-bin/luci/;stok=stok/admin/ledgeneral?form=setting')
+        self.assertEqual(mock_post.call_args.kwargs['data'], 'operation=read')
+
+        client.request('admin/firmware?form=upgrade&operation=read&extra=1', 'operation=read')
+        self.assertEqual(mock_post.call_args.args[0],
+                         'http://192.168.0.1/cgi-bin/luci/;stok=stok/admin/firmware?form=upgrade&extra=1')
+
+        client.request('admin/ledgeneral?form=setting&operation=read', '')
+        self.assertEqual(mock_post.call_args.args[0],
+                         'http://192.168.0.1/cgi-bin/luci/;stok=stok/admin/ledgeneral?form=setting&operation=read')
+
+        client.request('admin/vpnconn?form=config&operation=list&vpntype=openvpn', 'operation=list&vpntype=openvpn')
+        self.assertEqual(mock_post.call_args.args[0],
+                         'http://192.168.0.1/cgi-bin/luci/;stok=stok/admin/vpnconn?form=config')
+        self.assertEqual(mock_post.call_args.kwargs['data'], 'operation=list&vpntype=openvpn')
+
+        client.request('admin/wireless?form=guest&form=guest_5g_2', 'operation=write&guest_5g_2_enable=on')
+        self.assertEqual(mock_post.call_args.args[0],
+                         'http://192.168.0.1/cgi-bin/luci/;stok=stok/admin/wireless?form=guest&form=guest_5g_2')
+
     def test_set_wifi(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(
@@ -252,7 +302,7 @@ class TestTPLinkC1200Client(TestCase):
             "psk_version=2&psk_cipher=AES&psk_key=testkey123&hwmode=11ac&"
             "htmode=VHT20&channel=36&txpower=20&disabled_all=no"
         )
-        expected_path = f"admin/wireless?form=wireless_5g&{expected_data}"
+        expected_path = "admin/wireless?form=wireless_5g"
 
         self.assertEqual(client.captured_path, expected_path)
         self.assertEqual(client.captured_data, expected_data)

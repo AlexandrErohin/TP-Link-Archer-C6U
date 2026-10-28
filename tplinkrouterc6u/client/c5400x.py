@@ -1,3 +1,4 @@
+from logging import Logger
 from re import search
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
@@ -6,6 +7,23 @@ from tplinkrouterc6u.client.c6u import TplinkBaseRouter
 
 
 class TplinkC5400XRouter(TplinkBaseRouter):
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        # This firmware ignores the POST body without a form Content-Type: insert/remove fail with
+        # "no such callback" and write parameters (e.g. enable=on) are dropped
+        self._headers_request['Content-Type'] = 'application/x-www-form-urlencoded'
+
+    def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+        # Once the body is read, a parameter that is also in the URL arrives twice ("no such callback" for
+        # operation): send it only in the body, like the web UI
+        if data and '?' in path:
+            base, query = path.split('?', 1)
+            sent = {pair.split('=', 1)[0] for pair in data.split('&')}
+            query = '&'.join(pair for pair in query.split('&') if pair.split('=', 1)[0] not in sent)
+            path = '{}?{}'.format(base, query) if query else base
+        return super().request(path, data, ignore_response, ignore_errors)
+
     def supports(self) -> bool:
         return len(self.password) >= 200
 
@@ -120,6 +138,4 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         if disabled_all is not None:
             data += f"&disabled_all={disabled_all}"
 
-        path = f"admin/wireless?form={value}&{data}"
-
-        self.request(path, data)
+        self.request(f"admin/wireless?form={value}", data)
