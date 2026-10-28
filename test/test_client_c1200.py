@@ -5,6 +5,7 @@ from json import loads
 from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
     TplinkC1200Router,
+    WifiOffPeriod,
     Connection,
     ClientError,
     ClientException,
@@ -1283,6 +1284,57 @@ class TestTPLinkC1200Client(TestCase):
             ("admin/wireless?form=wireless_schedule", "operation=write&enable=on"),
             ("admin/wireless?form=wireless_schedule", "operation=write&enable=off"),
         ])
+
+    def test_wifi_off_periods(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if data.startswith("operation=write"):
+                    self.writes.append(dict(parse_qsl(data)))
+                    return {}
+                if path == "admin/wireless?form=wireless_schedule&operation=read":
+                    return self.schedule
+                raise ClientException("no such callback")
+
+        client = TPLinkRouterTest("", "")
+        client.writes = []
+        client.schedule = {"enable": "off", "list": {}}
+        self.assertEqual(client.wifi_schedule_status().periods, [])
+
+        client.schedule = {"enable": "on", "list": ["eve:[23,7]", "mon,tue:[1,2]", "broken", "sat:[x,1]"]}
+        periods = client.wifi_schedule_status().periods
+        self.assertEqual(periods, [WifiOffPeriod(start=23, end=7, days=[]),
+                                   WifiOffPeriod(start=1, end=2, days=["mon", "tue"])])
+
+        client.set_wifi_off_periods([WifiOffPeriod(start=22, end=6, days=["sat", "sun"]),
+                                     WifiOffPeriod(start=0, end=24, days=[])])
+        self.assertEqual(client.writes[-1], {"operation": "write", "list": '["sun,sat:[22,6]","eve:[0,24]"]'})
+
+        # The first period changes, the others stay
+        client.set_wifi_off_period(start=22)
+        self.assertEqual(client.writes[-1]["list"], '["eve:[22,7]","mon,tue:[1,2]"]')
+        client.set_wifi_off_period(end=6, days=["mon", "fri"])
+        self.assertEqual(client.writes[-1]["list"], '["mon,fri:[23,6]","mon,tue:[1,2]"]')
+        client.remove_wifi_off_period()
+        self.assertEqual(client.writes[-1]["list"], '["mon,tue:[1,2]"]')
+
+        # With none yet, a new one starts at 23 -> 7, every day
+        client.schedule = {"enable": "off", "list": {}}
+        client.set_wifi_off_period(days=["sun", "sat"])
+        self.assertEqual(client.writes[-1]["list"], '["sun,sat:[23,7]"]')
+        writes = len(client.writes)
+        client.remove_wifi_off_period()
+        self.assertEqual(len(client.writes), writes)
+
+        with self.assertRaises(ValueError):
+            client.set_wifi_off_periods([WifiOffPeriod(start=25, end=1)])
+        with self.assertRaises(ValueError):
+            client.set_wifi_off_periods([WifiOffPeriod(start=1, end=2, days=["monday"])])
 
     def test_wps_and_guest_network_access(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):

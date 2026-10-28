@@ -52,6 +52,7 @@ from tplinkrouterc6u.common.dataclass import (
     ClientsPerBand,
     DailyTraffic,
     WifiNetwork,
+    WifiOffPeriod,
     WifiSchedule,
     GuestNetworkAccess,
     WanSpeed,

@@ -172,6 +172,9 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_wifi_networks |   | Every WiFi network by form name (`wireless_2g`, `wireless_5g`, `wireless_5g_2`, `guest_2g`, `guest_5g`, `guest_5g_2`), without passwords; networks the router does not have are left out (Archer C5400X) | dict[str, [WifiNetwork](#wifi_network)] |
 | wifi_schedule_status |   | Wireless Off Time Schedule: on or off, number of off periods and which bands it has off right now (Archer C5400X) | [WifiSchedule](#wifi_schedule) |
 | set_wifi_schedule | enable: bool | Turn the Wireless Off Time Schedule on or off, keeping its off periods (Archer C5400X) |   |
+| set_wifi_off_periods | periods: list[[WifiOffPeriod](#wifi_off_period)] | Replace the Wireless Off Time Schedule's off periods (whole hours; does not turn the schedule on or off) (Archer C5400X) |   |
+| set_wifi_off_period | start: int, end: int, days: list[str] | Change the first off period, keeping the others; arguments left out keep their value; with no period yet, one starts at 23 -> 7 every day (Archer C5400X) |   |
+| remove_wifi_off_period |   | Remove the first off period, keeping the others (Archer C5400X) |   |
 | wps_status |   | Is WPS on (Archer C5400X) | bool, None |
 | guest_network_access |   | Whether guests may access each other and the local network (Archer C5400X) | [GuestNetworkAccess](#guest_network_access) |
 | get_security_settings |   | Remote management, local HTTPS, DMZ, UPnP and its port mappings, port forwards, SPI firewall, ping from WAN/LAN and access control (Archer C5400X). Read only; counts, no client names or MACs. Fields of a page the firmware lacks are None | [SecuritySettings](#security_settings) |
@@ -571,6 +574,14 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 | off_now_2g | The schedule has the 2.4 GHz band off right now | bool, None |
 | off_now_5g | The schedule has the 5 GHz band off right now | bool, None |
 | off_now_5g_2 | The schedule has the second 5 GHz band off right now | bool, None |
+| periods | The off periods, in the router's order | list[[WifiOffPeriod](#wifi_off_period)], None |
+
+### <a id="wifi_off_period">WifiOffPeriod</a>
+| Field | Description | Type |
+| --- |---|---|
+| start | Hour the WiFi goes off, 0-24 | int |
+| end | Hour it comes back, 0-24; before start means overnight | int |
+| days | Router day names (`sun` .. `sat`); empty = every day | list[str] |
 
 ### <a id="guest_network_access">GuestNetworkAccess</a>
 | Field | Description | Type |

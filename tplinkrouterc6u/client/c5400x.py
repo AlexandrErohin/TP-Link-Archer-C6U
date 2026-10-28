@@ -1,4 +1,5 @@
 from collections import Counter
+from json import dumps, loads
 from datetime import datetime, timezone
 from logging import Logger
 from re import IGNORECASE, fullmatch, search
@@ -28,6 +29,7 @@ from tplinkrouterc6u.common.dataclass import (
     WanPortSpeed,
     WanSpeed,
     WifiNetwork,
+    WifiOffPeriod,
     WifiSchedule,
 )
 from tplinkrouterc6u.common.helper import get_mac
@@ -103,6 +105,29 @@ def _epoch(value) -> datetime | None:
         return datetime.fromtimestamp(seconds, tz=timezone.utc)
     except (OverflowError, OSError, ValueError):
         return None
+
+
+# Day names of the Wireless Schedule page, in its order
+WIFI_DAYS = ('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat')
+
+
+def _wifi_off_periods(entries) -> list[WifiOffPeriod] | None:
+    # "days:[from,to]" strings; "eve" = every day. Entries this code cannot read are left out
+    if isinstance(entries, dict) and not entries:
+        return []
+    if not isinstance(entries, list):
+        return None
+    periods = []
+    for entry in entries:
+        days, _, hours = str(entry).partition(':')
+        try:
+            start, end = loads(hours)
+            start, end = int(start), int(end)
+        except (TypeError, ValueError):
+            continue
+        periods.append(WifiOffPeriod(start=start, end=end,
+                                     days=[] if days == 'eve' else [day for day in days.split(',') if day]))
+    return periods
 
 
 class TplinkC5400XRouter(TplinkBaseRouter):
@@ -621,6 +646,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             enable=_flag(data.get('enable')),
             # The router sends {} when there is none; the web page reads a list of "days:[from,to]" strings
             off_periods=len(periods) if isinstance(periods, (list, dict)) else None,
+            periods=_wifi_off_periods(periods),
         )
         try:
             now = self.request('admin/wireless?form=wireless_schedule_wifi_disable&operation=read', 'operation=read')
@@ -635,6 +661,36 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # What the switch of the Wireless Schedule page sends; the off periods (list) stay as they are
         self.request('admin/wireless?form=wireless_schedule',
                      'operation=write&enable={}'.format('on' if enable else 'off'))
+
+    def set_wifi_off_periods(self, periods: list[WifiOffPeriod]) -> None:
+        # Like the Wireless Schedule page: the whole list, as JSON, of "days:[from,to]" ("eve" = every day, else
+        # day names joined by commas), whole hours 0-24. The schedule's on/off switch is not touched
+        entries = []
+        for period in periods:
+            if not all(isinstance(hour, int) and 0 <= hour <= 24 for hour in (period.start, period.end)):
+                raise ValueError('WiFi off hours must be whole hours from 0 to 24')
+            unknown = set(period.days) - set(WIFI_DAYS)
+            if unknown:
+                raise ValueError('Unknown days: {}'.format(sorted(unknown)))
+            days = ','.join(day for day in WIFI_DAYS if day in period.days) if period.days else 'eve'
+            entries.append('{}:[{},{}]'.format(days, period.start, period.end))
+        self.request('admin/wireless?form=wireless_schedule',
+                     urlencode({'operation': 'write', 'list': dumps(entries, separators=(',', ':'))}))
+
+    def set_wifi_off_period(self, start: int = None, end: int = None, days: list[str] = None) -> None:
+        # Change the first off period, keeping the others; with none yet, start one (23 -> 7, every day)
+        periods = self.wifi_schedule_status().periods or []
+        first = periods[0] if periods else WifiOffPeriod(start=23, end=7, days=[])
+        changed = WifiOffPeriod(start=first.start if start is None else start,
+                                end=first.end if end is None else end,
+                                days=first.days if days is None else list(days))
+        self.set_wifi_off_periods([changed] + periods[1:])
+
+    def remove_wifi_off_period(self) -> None:
+        # Remove the first off period, keeping the others
+        periods = self.wifi_schedule_status().periods or []
+        if periods:
+            self.set_wifi_off_periods(periods[1:])
 
     def wps_status(self) -> bool | None:
         # WPS switch of System Parameters

@@ -626,12 +626,23 @@ class WifiNetwork:
 
 
 @dataclass
+class WifiOffPeriod:
+    # Whole hours, 0-24; end may be before start (overnight, e.g. 23 -> 7)
+    start: int
+    end: int
+    # Router day names (sun, mon, tue, wed, thu, fri, sat); empty = every day
+    days: list[str] = field(default_factory=list)
+
+
+@dataclass
 class WifiSchedule:
     enable: bool | None = None
     off_periods: int | None = None
     off_now_2g: bool | None = None
     off_now_5g: bool | None = None
     off_now_5g_2: bool | None = None
+    # The off periods themselves, in the router's order (None when the router gave no list)
+    periods: list[WifiOffPeriod] | None = None
 
 
 @dataclass
