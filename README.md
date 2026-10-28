@@ -166,6 +166,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | set_wifi_schedule | enable: bool | Turn the Wireless Off Time Schedule on or off, keeping its off periods (Archer C5400X) |   |
 | wps_status |   | Is WPS on (Archer C5400X) | bool, None |
 | guest_network_access |   | Whether guests may access each other and the local network (Archer C5400X) | [GuestNetworkAccess](#guest_network_access) |
+| get_security_settings |   | Remote management, local HTTPS, DMZ, UPnP and its port mappings, port forwards, SPI firewall, ping from WAN/LAN and access control (Archer C5400X). Read only; counts, no client names or MACs. Fields of a page the firmware lacks are None | [SecuritySettings](#security_settings) |
+| get_homecare_status |   | HomeCare antivirus: its three protections, days protected and its database (Archer C5400X) | [HomeCareStatus](#homecare_status) |
+| get_blocked_threats |   | How many threats HomeCare blocked, by kind, and the newest one's time, kind and category; never the client, owner, site or attacker (Archer C5400X) | [BlockedThreats](#blocked_threats) |
+| get_ip_mac_binding |   | Whether IP & MAC Binding is on and how many ARP entries and bindings there are (Archer C5400X) | [IpMacBinding](#ip_mac_binding) |
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
@@ -598,6 +602,56 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 | bandwidth_mode | `auto` (from the last speed test) or manual | str, None |
 | download_bandwidth | Total download bandwidth, Mbit/s | float, None |
 | upload_bandwidth | Total upload bandwidth, Mbit/s | float, None |
+
+### <a id="security_settings">SecuritySettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| remote_management | Remote management (web access from the internet) is on | bool, None |
+| remote_management_any_address | Remote management is allowed from any address (not only a specified one) | bool, None |
+| remote_management_http_port | Remote management HTTP port | int, None |
+| remote_management_https_port | Remote management HTTPS port | int, None |
+| local_https | Local management over HTTPS is on | bool, None |
+| dmz | DMZ is on | bool, None |
+| dmz_host | DMZ host IP address, only while the DMZ is on | str, None |
+| upnp | UPnP is on | bool, None |
+| upnp_mappings | Port mappings opened through UPnP | int, None |
+| upnp_mappings_by_protocol | UPnP port mappings per protocol, e.g. `{'UDP': 3, 'TCP': 1}` | dict, None |
+| port_forwards | Port forwarding (virtual server) rules | int, None |
+| port_forwards_enabled | Port forwarding rules that are on | int, None |
+| spi_firewall | SPI firewall is on | bool, None |
+| ping_from_wan | The router answers pings from the internet | bool, None |
+| ping_from_lan | The router answers pings from the LAN | bool, None |
+| access_control | Access control is on | bool, None |
+| access_control_mode | `blacklist` or `whitelist` | str, None |
+| access_control_blocked | Devices in the access control block list (blacklist mode only) | int, None |
+
+### <a id="homecare_status">HomeCareStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| malicious_content_filter | Malicious content filter is on | bool, None |
+| intrusion_prevention | Intrusion prevention system is on | bool, None |
+| infected_device_quarantine | Infected device quarantine is on | bool, None |
+| protected_days | Days the antivirus has been protecting the network | int, None |
+| database_checked | When the antivirus database was last found up to date (UTC) | datetime, None |
+| database_updating | The antivirus database is updating | bool, None |
+| rules_version | Version of the antivirus rule list | int, None |
+
+### <a id="blocked_threats">BlockedThreats</a>
+| Field | Description | Type |
+| --- |---|---|
+| events | Entries in the blocked threats history | int |
+| hits | Times those threats were blocked | int |
+| by_type | Entries per kind: `block` (malicious site), `prevent` (intrusion), `infected_block` (infected device) | dict |
+| last_time | Time of the newest entry (UTC) | datetime, None |
+| last_type | Kind of the newest entry | str, None |
+| last_category_id | Category id of the newest entry (see `admin/security?form=category`) | int, None |
+
+### <a id="ip_mac_binding">IpMacBinding</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | IP & MAC Binding is on | bool, None |
+| arp_entries | Entries in the ARP list | int, None |
+| bindings | IP & MAC bindings | int, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

@@ -58,5 +58,9 @@ from tplinkrouterc6u.common.dataclass import (
     SpeedTest,
     WanPortSpeed,
     QoSSettings,
+    SecuritySettings,
+    HomeCareStatus,
+    BlockedThreats,
+    IpMacBinding,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError

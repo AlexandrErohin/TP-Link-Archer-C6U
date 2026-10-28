@@ -6,7 +6,12 @@ from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
     TplinkC1200Router,
     Connection,
+    ClientError,
     ClientException,
+    SecuritySettings,
+    HomeCareStatus,
+    BlockedThreats,
+    IpMacBinding,
 )
 
 
@@ -668,6 +673,217 @@ class TestTPLinkC1200Client(TestCase):
                          (True, None, None, None))
         qos = self._wan_client({settings: {}, dpi: {}}).get_qos()
         self.assertIsNone(qos.enabled)
+
+    def test_get_security_settings(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append(path)
+                if path not in self.responses:
+                    raise ClientError("no such callback")
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.responses = {
+            "admin/administration?form=remote&operation=read": {
+                "web_address": "https://203.0.113.5:443", "http_port": "80", "enable": "off",
+                "https_port": "443", "remote": False, "managers": "all"},
+            "admin/administration?form=https&operation=read": {"https_enable": "off"},
+            "admin/nat?form=dmz&operation=read": {"enable": "on", "ipaddr": "192.168.0.10"},
+            "admin/nat?form=vs&operation=read": [
+                {"enable": "on", "external_port": "8080", "internal_port": "80", "ipaddr": "192.168.0.10",
+                 "name": "web", "protocol": "ALL"},
+                {"enable": "off", "external_port": "22", "internal_port": "22", "ipaddr": "192.168.0.11",
+                 "name": "ssh", "protocol": "TCP"},
+            ],
+            "admin/upnp?form=enable&operation=read": {"enable": "on"},
+            "admin/upnp?form=service&operation=read": [
+                {"external_port": "50000", "internal_port": "50000", "ipaddr": "192.168.0.10",
+                 "leasetime": "02:00:00", "name": "Console", "protocol": "UDP"},
+                {"external_port": "50001", "internal_port": "50001", "ipaddr": "192.168.0.10",
+                 "leasetime": "02:00:00", "name": "Console", "protocol": "UDP"},
+                {"external_port": "6000", "internal_port": "6000", "ipaddr": "192.168.0.11",
+                 "leasetime": "00:30:00", "name": "Game", "protocol": "tcp"},
+            ],
+            "admin/security_settings?form=new_enable&operation=read": {
+                "enable": "off", "lan_ping": "on", "wan_ping": "off"},
+            "admin/access_control?form=enable&operation=read": {"enable": "on", "host_mac": "06-E6-97-9E-23-F5"},
+            "admin/access_control?form=mode&operation=read": {"access_mode": "black"},
+            "admin/access_control?form=black_list&operation=load": {},
+        }
+        settings = client.get_security_settings()
+        self.assertIsInstance(settings, SecuritySettings)
+        self.assertFalse(settings.remote_management)
+        self.assertTrue(settings.remote_management_any_address)
+        self.assertEqual(settings.remote_management_http_port, 80)
+        self.assertEqual(settings.remote_management_https_port, 443)
+        self.assertFalse(settings.local_https)
+        self.assertTrue(settings.dmz)
+        self.assertEqual(settings.dmz_host, "192.168.0.10")
+        self.assertTrue(settings.upnp)
+        self.assertEqual(settings.upnp_mappings, 3)
+        self.assertEqual(settings.upnp_mappings_by_protocol, {"UDP": 2, "TCP": 1})
+        self.assertEqual(settings.port_forwards, 2)
+        self.assertEqual(settings.port_forwards_enabled, 1)
+        self.assertFalse(settings.spi_firewall)
+        self.assertFalse(settings.ping_from_wan)
+        self.assertTrue(settings.ping_from_lan)
+        self.assertTrue(settings.access_control)
+        self.assertEqual(settings.access_control_mode, "blacklist")
+        self.assertEqual(settings.access_control_blocked, 0)
+        # Never the WAN address or the admin's MAC
+        self.assertNotIn("203.0.113.5", str(settings))
+        self.assertNotIn("06-E6-97-9E-23-F5", str(settings))
+
+        # DMZ off: no host; whitelist mode: the block list is not read
+        client.responses["admin/nat?form=dmz&operation=read"] = {"enable": "off", "ipaddr": "192.168.0.10"}
+        client.responses["admin/access_control?form=mode&operation=read"] = {"access_mode": "white"}
+        client.paths = []
+        settings = client.get_security_settings()
+        self.assertFalse(settings.dmz)
+        self.assertIsNone(settings.dmz_host)
+        self.assertEqual(settings.access_control_mode, "whitelist")
+        self.assertIsNone(settings.access_control_blocked)
+        self.assertNotIn("admin/access_control?form=black_list&operation=load", client.paths)
+
+        # Pages the firmware lacks or empty answers: None, never an error
+        client.responses = {"admin/nat?form=dmz&operation=read": {},
+                            "admin/upnp?form=service&operation=read": []}
+        settings = client.get_security_settings()
+        self.assertIsNone(settings.remote_management)
+        self.assertIsNone(settings.remote_management_any_address)
+        self.assertIsNone(settings.dmz)
+        self.assertIsNone(settings.upnp)
+        self.assertEqual(settings.upnp_mappings, 0)
+        self.assertEqual(settings.upnp_mappings_by_protocol, {})
+        self.assertIsNone(settings.port_forwards)
+        self.assertIsNone(settings.spi_firewall)
+        self.assertIsNone(settings.access_control)
+        self.assertIsNone(settings.access_control_mode)
+        self.assertIsNone(settings.access_control_blocked)
+
+    def test_get_homecare_status(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path not in self.responses:
+                    raise ClientError("no such callback")
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/security?form=info&operation=read": {
+                "is_updating": False, "intrusion_prevention_system": "enable", "malicious_sites_blocking": "enable",
+                "checked_time": 1792694581, "protected_days": 143, "infected_device_prevention_blocking": "disable"},
+            "admin/security?form=rule&operation=read": {"version": 1216, "rule_list": [{"id": 1, "name": "Rule"}]},
+        }
+        status = client.get_homecare_status()
+        self.assertIsInstance(status, HomeCareStatus)
+        self.assertTrue(status.malicious_content_filter)
+        self.assertTrue(status.intrusion_prevention)
+        self.assertFalse(status.infected_device_quarantine)
+        self.assertEqual(status.protected_days, 143)
+        self.assertEqual(status.database_checked, datetime(2026, 10, 22, 18, 43, 1, tzinfo=timezone.utc))
+        self.assertFalse(status.database_updating)
+        self.assertEqual(status.rules_version, 1216)
+
+        client.responses = {"admin/security?form=info&operation=read": {}}
+        status = client.get_homecare_status()
+        self.assertIsNone(status.malicious_content_filter)
+        self.assertIsNone(status.protected_days)
+        self.assertIsNone(status.database_checked)
+        self.assertIsNone(status.database_updating)
+        self.assertIsNone(status.rules_version)
+
+    def test_get_blocked_threats(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append(path)
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.response = [
+            {"attacker": "", "blocked_website": "bad.example.com", "category_id": 4, "client": "Laptop",
+             "event_id": 1, "hits": 3, "owner": "Alice", "rule_id": 0, "timestamp": 1792694581, "type": "block"},
+            {"attacker": "198.51.100.7", "blocked_website": "", "category_id": 0, "client": "Laptop",
+             "event_id": 2, "hits": 1, "owner": "Alice", "rule_id": 1050694, "timestamp": 1792780981,
+             "type": "prevent"},
+            {"attacker": "", "blocked_website": "worse.example.com", "category_id": "2", "client": "Phone",
+             "event_id": 3, "hits": "2", "owner": "Bob", "rule_id": 0, "timestamp": "1792700000", "type": "block"},
+        ]
+        threats = client.get_blocked_threats()
+        self.assertEqual(client.paths, ["admin/security?form=history&operation=read"])
+        self.assertIsInstance(threats, BlockedThreats)
+        self.assertEqual(threats.events, 3)
+        self.assertEqual(threats.hits, 6)
+        self.assertEqual(threats.by_type, {"block": 2, "prevent": 1})
+        self.assertEqual(threats.last_time, datetime(2026, 10, 23, 18, 43, 1, tzinfo=timezone.utc))
+        self.assertEqual(threats.last_type, "prevent")
+        self.assertEqual(threats.last_category_id, 0)
+        for personal in ("bad.example.com", "198.51.100.7", "Laptop", "Alice", "Phone", "Bob"):
+            self.assertNotIn(personal, str(threats))
+
+        for empty in ([], {}, None):
+            client.response = empty
+            threats = client.get_blocked_threats()
+            self.assertEqual(threats.events, 0)
+            self.assertEqual(threats.hits, 0)
+            self.assertEqual(threats.by_type, {})
+            self.assertIsNone(threats.last_time)
+            self.assertIsNone(threats.last_type)
+            self.assertIsNone(threats.last_category_id)
+
+    def test_get_ip_mac_binding(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path not in self.responses:
+                    raise ClientError("no such callback")
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/imb?form=setting&operation=read": {"enable": "on"},
+            "admin/imb?form=arp_list&operation=load": [
+                {"mac": "06-E6-97-9E-23-F5", "ipaddr": "192.168.0.10", "enable": "off"},
+                {"mac": "06-E6-97-9E-23-F6", "ipaddr": "192.168.0.11", "enable": "on"},
+            ],
+            "admin/imb?form=bind_list&operation=load": [],
+        }
+        binding = client.get_ip_mac_binding()
+        self.assertIsInstance(binding, IpMacBinding)
+        self.assertTrue(binding.enable)
+        self.assertEqual(binding.arp_entries, 2)
+        self.assertEqual(binding.bindings, 0)
+
+        client.responses = {}
+        binding = client.get_ip_mac_binding()
+        self.assertIsNone(binding.enable)
+        self.assertIsNone(binding.arp_entries)
+        self.assertIsNone(binding.bindings)
 
     def test_smart_connect(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):

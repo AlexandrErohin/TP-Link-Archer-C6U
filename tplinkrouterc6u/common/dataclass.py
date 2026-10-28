@@ -673,3 +673,53 @@ class QoSSettings:
     bandwidth_mode: str | None = None
     download_bandwidth: float | None = None
     upload_bandwidth: float | None = None
+
+
+@dataclass
+class SecuritySettings:
+    remote_management: bool | None = None
+    remote_management_any_address: bool | None = None
+    remote_management_http_port: int | None = None
+    remote_management_https_port: int | None = None
+    local_https: bool | None = None
+    dmz: bool | None = None
+    dmz_host: str | None = None
+    upnp: bool | None = None
+    upnp_mappings: int | None = None
+    upnp_mappings_by_protocol: dict[str, int] | None = None
+    port_forwards: int | None = None
+    port_forwards_enabled: int | None = None
+    spi_firewall: bool | None = None
+    ping_from_wan: bool | None = None
+    ping_from_lan: bool | None = None
+    access_control: bool | None = None
+    access_control_mode: str | None = None
+    access_control_blocked: int | None = None
+
+
+@dataclass
+class HomeCareStatus:
+    malicious_content_filter: bool | None = None
+    intrusion_prevention: bool | None = None
+    infected_device_quarantine: bool | None = None
+    protected_days: int | None = None
+    database_checked: datetime | None = None
+    database_updating: bool | None = None
+    rules_version: int | None = None
+
+
+@dataclass
+class BlockedThreats:
+    events: int = 0
+    hits: int = 0
+    by_type: dict[str, int] = field(default_factory=dict)
+    last_time: datetime | None = None
+    last_type: str | None = None
+    last_category_id: int | None = None
+
+
+@dataclass
+class IpMacBinding:
+    enable: bool | None = None
+    arp_entries: int | None = None
+    bindings: int | None = None

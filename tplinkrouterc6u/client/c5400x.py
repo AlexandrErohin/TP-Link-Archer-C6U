@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timezone
 from logging import Logger
 from re import IGNORECASE, fullmatch, search
@@ -5,12 +6,16 @@ from urllib.parse import quote, urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import (
+    BlockedThreats,
     ClientsPerBand,
     DailyTraffic,
     GuestNetworkAccess,
+    HomeCareStatus,
+    IpMacBinding,
     PortModes,
     PortStatus,
     QoSSettings,
+    SecuritySettings,
     SpeedTest,
     Status,
     UsbSharing,
@@ -22,8 +27,37 @@ from tplinkrouterc6u.common.dataclass import (
     WifiSchedule,
 )
 from tplinkrouterc6u.common.helper import get_mac
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientError, ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
+
+_SECURITY_FLAGS = {'on': True, 'enable': True, 'off': False, 'disable': False}
+
+
+def _security_flag(data: dict | None, key: str) -> bool | None:
+    # on/off and enable/disable fields; None when missing or unknown
+    if not isinstance(data, dict):
+        return None
+    return _SECURITY_FLAGS.get(str(data.get(key)).lower())
+
+
+def _security_int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _security_time(value) -> datetime | None:
+    # Epoch seconds, as the web page reads them (new Date(time * 1000))
+    seconds = _security_int(value)
+    return datetime.fromtimestamp(seconds, timezone.utc) if seconds else None
+
+
+def _security_rows(data) -> list | None:
+    # A list answer; an empty one may come as {}. None when the read failed
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    return [] if data == {} else None
 
 
 def _flag(value) -> bool | None:
@@ -315,6 +349,92 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             bandwidth_mode=dpi.get('bandwidth_mode'),
             download_bandwidth=_mbit(dpi.get('downstream_bandwidth')),
             upload_bandwidth=_mbit(dpi.get('upstream_bandwidth')),
+        )
+
+    def _security_read(self, form: str, operation: str = 'read') -> dict | list | None:
+        # A page this firmware lacks answers with an error: only that page's fields stay None
+        try:
+            return self.request('admin/{}&operation={}'.format(form, operation), 'operation={}'.format(operation))
+        except ClientError:
+            return None
+
+    def get_security_settings(self) -> SecuritySettings:
+        # Read only: remote management, DMZ, UPnP, port forwards, firewall and access control (Security, NAT and
+        # Administration pages). Counts only, no client names, MACs or the WAN address
+        remote = self._security_read('administration?form=remote')
+        dmz = self._security_read('nat?form=dmz')
+        forwards = _security_rows(self._security_read('nat?form=vs'))
+        mappings = _security_rows(self._security_read('upnp?form=service'))
+        firewall = self._security_read('security_settings?form=new_enable')
+        mode = self._security_read('access_control?form=mode')
+        settings = SecuritySettings(
+            remote_management=_security_flag(remote, 'enable'),
+            local_https=_security_flag(self._security_read('administration?form=https'), 'https_enable'),
+            dmz=_security_flag(dmz, 'enable'),
+            upnp=_security_flag(self._security_read('upnp?form=enable'), 'enable'),
+            spi_firewall=_security_flag(firewall, 'enable'),
+            ping_from_wan=_security_flag(firewall, 'wan_ping'),
+            ping_from_lan=_security_flag(firewall, 'lan_ping'),
+            access_control=_security_flag(self._security_read('access_control?form=enable'), 'enable'),
+        )
+        if isinstance(remote, dict):
+            settings.remote_management_any_address = {'all': True, 'specified': False}.get(remote.get('managers'))
+            settings.remote_management_http_port = _security_int(remote.get('http_port'))
+            settings.remote_management_https_port = _security_int(remote.get('https_port'))
+        if settings.dmz:
+            settings.dmz_host = dmz.get('ipaddr') or None
+        if mappings is not None:
+            settings.upnp_mappings = len(mappings)
+            settings.upnp_mappings_by_protocol = dict(Counter(
+                str(row['protocol']).upper() for row in mappings if row.get('protocol')))
+        if forwards is not None:
+            settings.port_forwards = len(forwards)
+            settings.port_forwards_enabled = sum(1 for row in forwards if _security_flag(row, 'enable'))
+        if isinstance(mode, dict):
+            settings.access_control_mode = {'black': 'blacklist', 'white': 'whitelist'}.get(mode.get('access_mode'))
+        if settings.access_control_mode == 'blacklist':
+            blocked = _security_rows(self._security_read('access_control?form=black_list', 'load'))
+            settings.access_control_blocked = None if blocked is None else len(blocked)
+        return settings
+
+    def get_homecare_status(self) -> HomeCareStatus:
+        # HomeCare antivirus (Security > Antivirus)
+        info = self._security_read('security?form=info')
+        info = info if isinstance(info, dict) else {}
+        rule = self._security_read('security?form=rule')
+        updating = info.get('is_updating')
+        return HomeCareStatus(
+            malicious_content_filter=_security_flag(info, 'malicious_sites_blocking'),
+            intrusion_prevention=_security_flag(info, 'intrusion_prevention_system'),
+            infected_device_quarantine=_security_flag(info, 'infected_device_prevention_blocking'),
+            protected_days=_security_int(info.get('protected_days')),
+            database_checked=_security_time(info.get('checked_time')),
+            database_updating=updating if isinstance(updating, bool) else None,
+            rules_version=_security_int(rule.get('version')) if isinstance(rule, dict) else None,
+        )
+
+    def get_blocked_threats(self) -> BlockedThreats:
+        # HomeCare history of blocked threats. Each entry also names the client, its owner and the site,
+        # attacker or blocked IP: only counts, kinds and the newest time are kept
+        rows = _security_rows(self.request('admin/security?form=history&operation=read', 'operation=read')) or []
+        newest = max(rows, key=lambda row: _security_int(row.get('timestamp')) or 0, default={})
+        return BlockedThreats(
+            events=len(rows),
+            hits=sum(_security_int(row.get('hits')) or 0 for row in rows),
+            by_type=dict(Counter(str(row['type']) for row in rows if row.get('type'))),
+            last_time=_security_time(newest.get('timestamp')),
+            last_type=str(newest['type']) if newest.get('type') else None,
+            last_category_id=_security_int(newest.get('category_id')),
+        )
+
+    def get_ip_mac_binding(self) -> IpMacBinding:
+        # IP & MAC Binding (Security page): whether it is on and how many ARP entries and bindings there are
+        arp = _security_rows(self._security_read('imb?form=arp_list', 'load'))
+        bindings = _security_rows(self._security_read('imb?form=bind_list', 'load'))
+        return IpMacBinding(
+            enable=_security_flag(self._security_read('imb?form=setting'), 'enable'),
+            arp_entries=None if arp is None else len(arp),
+            bindings=None if bindings is None else len(bindings),
         )
 
     def smart_connect_status(self) -> bool | None:
