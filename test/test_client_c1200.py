@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest import main, TestCase
 from unittest.mock import Mock, patch
 from json import loads
@@ -563,6 +564,110 @@ class TestTPLinkC1200Client(TestCase):
         self.assertTrue(client.nat_boost_status())
         client.response = {"enable": "on"}
         self.assertIsNone(client.nat_boost_status())
+
+    def _wan_client(self, responses: dict) -> TplinkC1200Router:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = responses
+        return client
+
+    def test_get_port_status(self) -> None:
+        path = "admin/status?form=router&operation=read"
+        rows = [{"wan_status": "connected", "wan_speed": 1000, "wan_duplex": "FULL"},
+                {"lan1_duplex": "FULL", "lan1_speed": 1000, "lan1_status": "connected"},
+                {"lan2_status": "connected", "lan2_speed": "100", "lan2_duplex": "HALF"},
+                {"lan3_speed": "", "lan3_status": "unconnected", "lan3_duplex": ""}]
+        rows += [{f"lan{n}_status": "unconnected", f"lan{n}_speed": 0, f"lan{n}_duplex": ""} for n in range(4, 9)]
+        ports = self._wan_client({path: rows}).get_port_status()
+        self.assertEqual([port.port for port in ports], list(range(9)))
+        self.assertEqual((ports[0].link_up, ports[0].negotiated_speed, ports[0].negotiated_duplex),
+                         (True, 1000, "full"))
+        self.assertEqual((ports[2].link_up, ports[2].negotiated_speed, ports[2].negotiated_duplex),
+                         (True, 100, "half"))
+        for port in ports[3:]:
+            self.assertEqual((port.link_up, port.negotiated_speed, port.negotiated_duplex), (False, None, None))
+
+        ports = self._wan_client({path: [{"wan_status": "disconnected", "wan_speed": 0, "wan_duplex": ""},
+                                         {"lan1_status": "new_word"}, {"other": 1}, "junk"]}).get_port_status()
+        self.assertEqual([(port.port, port.link_up, port.negotiated_speed) for port in ports],
+                         [(0, False, None), (1, None, None)])
+        ports = self._wan_client({path: [{"wan_status": "disconnected", "wan_speed": 1000,
+                                          "wan_duplex": "FULL"}]}).get_port_status()
+        self.assertEqual((ports[0].link_up, ports[0].negotiated_speed), (True, 1000))
+        self.assertEqual(self._wan_client({path: []}).get_port_status(), [])
+        self.assertEqual(self._wan_client({path: {}}).get_port_status(), [])
+        self.assertEqual(self._wan_client({path: None}).get_port_status(), [])
+
+    def test_get_wan_speed(self) -> None:
+        path = "admin/status?form=wan_speed&operation=read"
+        speed = self._wan_client({path: {"down_speed": 250000, "up_speed": 12000,
+                                         "test_time": 1700000000}}).get_wan_speed()
+        self.assertEqual(speed.download, 250000)
+        self.assertEqual(speed.upload, 12000)
+        self.assertEqual(speed.time, datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc))
+
+        speed = self._wan_client({path: {"down_speed": -1, "up_speed": "x"}}).get_wan_speed()
+        self.assertEqual((speed.download, speed.upload, speed.time), (None, None, None))
+        speed = self._wan_client({path: {}}).get_wan_speed()
+        self.assertEqual((speed.download, speed.upload, speed.time), (None, None, None))
+
+    def test_get_speed_test(self) -> None:
+        path = "admin/status?form=speedtest&operation=read"
+        test = self._wan_client({path: {"status": "idle", "down_speed": 512000, "up_speed": 102400,
+                                        "test_time": 1700000000}}).get_speed_test()
+        self.assertEqual((test.status, test.download, test.upload), ("idle", 500.0, 100.0))
+        self.assertEqual(test.time, datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc))
+
+        test = self._wan_client({path: {"status": "down_test", "down_speed": -1, "up_speed": -1,
+                                        "test_time": 1700000000}}).get_speed_test()
+        self.assertEqual((test.status, test.download, test.upload), ("down_test", None, None))
+        test = self._wan_client({path: {"status": "idle", "down_speed": 0, "up_speed": 0,
+                                        "test_time": 0}}).get_speed_test()
+        self.assertEqual((test.status, test.download, test.upload, test.time), ("idle", None, None, None))
+        test = self._wan_client({path: {}}).get_speed_test()
+        self.assertEqual((test.status, test.download, test.upload, test.time), (None, None, None, None))
+
+    def test_get_wan_port_speed(self) -> None:
+        current = "admin/network?form=port_speed_current&operation=read"
+        supported = "admin/network?form=port_speed_supported&operation=read"
+        port = self._wan_client({current: {"speed": "1000F"},
+                                 supported: {"supported": ["auto", "1000F", "100F"]}}).get_wan_port_speed()
+        self.assertEqual((port.value, port.speed, port.duplex, port.auto_negotiation), ("1000F", 1000, "full", False))
+        self.assertEqual(port.supported, ["auto", "1000F", "100F"])
+
+        port = self._wan_client({current: {"speed": "auto"}, supported: {}}).get_wan_port_speed()
+        self.assertEqual((port.value, port.speed, port.duplex, port.auto_negotiation), ("auto", None, None, True))
+        self.assertEqual(port.supported, [])
+        port = self._wan_client({current: {"speed": "10H"}, supported: {"supported": "auto"}}).get_wan_port_speed()
+        self.assertEqual((port.speed, port.duplex, port.auto_negotiation, port.supported), (10, "half", False, []))
+        port = self._wan_client({current: {}, supported: {}}).get_wan_port_speed()
+        self.assertEqual((port.value, port.speed, port.duplex, port.auto_negotiation), (None, None, None, None))
+
+    def test_get_qos(self) -> None:
+        settings = "admin/qos?form=settings&operation=read"
+        dpi = "admin/smart_network?form=dpi_qos&operation=read"
+        qos = self._wan_client({
+            settings: {"enable_app": "on", "enable": "off", "up_band": "1000", "up_unit": "mbps"},
+            dpi: {"upstream_bandwidth": 102400, "downstream_bandwidth": 512000, "qos_mode": "custom",
+                  "bandwidth_mode": "auto", "max_download": 1024000, "max_upload": 1024000},
+        }).get_qos()
+        self.assertEqual((qos.enabled, qos.mode, qos.bandwidth_mode), (False, "custom", "auto"))
+        self.assertEqual((qos.download_bandwidth, qos.upload_bandwidth), (500.0, 100.0))
+
+        qos = self._wan_client({settings: {"enable": "on"}, dpi: {}}).get_qos()
+        self.assertEqual((qos.enabled, qos.mode, qos.download_bandwidth, qos.upload_bandwidth),
+                         (True, None, None, None))
+        qos = self._wan_client({settings: {}, dpi: {}}).get_qos()
+        self.assertIsNone(qos.enabled)
 
     def test_smart_connect(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):

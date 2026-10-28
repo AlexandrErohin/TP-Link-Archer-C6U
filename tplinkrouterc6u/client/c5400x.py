@@ -1,5 +1,6 @@
+from datetime import datetime, timezone
 from logging import Logger
-from re import IGNORECASE, search
+from re import IGNORECASE, fullmatch, search
 from urllib.parse import quote, urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
@@ -8,10 +9,15 @@ from tplinkrouterc6u.common.dataclass import (
     DailyTraffic,
     GuestNetworkAccess,
     PortModes,
+    PortStatus,
+    QoSSettings,
+    SpeedTest,
     Status,
     UsbSharing,
     UsbStorage,
     VpnServerSettings,
+    WanPortSpeed,
+    WanSpeed,
     WifiNetwork,
     WifiSchedule,
 )
@@ -25,6 +31,40 @@ def _flag(value) -> bool | None:
     if isinstance(value, bool):
         return value
     return {'on': True, 'off': False, 'true': True, 'false': False}.get(str(value).lower())
+
+
+def _dict(data) -> dict:
+    return data if isinstance(data, dict) else {}
+
+
+def _number(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _rate(value) -> int | None:
+    # -1 (or anything negative) = not measured yet
+    number = _number(value)
+    return None if number is None or number < 0 else number
+
+
+def _mbit(value) -> float | None:
+    # Speed test and QoS bandwidths come in Mbit/s x 1024 (1000 Mbit/s = 1024000); the web page divides by 1024
+    number = _rate(value)
+    return None if number is None else number / 1024
+
+
+def _epoch(value) -> datetime | None:
+    # Unix time; 0 = never
+    seconds = _number(value)
+    if not seconds or seconds < 0:
+        return None
+    try:
+        return datetime.fromtimestamp(seconds, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 class TplinkC5400XRouter(TplinkBaseRouter):
@@ -204,6 +244,78 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         if data.get('boost_support') != 'yes':
             return None
         return {'on': True, 'off': False}.get(data.get('hw_enable'))
+
+    def get_port_status(self) -> list[PortStatus]:
+        # The port table of the Network Map: one row per port, the Internet port first (wan_status / wan_speed /
+        # wan_duplex), then lan1_* .. lan8_*. Port 0 is the Internet port, like that table. Status words from the
+        # web page: connected, unconnected (LAN) or disconnected (Internet); the speed is 0 or "" without a link.
+        # A negotiated speed means the cable is linked even if the Internet port says disconnected (no internet)
+        data = self.request('admin/status?form=router&operation=read', 'operation=read')
+        fields = {}
+        for row in data if isinstance(data, list) else [data]:
+            for key, value in _dict(row).items():
+                match = fullmatch(r'(wan|lan(\d+))_(status|speed|duplex)', key)
+                if match:
+                    fields.setdefault(int(match.group(2) or 0), {})[match.group(3)] = value
+        ports = []
+        for port in sorted(fields):
+            speed = _number(fields[port].get('speed'))
+            speed = speed if speed and speed > 0 else None
+            duplex = str(fields[port].get('duplex') or '').lower()
+            ports.append(PortStatus(
+                port=port,
+                link_up=True if speed else {'connected': True, 'unconnected': False, 'disconnected': False,
+                                            'unplugged': False}.get(str(fields[port].get('status') or '').lower()),
+                negotiated_speed=speed,
+                negotiated_duplex=duplex if duplex in ('full', 'half') else None,
+            ))
+        return ports
+
+    def get_wan_speed(self) -> WanSpeed:
+        # The live internet rate on the Network Map (the page reads it every 3 s and shows value / 1024 as KB/s):
+        # bytes per second, checked against a ~90 Mbit/s download. time = when the router took it
+        data = _dict(self.request('admin/status?form=wan_speed&operation=read', 'operation=read'))
+        return WanSpeed(download=_rate(data.get('down_speed')), upload=_rate(data.get('up_speed')),
+                        time=_epoch(data.get('test_time')))
+
+    def get_speed_test(self) -> SpeedTest:
+        # Last run of the router's own speed test (Network Map > Speed Test). status: idle, down_test, up_test or
+        # fail (what the web page checks). Speeds are -1 while measuring; test_time is 0 if it never ran
+        data = _dict(self.request('admin/status?form=speedtest&operation=read', 'operation=read'))
+        time = _epoch(data.get('test_time'))
+        if time is None:
+            return SpeedTest(status=data.get('status'))
+        return SpeedTest(status=data.get('status'), download=_mbit(data.get('down_speed')),
+                         upload=_mbit(data.get('up_speed')), time=time)
+
+    def get_wan_port_speed(self) -> WanPortSpeed:
+        # Internet port Speed & Duplex (System Parameters): "auto", "1000F", "100F"..., and the choices this router
+        # offers. Probably the setting, not the negotiated link (that is port 0 of get_port_status)
+        current = _dict(self.request('admin/network?form=port_speed_current&operation=read', 'operation=read'))
+        supported = _dict(self.request('admin/network?form=port_speed_supported&operation=read', 'operation=read'))
+        value = current.get('speed')
+        match = fullmatch(r'(\d+)([FH])', str(value or '').upper())
+        choices = supported.get('supported')
+        return WanPortSpeed(
+            value=value,
+            speed=int(match.group(1)) if match else None,
+            duplex={'F': 'full', 'H': 'half'}[match.group(2)] if match else None,
+            auto_negotiation=True if str(value).lower() == 'auto' else False if match else None,
+            supported=[str(choice) for choice in choices] if isinstance(choices, list) else [],
+        )
+
+    def get_qos(self) -> QoSSettings:
+        # Whether QoS is on (qos?form=settings) and the total bandwidth it shares out (HomeCare QoS,
+        # smart_network?form=dpi_qos), in Mbit/s like the web page. bandwidth_mode "auto" = from the last speed test
+        settings = _dict(self.request('admin/qos?form=settings&operation=read', 'operation=read'))
+        dpi = _dict(self.request('admin/smart_network?form=dpi_qos&operation=read', 'operation=read'))
+        return QoSSettings(
+            enabled={'on': True, 'off': False}.get(settings.get('enable')),
+            mode=dpi.get('qos_mode'),
+            bandwidth_mode=dpi.get('bandwidth_mode'),
+            download_bandwidth=_mbit(dpi.get('downstream_bandwidth')),
+            upload_bandwidth=_mbit(dpi.get('upstream_bandwidth')),
+        )
 
     def smart_connect_status(self) -> bool | None:
         data = self.request('admin/wireless?form=smart_connect&operation=read', 'operation=read')

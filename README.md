@@ -151,6 +151,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
 | get_clients_per_band |   | Clients per band, main and guest networks together (Archer C5400X). Counted from the last `get_status()` without a request of its own (it calls `get_status()` only if there was none yet) | [ClientsPerBand](#clients_per_band) |
 | get_daily_traffic |   | Bytes downloaded and uploaded per day by every client together, as the Traffic Monitor chart shows them (Archer C5400X; answers also while the monitor is off). Includes traffic between local clients | [DailyTraffic](#daily_traffic) |
+| get_wan_speed |   | Live internet rate from the Network Map, bytes/s (Archer C5400X) | [WanSpeed](#wan_speed) |
+| get_speed_test |   | Result of the router's own speed test, Mbit/s (Archer C5400X) | [SpeedTest](#speed_test) |
+| get_wan_port_speed |   | Internet port Speed & Duplex value (`auto`, `1000F`, …) and the choices the router offers (Archer C5400X) | [WanPortSpeed](#wan_port_speed) |
+| get_qos |   | Whether QoS is on and the total bandwidth it shares out, Mbit/s (Archer C5400X) | [QoSSettings](#qos_settings) |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
@@ -183,7 +187,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
-| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
+| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 | [[PortStatus]](#port_status) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -463,7 +467,7 @@ Not all fields are filled by every client:
 ### <a id="port_status">PortStatus</a>
 | Field | Description | Type |
 | --- |---|---|
-| port | Physical port number (1-based) | int |
+| port | Physical port number (1-based; 0 is the Internet port on the Archer C5400X) | int |
 | enabled | Port administratively enabled | bool, None |
 | link_up | Link is up | bool, None |
 | auto_negotiation | Auto-negotiation configured | bool, None |
@@ -561,6 +565,39 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 | --- |---|---|
 | each_other | Guests may access each other | bool, None |
 | local_network | Guests may access the local network | bool, None |
+
+### <a id="wan_speed">WanSpeed</a>
+| Field | Description | Type |
+| --- |---|---|
+| download | Internet download rate, bytes/s | int, None |
+| upload | Internet upload rate, bytes/s | int, None |
+| time | When the router took the sample | datetime, None |
+
+### <a id="speed_test">SpeedTest</a>
+| Field | Description | Type |
+| --- |---|---|
+| status | `idle`, `down_test`, `up_test` or `fail` | str, None |
+| download | Download speed, Mbit/s (None while measuring or if it never ran) | float, None |
+| upload | Upload speed, Mbit/s | float, None |
+| time | When the test ran (None if never) | datetime, None |
+
+### <a id="wan_port_speed">WanPortSpeed</a>
+| Field | Description | Type |
+| --- |---|---|
+| value | Value as the router gives it, e.g. `auto`, `1000F`, `100F` | str, None |
+| speed | Speed in Mbps from the value (None for `auto`) | int, None |
+| duplex | `full` / `half` from the value | str, None |
+| auto_negotiation | The value is `auto` | bool, None |
+| supported | Values the router offers | list[str] |
+
+### <a id="qos_settings">QoSSettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| enabled | QoS is on | bool, None |
+| mode | QoS mode, e.g. `custom` | str, None |
+| bandwidth_mode | `auto` (from the last speed test) or manual | str, None |
+| download_bandwidth | Total download bandwidth, Mbit/s | float, None |
+| upload_bandwidth | Total upload bandwidth, Mbit/s | float, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

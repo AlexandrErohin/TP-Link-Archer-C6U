@@ -638,3 +638,38 @@ class WifiSchedule:
 class GuestNetworkAccess:
     each_other: bool | None = None
     local_network: bool | None = None
+
+
+@dataclass
+class WanSpeed:
+    # Live internet port rate, bytes per second (assumed: the web page shows value / 1024 as KB/s)
+    download: int | None = None
+    upload: int | None = None
+    time: datetime | None = None
+
+
+@dataclass
+class SpeedTest:
+    # The router's own speed test; Mbit/s like the web page (the router reports Mbit/s x 1024)
+    status: str | None = None
+    download: float | None = None
+    upload: float | None = None
+    time: datetime | None = None
+
+
+@dataclass
+class WanPortSpeed:
+    value: str | None = None
+    speed: int | None = None
+    duplex: str | None = None
+    auto_negotiation: bool | None = None
+    supported: list[str] = field(default_factory=list)
+
+
+@dataclass
+class QoSSettings:
+    enabled: bool | None = None
+    mode: str | None = None
+    bandwidth_mode: str | None = None
+    download_bandwidth: float | None = None
+    upload_bandwidth: float | None = None

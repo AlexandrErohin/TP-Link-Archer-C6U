@@ -54,5 +54,9 @@ from tplinkrouterc6u.common.dataclass import (
     WifiNetwork,
     WifiSchedule,
     GuestNetworkAccess,
+    WanSpeed,
+    SpeedTest,
+    WanPortSpeed,
+    QoSSettings,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError
