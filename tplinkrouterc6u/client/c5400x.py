@@ -3,7 +3,15 @@ from re import IGNORECASE, search
 from urllib.parse import quote, urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
-from tplinkrouterc6u.common.dataclass import PortModes, Status, UsbSharing, UsbStorage, VpnServerSettings
+from tplinkrouterc6u.common.dataclass import (
+    ClientsPerBand,
+    DailyTraffic,
+    PortModes,
+    Status,
+    UsbSharing,
+    UsbStorage,
+    VpnServerSettings,
+)
 from tplinkrouterc6u.common.helper import get_mac
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
@@ -17,6 +25,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # "no such callback" and write parameters (e.g. enable=on) are dropped
         self._headers_request['Content-Type'] = 'application/x-www-form-urlencoded'
         self._traffic_lists = True
+        self._last_status = None
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
         # Once the body is read, a parameter that is also in the URL arrives twice ("no such callback" for
@@ -59,6 +68,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
 
     def get_status(self) -> Status:
         status = super().get_status()
+        self._last_status = status
         if not self._traffic_lists:
             return status
         try:
@@ -90,6 +100,52 @@ class TplinkC5400XRouter(TplinkBaseRouter):
     def _status_conn_type(self, data: dict) -> str | None:
         # conn_type here is the USB modem connection ("0" = none); the WAN type is wan_ipv4_conntype
         return data.get('wan_ipv4_conntype') or data.get('conn_type')
+
+    @staticmethod
+    def _map_wire_type(data: str | None, host: bool = True) -> Connection:
+        # The router's own pages call the second 5 GHz band "5G_2"; the base mapping folds it into 5G
+        if data and data.upper().startswith('5G') and data.replace('-', '_').endswith('_2'):
+            return Connection.HOST_5G_2 if host else Connection.GUEST_5G_2
+        return TplinkBaseRouter._map_wire_type(data, host)
+
+    def get_clients_per_band(self) -> ClientsPerBand:
+        # Counted from the client list of the last get_status() (no request of its own; it calls get_status() only
+        # when there is none yet). Main and guest networks together; wifi_5g_2 is None without a second 5 GHz band
+        status = self._last_status if self._last_status is not None else self.get_status()
+        types = [device.type for device in status.devices]
+        return ClientsPerBand(
+            wired=types.count(Connection.WIRED),
+            wifi_2g=types.count(Connection.HOST_2G) + types.count(Connection.GUEST_2G),
+            wifi_5g=types.count(Connection.HOST_5G) + types.count(Connection.GUEST_5G),
+            wifi_5g_2=(types.count(Connection.HOST_5G_2) + types.count(Connection.GUEST_5G_2)
+                       if status.wifi_5g_2_enable is not None else None),
+        )
+
+    def get_daily_traffic(self) -> DailyTraffic:
+        # What the Traffic Monitor chart shows (also while the monitor is off): bytes per day of every client together,
+        # internet plus traffic between local clients. data has max_recent_tick (7) days; tick counts the days so far
+        # and the chart draws only that many. The router's chart draws data[0] as the newest day and data[i] as i days
+        # before it; only data[0] was seen growing during a day (when the day starts is not verified)
+        data = self.request('admin/traffic?form=data&operation=seg_get', 'operation=seg_get&ip=all&seg_type=day')
+        data = data if isinstance(data, dict) else {}
+        rows = data.get('data') if isinstance(data.get('data'), list) else []
+        tick = self._to_int(data.get('tick'))
+        if tick == 0:
+            rows = [{'ups': 0, 'downs': 0}]
+        elif tick is not None and tick > 0:
+            rows = rows[:tick]
+        rows = [row if isinstance(row, dict) else {} for row in rows]
+        return DailyTraffic(
+            downloads=[self._to_int(row.get('downs')) for row in rows],
+            uploads=[self._to_int(row.get('ups')) for row in rows],
+        )
+
+    @staticmethod
+    def _to_int(value) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def set_led(self, enable: bool) -> None:
         current_state = (self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')

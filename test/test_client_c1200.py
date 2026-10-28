@@ -278,6 +278,105 @@ class TestTPLinkC1200Client(TestCase):
         client.get_status()
         self.assertNotIn("admin/traffic?form=lists&operation=load", client.paths)
 
+    def test_get_clients_per_band(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.paths.append(path)
+                if path == "admin/status?form=all&operation=read":
+                    return dict(self.status_data)
+                return {}
+
+        def client_entry(number: int, wire_type: str) -> dict:
+            return {"macaddr": "02-00-00-00-00-{:02X}".format(number), "ipaddr": "192.168.0.{}".format(number),
+                    "hostname": "client{}".format(number), "wire_type": wire_type}
+
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.status_data = {
+            "lan_macaddr": "06-E6-97-9E-23-F5",
+            "wireless_5g_2_enable": "on",
+            "access_devices_wired": [client_entry(1, "wired")],
+            "access_devices_wireless_host": [client_entry(2, "2.4G"), client_entry(3, "5G"),
+                                             client_entry(4, "5G_2"), client_entry(5, "5G_2")],
+            "access_devices_wireless_guest": [client_entry(6, "2.4G"), client_entry(7, "5G_2")],
+        }
+
+        # No get_status() yet: it reads the status once
+        bands = client.get_clients_per_band()
+        self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (1, 2, 1, 3))
+        self.assertEqual(client.paths.count("admin/status?form=all&operation=read"), 1)
+
+        # Afterwards it counts the last get_status() without another request
+        client.status_data["access_devices_wireless_host"] = [client_entry(3, "5G")]
+        client.get_status()
+        client.paths = []
+        bands = client.get_clients_per_band()
+        self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (1, 1, 1, 1))
+        self.assertEqual(client.paths, [])
+
+        types = {device.hostname: device.type for device in client.get_status().devices}
+        self.assertEqual(types["client3"], Connection.HOST_5G)
+        self.assertEqual(types["client6"], Connection.GUEST_2G)
+        self.assertEqual(types["client7"], Connection.GUEST_5G_2)
+
+        # Without a second 5 GHz band there is no count for it
+        client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5", "access_devices_wireless_host": [
+            client_entry(2, "2.4G"), client_entry(3, "5G")]}
+        client.get_status()
+        bands = client.get_clients_per_band()
+        self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (0, 1, 1, None))
+
+    def test_get_daily_traffic(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+                return self.response
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.response = {
+            "day": 3, "hour": 14, "minute": 10, "tick": 23, "max_recent_tick": 7,
+            "data": [{"ups": 100 + day, "downs": 1000 + day} for day in range(7)],
+        }
+        traffic = client.get_daily_traffic()
+        self.assertEqual(client.calls, [("admin/traffic?form=data&operation=seg_get",
+                                         "operation=seg_get&ip=all&seg_type=day")])
+        self.assertEqual(traffic.downloads, [1000, 1001, 1002, 1003, 1004, 1005, 1006])
+        self.assertEqual(traffic.uploads, [100, 101, 102, 103, 104, 105, 106])
+        self.assertEqual(traffic.download_today, 1000)
+        self.assertEqual(traffic.upload_today, 100)
+
+        # Fewer days counted than slots: only those
+        client.response = dict(client.response, tick=2)
+        self.assertEqual(client.get_daily_traffic().downloads, [1000, 1001])
+
+        # Before the first day is counted the chart shows 0 for today
+        client.response = dict(client.response, tick=0)
+        traffic = client.get_daily_traffic()
+        self.assertEqual((traffic.downloads, traffic.uploads), ([0], [0]))
+
+        # Missing fields: None, never an error
+        client.response = {"data": [{"ups": 5}, "x"]}
+        traffic = client.get_daily_traffic()
+        self.assertEqual(traffic.downloads, [None, None])
+        self.assertEqual(traffic.uploads, [5, None])
+        self.assertIsNone(traffic.download_today)
+        client.response = {}
+        traffic = client.get_daily_traffic()
+        self.assertEqual((traffic.downloads, traffic.download_today, traffic.upload_today), ([], None, None))
+
     def test_led_night_mode(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

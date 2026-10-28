@@ -580,3 +580,26 @@ class VpnServerSettings:
     pptp_enabled: bool | None = None
     pptp_unencrypted_access: bool | None = None
     pptp_samba_access: bool | None = None
+
+
+@dataclass
+class ClientsPerBand:
+    wired: int | None = None
+    wifi_2g: int | None = None
+    wifi_5g: int | None = None
+    wifi_5g_2: int | None = None
+
+
+@dataclass
+class DailyTraffic:
+    # Bytes per day, newest first: index 0 is today
+    downloads: list[int | None] = field(default_factory=list)
+    uploads: list[int | None] = field(default_factory=list)
+
+    @property
+    def download_today(self) -> int | None:
+        return self.downloads[0] if self.downloads else None
+
+    @property
+    def upload_today(self) -> int | None:
+        return self.uploads[0] if self.uploads else None

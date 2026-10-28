@@ -149,6 +149,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | get_port_modes |   | Whether WAN aggregation, link aggregation and IPTV are on (Archer C5400X) | [PortModes](#port_modes) |
 | nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
+| get_clients_per_band |   | Clients per band, main and guest networks together (Archer C5400X). Counted from the last `get_status()` without a request of its own (it calls `get_status()` only if there was none yet) | [ClientsPerBand](#clients_per_band) |
+| get_daily_traffic |   | Bytes downloaded and uploaded per day by every client together, as the Traffic Monitor chart shows them (Archer C5400X; answers also while the monitor is off). Includes traffic between local clients | [DailyTraffic](#daily_traffic) |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
@@ -507,11 +509,27 @@ Not all fields are filled by every client:
 | pptp_unencrypted_access | PPTP allows unencrypted connections | bool, None |
 | pptp_samba_access | PPTP clients may reach Samba (Network Place) | bool, None |
 
+### <a id="clients_per_band">ClientsPerBand</a>
+| Field | Description | Type |
+| --- |---|---|
+| wired | Wired clients | int, None |
+| wifi_2g | Clients on 2.4 GHz (main and guest networks) | int, None |
+| wifi_5g | Clients on 5 GHz (the first 5 GHz band on tri-band routers) | int, None |
+| wifi_5g_2 | Clients on the second 5 GHz band; None on routers without it | int, None |
+
+### <a id="daily_traffic">DailyTraffic</a>
+| Field | Description | Type |
+| --- |---|---|
+| downloads | Bytes downloaded per day, newest first (index 0 = today); up to 7 days | list[int, None] |
+| uploads | Bytes uploaded per day, same order | list[int, None] |
+| download_today | downloads[0] | int, None |
+| upload_today | uploads[0] | int, None |
+
 ## Enum
 ### <a id="connection">Connection</a>
 - Connection.HOST_2G - host wifi 2.4G
 - Connection.HOST_5G - host wifi 5G
-- Connection.HOST_5G_2 - host wifi second 5G band (tri-band C5400X `set_wifi`)
+- Connection.HOST_5G_2 - host wifi second 5G band (tri-band C5400X `set_wifi` and its clients)
 - Connection.HOST_6G - host wifi 6G
 - Connection.HOST_MLO - host MLO client connection (EX; multi-link)
 - Connection.HOST_MLO_2G - MLO enable switch for 2.4G (EX `set_wifi` only)
@@ -519,7 +537,7 @@ Not all fields are filled by every client:
 - Connection.HOST_MLO_6G - MLO enable switch for 6G (EX `set_wifi` only)
 - Connection.GUEST_2G - guest wifi 2.4G
 - Connection.GUEST_5G - guest wifi 5G
-- Connection.GUEST_5G_2 - guest wifi second 5G band (tri-band C5400X `set_wifi`)
+- Connection.GUEST_5G_2 - guest wifi second 5G band (tri-band C5400X `set_wifi` and its clients)
 - Connection.GUEST_6G - guest wifi 6G
 - Connection.IOT_2G - IoT wifi 2.4G
 - Connection.IOT_5G - IoT wifi 5G
