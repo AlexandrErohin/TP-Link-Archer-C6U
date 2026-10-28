@@ -35,6 +35,10 @@ class TplinkC5400XRouter(TplinkBaseRouter):
                 self._logger.debug(error)
             raise ClientException(error)
 
+    def _status_conn_type(self, data: dict) -> str | None:
+        # conn_type here is the USB modem connection ("0" = none); the WAN type is wan_ipv4_conntype
+        return data.get('wan_ipv4_conntype') or data.get('conn_type')
+
     def set_led(self, enable: bool) -> None:
         current_state = (self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
                          .get('enable', 'off') == 'on')

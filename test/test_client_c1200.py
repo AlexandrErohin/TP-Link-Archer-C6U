@@ -158,6 +158,37 @@ class TestTPLinkC1200Client(TestCase):
 
         self.assertFalse(client.led_status())
 
+    def test_get_status_conn_type_is_wan_type(self) -> None:
+        response_status = {
+            "lan_macaddr": "06-E6-97-9E-23-F5",
+            "wan_macaddr": "D6-0B-40-57-DA-60",
+            "wan_ipv4_ipaddr": "10.0.0.2",
+            "lan_ipv4_ipaddr": "192.168.0.1",
+            "wan_ipv4_gateway": "10.0.0.1",
+            "conn_type": "0",
+            "modem_connstatus": 0,
+            "wan_ipv4_conntype": "static",
+        }
+
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                if path == "admin/status?form=all&operation=read":
+                    return dict(self.status_data)
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.status_data = response_status
+        self.assertEqual(client.get_status().conn_type, "static")
+
+        client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5", "conn_type": "0"}
+        self.assertEqual(client.get_status().conn_type, "0")
+
     def test_set_wifi(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

@@ -387,6 +387,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return firmware
 
+    def _status_conn_type(self, data: dict) -> str | None:
+        return data.get('conn_type')
+
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
 
@@ -402,7 +405,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.lan_ipv4_dhcp_enable = self._str2bool(data.get('lan_ipv4_dhcp_enable'))
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
-        status.conn_type = data.get('conn_type')
+        status.conn_type = self._status_conn_type(data)
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
