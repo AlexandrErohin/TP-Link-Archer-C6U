@@ -361,6 +361,35 @@ class TestTPLinkC1200Client(TestCase):
             ("admin/wireless?form=guest_5g_2", "operation=write&enable=off"),
         ])
 
+    def test_get_port_modes(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                return self.responses[path]
+
+        client = TPLinkRouterTest("", "")
+        client.responses = {
+            "admin/network?form=addl_wan&operation=read": {"addl_wan_port": "1", "addl_wan_enable": "0"},
+            "admin/network?form=lan_agg&operation=read": {"lacpmode": "2", "LAN2": "1", "LAN3": "1",
+                                                          "enable_agg": "1"},
+            "admin/iptv?form=setting&operation=read": {"enable": "off", "mode": "Bridge", "lan7": "IPTV"},
+        }
+        modes = client.get_port_modes()
+        self.assertFalse(modes.wan_aggregation)
+        self.assertTrue(modes.link_aggregation)
+        self.assertFalse(modes.iptv)
+
+        client.responses = {path: {} for path in client.responses}
+        modes = client.get_port_modes()
+        self.assertIsNone(modes.wan_aggregation)
+        self.assertIsNone(modes.link_aggregation)
+        self.assertIsNone(modes.iptv)
+
     def test_smart_connect(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
             def request(

@@ -147,6 +147,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
+| get_port_modes |   | Whether WAN aggregation, link aggregation and IPTV are on (Archer C5400X) | [PortModes](#port_modes) |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
 | set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
 | reboot |   | reboot router |
@@ -463,6 +464,13 @@ Not all fields are filled by every client:
 | tx_bad_packets | Transmitted bad packets | int, None |
 | rx_good_packets | Received good packets | int, None |
 | rx_bad_packets | Received bad packets | int, None |
+
+### <a id="port_modes">PortModes</a>
+| Field | Description | Type |
+| --- |---|---|
+| wan_aggregation | A LAN port works as a second WAN port | bool, None |
+| link_aggregation | Two LAN ports are aggregated | bool, None |
+| iptv | IPTV/VLAN port setup is on | bool, None |
 
 ## Enum
 ### <a id="connection">Connection</a>

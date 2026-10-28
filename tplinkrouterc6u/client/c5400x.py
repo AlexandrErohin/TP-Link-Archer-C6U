@@ -3,6 +3,7 @@ from re import search
 from urllib.parse import urlencode
 from requests import post
 from tplinkrouterc6u.common.package_enum import Connection
+from tplinkrouterc6u.common.dataclass import PortModes
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.client.c6u import TplinkBaseRouter
 
@@ -87,6 +88,16 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # Only enable: the router keeps time_start / time_end as they are
         self.request('admin/ledpm?form=setting&operation=write',
                      'operation=write&enable={}'.format('on' if enable else 'off'))
+
+    def get_port_modes(self) -> PortModes:
+        wan = self.request('admin/network?form=addl_wan&operation=read', 'operation=read')
+        lan = self.request('admin/network?form=lan_agg&operation=read', 'operation=read')
+        iptv = self.request('admin/iptv?form=setting&operation=read', 'operation=read')
+        return PortModes(
+            wan_aggregation={'1': True, '0': False}.get(str(wan.get('addl_wan_enable'))),
+            link_aggregation={'1': True, '0': False}.get(str(lan.get('enable_agg'))),
+            iptv={'on': True, 'off': False}.get(iptv.get('enable')),
+        )
 
     def smart_connect_status(self) -> bool | None:
         data = self.request('admin/wireless?form=smart_connect&operation=read', 'operation=read')

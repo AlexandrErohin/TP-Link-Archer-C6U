@@ -542,3 +542,10 @@ class PortStatus:
     tx_bad_packets: int | None = None
     rx_good_packets: int | None = None
     rx_bad_packets: int | None = None
+
+
+@dataclass
+class PortModes:
+    wan_aggregation: bool | None = None
+    link_aggregation: bool | None = None
+    iptv: bool | None = None
