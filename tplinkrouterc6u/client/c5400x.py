@@ -326,6 +326,12 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         return SpeedTest(status=data.get('status'), download=_mbit(data.get('down_speed')),
                          upload=_mbit(data.get('up_speed')), time=time)
 
+    def start_speed_test(self) -> None:
+        # The "Test again" button of Network Map > Speed Test. The router downloads and uploads for a while (the
+        # internet is busy meanwhile); the web page then calls get_speed_test() every few seconds in the same session
+        # until status is idle or fail
+        self.request('admin/status?form=speedtest', 'operation=start')
+
     def get_wan_port_speed(self) -> WanPortSpeed:
         # Internet port Speed & Duplex (System Parameters): "auto", "1000F", "100F"..., and the choices this router
         # offers. Probably the setting, not the negotiated link (that is port 0 of get_port_status)

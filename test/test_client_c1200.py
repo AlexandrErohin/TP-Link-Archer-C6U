@@ -641,6 +641,23 @@ class TestTPLinkC1200Client(TestCase):
         test = self._wan_client({path: {}}).get_speed_test()
         self.assertEqual((test.status, test.download, test.upload, test.time), (None, None, None, None))
 
+    def test_start_speed_test(self) -> None:
+        class TPLinkRouterTest(TplinkC1200Router):
+            def request(
+                self,
+                path: str,
+                data: str,
+                ignore_response: bool = False,
+                ignore_errors: bool = False,
+            ) -> dict | None:
+                self.calls.append((path, data))
+                return {}
+
+        client = TPLinkRouterTest("", "")
+        client.calls = []
+        client.start_speed_test()
+        self.assertEqual(client.calls, [("admin/status?form=speedtest", "operation=start")])
+
     def test_get_wan_port_speed(self) -> None:
         current = "admin/network?form=port_speed_current&operation=read"
         supported = "admin/network?form=port_speed_supported&operation=read"

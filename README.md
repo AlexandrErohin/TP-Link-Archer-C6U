@@ -153,6 +153,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_daily_traffic |   | Bytes downloaded and uploaded per day by every client together, as the Traffic Monitor chart shows them (Archer C5400X; answers also while the monitor is off). Includes traffic between local clients | [DailyTraffic](#daily_traffic) |
 | get_wan_speed |   | Live internet rate from the Network Map, bytes/s (Archer C5400X) | [WanSpeed](#wan_speed) |
 | get_speed_test |   | Result of the router's own speed test, Mbit/s (Archer C5400X) | [SpeedTest](#speed_test) |
+| start_speed_test |   | Starts the router's own speed test (Archer C5400X). It runs for a while: call get_speed_test until its status is idle or fail, without logging out in between (like the web page) |   |
 | get_wan_port_speed |   | Internet port Speed & Duplex value (`auto`, `1000F`, …) and the choices the router offers (Archer C5400X) | [WanPortSpeed](#wan_port_speed) |
 | get_qos |   | Whether QoS is on and the total bandwidth it shares out, Mbit/s (Archer C5400X) | [QoSSettings](#qos_settings) |
 | get_firmware_update |   | Installed firmware and, from TP-Link's cloud as the web UI shows it, the newest version and whether it is newer (Archer C5400X). Read only: it never starts the upgrade. The cloud part is None without internet or a TP-Link ID | [FirmwareUpdate](#firmware_update) |
