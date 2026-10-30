@@ -1722,6 +1722,24 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(forwards[0].name, 'web')
         self.assertEqual(forwards[0].protocol, 'UDP')
 
+    def test_get_ipv4_port_forwards_list_envelope(self) -> None:
+        """Some firmware wraps the same rows under a list key."""
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                return {'list': [
+                    {'internal_port': '80', 'name': 'web', 'enable': 'on',
+                     'external_port': '8080', 'ipaddr': '10.0.0.7', 'protocol': 'TCP'},
+                ]}
+
+        client = TPLinkRouterTest('', '')
+        forwards = client.get_ipv4_port_forwards()
+        self.assertEqual(len(forwards), 1)
+        self.assertEqual(forwards[0].name, 'web')
+        self.assertEqual(forwards[0].internal_port, '80')
+
     def test_get_ipv4_port_forwards_empty(self) -> None:
         """An empty table is {} (AX23 v2 port triggering / IPv6 firewall)."""
         router_class = self.router_class
@@ -1786,6 +1804,8 @@ class TestTPLinkClient(TestCase):
             client.add_ipv4_port_forward('', 80, 80, '10.0.0.30')
         with self.assertRaises(ClientException):
             client.add_ipv4_port_forward('x', '99999', 80, '10.0.0.30')
+        with self.assertRaisesRegex(ClientException, 'descending port range'):
+            client.add_ipv4_port_forward('x', '9000-8000', 80, '10.0.0.30')
         with self.assertRaises(ClientException):
             client.add_ipv4_port_forward('x', 80, 'abc', '10.0.0.30')
         with self.assertRaises(ClientException):
@@ -1820,6 +1840,34 @@ class TestTPLinkClient(TestCase):
             loads(body['new']),
             {'name': 'qb', 'ipaddr': '192.168.0.18', 'external_port': '54535',
              'internal_port': '54546', 'protocol': 'ALL', 'enable': 'off'})
+
+    def test_update_delete_ipv4_port_forward_list_envelope(self) -> None:
+        """Update/delete also accept list-wrapped loads, not just reads."""
+        writes = []
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return {'list': [
+                        {'internal_port': '80', 'name': 'web', 'enable': 'on',
+                         'external_port': '8080', 'ipaddr': '10.0.0.7', 'protocol': 'TCP'},
+                        {'internal_port': '443', 'name': 'https', 'enable': 'off',
+                         'external_port': '443', 'ipaddr': '10.0.0.8', 'protocol': 'TCP'},
+                    ]}
+                writes.append(dict(parse_qsl(data)))
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.update_ipv4_port_forward('https', internal_port=8443)
+        client.delete_ipv4_port_forward('https')
+        self.assertEqual(len(writes), 2)
+        self.assertEqual(writes[0]['operation'], 'update')
+        self.assertEqual(loads(writes[0]['new'])['internal_port'], '8443')
+        self.assertEqual(writes[1]['operation'], 'remove')
+        self.assertEqual(writes[1]['key'], 'https')
+        self.assertEqual(writes[1]['index'], '1')
 
     def test_update_ipv4_port_forward_not_found(self) -> None:
         router_class = self.router_class
