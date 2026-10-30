@@ -359,66 +359,6 @@ class TPLinkMRClientBase(AbstractRouter):
 
         return dhcp_leases
 
-    def get_dsl_status(self) -> DSLStatus:
-        """Physical layer status of the DSL line.
-
-        Only meaningful on the DSL capable models in this family (the VR series
-        and TD-W variants). Cellular-only and Ethernet-WAN models return an
-        empty DSLStatus.
-
-        WAN_DSL_INTF_CFG must be read as a list: these devices expose one entry
-        per WAN interface slot (DSL, Ethernet, USB) and only the DSL one carries
-        data, so this returns the first entry that is not Disabled.
-        """
-        dsl_status = DSLStatus()
-
-        acts = [self.ActItem(self.ActItem.GL, 'WAN_DSL_INTF_CFG', attrs=[
-            'status', 'modulationType', 'X_TP_AnnexType',
-            'upstreamCurrRate', 'downstreamCurrRate',
-            'upstreamMaxRate', 'downstreamMaxRate',
-            'upstreamNoiseMargin', 'downstreamNoiseMargin',
-            'upstreamAttenuation', 'downstreamAttenuation',
-            'X_TP_UpTime',
-        ])]
-        _, values = self.req_act(acts)
-
-        line = {}
-        # MR req_act yields a dict for one slot, a list for several, [] for none;
-        # the EX transport wraps that in a per-act list. Scan every slot.
-        slots = []
-        for value in self._to_list(values):
-            slots.extend(value if isinstance(value, list) else [value])
-        for item in slots:
-            if isinstance(item, dict) and item.get('status') not in (None, '', 'Disabled'):
-                line = item
-                break
-
-        if not line:
-            return dsl_status
-
-        def as_int(key):
-            value = line.get(key)
-            return int(value) if value not in (None, '') else None
-
-        def as_tenths(key):
-            value = as_int(key)
-            return value / 10 if value is not None else None
-
-        dsl_status.status = line.get('status')
-        dsl_status.modulation = line.get('modulationType') or None
-        dsl_status.annex = line.get('X_TP_AnnexType') or None
-        dsl_status.upstream_curr_rate = as_int('upstreamCurrRate')
-        dsl_status.downstream_curr_rate = as_int('downstreamCurrRate')
-        dsl_status.upstream_max_rate = as_int('upstreamMaxRate')
-        dsl_status.downstream_max_rate = as_int('downstreamMaxRate')
-        dsl_status.upstream_noise_margin = as_tenths('upstreamNoiseMargin')
-        dsl_status.downstream_noise_margin = as_tenths('downstreamNoiseMargin')
-        dsl_status.upstream_attenuation = as_tenths('upstreamAttenuation')
-        dsl_status.downstream_attenuation = as_tenths('downstreamAttenuation')
-        dsl_status.uptime = as_int('X_TP_UpTime')
-
-        return dsl_status
-
     def get_ipv4_status(self) -> IPv4Status:
         acts = [
             self.ActItem(self.ActItem.GS, 'LAN_IP_INTF',
@@ -474,6 +414,73 @@ class TPLinkMRClientBase(AbstractRouter):
             ipv6_status._ipv6_site_prefix_length = item.get('X_TP_SitePrefixLength', '')
 
         return ipv6_status
+
+    def get_dsl_status(self) -> DSLStatus:
+        """Physical layer status of the DSL line.
+
+        Only meaningful on the DSL capable models in this family (the VR series
+        and TD-W variants). Cellular-only and Ethernet-WAN models return an
+        empty DSLStatus. Inherited by EX / VR1200v via the same base class; the
+        EX JSON transport path is covered by the slot flatten below but has not
+        been verified on DSL-capable EX hardware.
+
+        WAN_DSL_INTF_CFG must be read as a list: these devices expose one entry
+        per WAN interface slot (DSL, Ethernet, USB) and only the DSL one carries
+        data, so this returns the first entry that is not Disabled.
+        """
+        dsl_status = DSLStatus()
+
+        acts = [self.ActItem(self.ActItem.GL, 'WAN_DSL_INTF_CFG', attrs=[
+            'status', 'modulationType', 'X_TP_AnnexType',
+            'upstreamCurrRate', 'downstreamCurrRate',
+            'upstreamMaxRate', 'downstreamMaxRate',
+            'upstreamNoiseMargin', 'downstreamNoiseMargin',
+            'upstreamAttenuation', 'downstreamAttenuation',
+            'X_TP_UpTime',
+        ])]
+        _, values = self.req_act(acts)
+
+        line = {}
+        # MR req_act yields a dict for one slot, a list for several, [] for none;
+        # the EX transport wraps that in a per-act list. Scan every slot.
+        slots = []
+        for value in self._to_list(values):
+            slots.extend(value if isinstance(value, list) else [value])
+        for item in slots:
+            if isinstance(item, dict) and item.get('status') not in (None, '', 'Disabled'):
+                line = item
+                break
+
+        if not line:
+            return dsl_status
+
+        def as_int(key):
+            value = line.get(key)
+            if value in (None, ''):
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
+        def as_tenths(key):
+            value = as_int(key)
+            return value / 10 if value is not None else None
+
+        dsl_status.status = line.get('status')
+        dsl_status.modulation = line.get('modulationType') or None
+        dsl_status.annex = line.get('X_TP_AnnexType') or None
+        dsl_status.upstream_curr_rate = as_int('upstreamCurrRate')
+        dsl_status.downstream_curr_rate = as_int('downstreamCurrRate')
+        dsl_status.upstream_max_rate = as_int('upstreamMaxRate')
+        dsl_status.downstream_max_rate = as_int('downstreamMaxRate')
+        dsl_status.upstream_noise_margin = as_tenths('upstreamNoiseMargin')
+        dsl_status.downstream_noise_margin = as_tenths('downstreamNoiseMargin')
+        dsl_status.upstream_attenuation = as_tenths('upstreamAttenuation')
+        dsl_status.downstream_attenuation = as_tenths('downstreamAttenuation')
+        dsl_status.uptime = as_int('X_TP_UpTime')
+
+        return dsl_status
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         acts = [

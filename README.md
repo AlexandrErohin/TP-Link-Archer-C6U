@@ -166,7 +166,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | delete_sms | sms: [SMS](#sms) | Delete sms message from the first page for LTE routers |   |
 | get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
-| get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR family; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
+| get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR; also inherited by EX/VR1200v, EX DSL path untested on hardware; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
 | get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
@@ -414,22 +414,6 @@ Not all fields are filled by every client:
 | network_types | All possible network types - {0: "No Service", 1: "GSM", 2: "WCDMA", 3: "4G LTE", 4: "TD-SCDMA", 5: "CDMA 1x", 6: "CDMA 1x Ev-Do", 7: "4G+ LTE", 8: "5G NR"} | dict |
 | sim_statuses | All possible sim statuses - {0: "No SIM card detected or SIM card error.", 1: "No SIM card detected.", 2: "SIM card error.", 3: "SIM card prepared.", 4: "SIM locked.", 5: "SIM unlocked. Authentication succeeded.", 6: "PIN locked.", 7: "SIM card is locked permanently.", 8: "suspension of transmission", 9: "Unopened"} | dict |
 
-### <a id="serving_cell">ServingCell</a>
-| Field | Description | Type |
-| --- |---|---|
-| network_type | network type  | int |
-| band| band number | int |
-| arfcn | absolute radio frequency channel number | int |
-| downlink_bandwidth | MHz | int |
-| downlink_frequency | MHz | int |
-| downlink_modulation | Downlink modulation scheme | str |
-| uplink_modulation | Uplink modulation scheme | str |
-| cqi | Channel quality indicator | int |
-| ri | Rank indicator | int |
-| resource_blocks | Number of resource blocks allocated in the NR cell | int |
-| rsrp | dBm | int |
-| rsrq | dBm | int |
-
 ### <a id="dsl_status">DSLStatus</a>
 | Field | Description | Type |
 | --- |---|---|
@@ -446,6 +430,22 @@ Not all fields are filled by every client:
 | upstream_attenuation | upstream line attenuation in dB | float, None |
 | downstream_attenuation | downstream line attenuation in dB | float, None |
 | uptime | line uptime as reported by the device (`X_TP_UpTime`) | int, None |
+
+### <a id="serving_cell">ServingCell</a>
+| Field | Description | Type |
+| --- |---|---|
+| network_type | network type  | int |
+| band| band number | int |
+| arfcn | absolute radio frequency channel number | int |
+| downlink_bandwidth | MHz | int |
+| downlink_frequency | MHz | int |
+| downlink_modulation | Downlink modulation scheme | str |
+| uplink_modulation | Uplink modulation scheme | str |
+| cqi | Channel quality indicator | int |
+| ri | Rank indicator | int |
+| resource_blocks | Number of resource blocks allocated in the NR cell | int |
+| rsrp | dBm | int |
+| rsrq | dBm | int |
 
 ### <a id="WifiStatus">WifiStatus</a>
 | Field | Description | Type |

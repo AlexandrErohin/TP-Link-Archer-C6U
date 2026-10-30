@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **MR / VR / EX:** `get_dsl_status()` returns DSL sync rates, SNR margin, attenuation and uptime as `DSLStatus` (`WAN_DSL_INTF_CFG` via GL; empty when no active DSL line). EX path is inherited but not hardware-verified ([#246](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/246), [#73](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/73)).
+
 ## [5.37.0] - 2026-10-17
 
 ### Added

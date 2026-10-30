@@ -698,6 +698,87 @@ X_TP_UpTime=318046
         self.assertIsNone(dsl.status)
         self.assertFalse(dsl.is_up)
 
+    def test_get_dsl_status_line_down(self) -> None:
+        # A Down (or Initializing) slot is still the active DSL interface: keep
+        # stats for monitoring, but is_up stays False.
+        response = '''[1,0,0,0,0,0]0
+status=Down
+modulationType=VDSL2
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=0
+downstreamCurrRate=0
+upstreamMaxRate=11503
+downstreamMaxRate=43643
+upstreamNoiseMargin=0
+downstreamNoiseMargin=0
+upstreamAttenuation=25
+downstreamAttenuation=182
+X_TP_UpTime=0
+[2,0,0,0,0,0]0
+status=Disabled
+modulationType=
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=0
+downstreamCurrRate=0
+upstreamMaxRate=0
+downstreamMaxRate=0
+upstreamNoiseMargin=0
+downstreamNoiseMargin=0
+upstreamAttenuation=0
+downstreamAttenuation=0
+X_TP_UpTime=0
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        dsl = TPLinkMRClientTest('', '').get_dsl_status()
+
+        self.assertEqual(dsl.status, 'Down')
+        self.assertFalse(dsl.is_up)
+        self.assertEqual(dsl.modulation, 'VDSL2')
+        self.assertEqual(dsl.downstream_curr_rate, 0)
+        self.assertEqual(dsl.downstream_max_rate, 43643)
+        self.assertEqual(dsl.downstream_attenuation, 18.2)
+
+    def test_get_dsl_status_malformed_numbers(self) -> None:
+        # Non-numeric CGI fields must not raise; pollers get None instead.
+        response = '''[1,0,0,0,0,0]0
+status=Up
+modulationType=VDSL2
+X_TP_AnnexType=Annex auto
+upstreamCurrRate=N/A
+downstreamCurrRate=
+upstreamMaxRate=11503
+downstreamMaxRate=bad
+upstreamNoiseMargin=xx
+downstreamNoiseMargin=58
+upstreamAttenuation=25
+downstreamAttenuation=182
+X_TP_UpTime=
+[error]0
+
+'''
+
+        class TPLinkMRClientTest(TPLinkMRClient):
+            def _request(self, url, method='POST', data_str=None, encrypt=False, is_login=False):
+                return 200, response
+
+        dsl = TPLinkMRClientTest('', '').get_dsl_status()
+
+        self.assertTrue(dsl.is_up)
+        self.assertIsNone(dsl.upstream_curr_rate)
+        self.assertIsNone(dsl.downstream_curr_rate)
+        self.assertEqual(dsl.upstream_max_rate, 11503)
+        self.assertIsNone(dsl.downstream_max_rate)
+        self.assertIsNone(dsl.upstream_noise_margin)
+        self.assertEqual(dsl.downstream_noise_margin, 5.8)
+        self.assertEqual(dsl.upstream_attenuation, 2.5)
+        self.assertIsNone(dsl.uptime)
+
     def test_get_status_mr6400(self) -> None:
         response = '''
 [1,1,0,0,0,0]0

@@ -472,6 +472,32 @@ class LTEStatus:
 
 
 @dataclass
+class DSLStatus:
+    """Physical layer status of a DSL line.
+
+    Rates are in kbps. Noise margin and attenuation are in dB: the devices
+    report them in tenths of a dB, and the client divides before populating
+    these fields so the values match what the router's own web UI shows.
+    """
+    status: str | None = None
+    modulation: str | None = None
+    annex: str | None = None
+    upstream_curr_rate: int | None = None
+    downstream_curr_rate: int | None = None
+    upstream_max_rate: int | None = None
+    downstream_max_rate: int | None = None
+    upstream_noise_margin: float | None = None
+    downstream_noise_margin: float | None = None
+    upstream_attenuation: float | None = None
+    downstream_attenuation: float | None = None
+    uptime: int | None = None
+
+    @property
+    def is_up(self) -> bool:
+        return self.status == 'Up'
+
+
+@dataclass
 class VPNStatus:
     openvpn_enable: bool | None = None
     pptpvpn_enable: bool | None = None
@@ -509,32 +535,6 @@ class VpnClientServer:
     protocol: VpnClientServerProtocol
     active: bool
     status: str | None = None
-
-
-@dataclass
-class DSLStatus:
-    """Physical layer status of a DSL line.
-
-    Rates are in kbps. Noise margin and attenuation are in dB: the devices
-    report them in tenths of a dB, and the client divides before populating
-    these fields so the values match what the router's own web UI shows.
-    """
-    status: str | None = None
-    modulation: str | None = None
-    annex: str | None = None
-    upstream_curr_rate: int | None = None
-    downstream_curr_rate: int | None = None
-    upstream_max_rate: int | None = None
-    downstream_max_rate: int | None = None
-    upstream_noise_margin: float | None = None
-    downstream_noise_margin: float | None = None
-    upstream_attenuation: float | None = None
-    downstream_attenuation: float | None = None
-    uptime: int | None = None
-
-    @property
-    def is_up(self) -> bool:
-        return self.status == 'Up'
 
 
 @dataclass
