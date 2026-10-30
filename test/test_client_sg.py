@@ -473,5 +473,48 @@ class TestTplinkRouterSGVpnClientStatus(TestCase):
         self.assertEqual(server.status, 'connected')
 
 
+class TestTplinkRouterSGSession(TestCase):
+    """Session lifecycle and failure-path tests for TplinkRouterSG."""
+
+    def test_request_before_authorize_raises(self) -> None:
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        with self.assertRaisesRegex(Exception, 'Not authorised'):
+            client.request('admin/status?form=all', 'operation=read')
+
+    def test_logout_clears_session(self) -> None:
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._stok = 'stok-token'
+        client._sysauth = 'cookie'
+        client._logged = True
+        with patch.object(TplinkRouterSG, 'request') as mock_request:
+            client.logout()
+        mock_request.assert_called_once()
+        self.assertIn('logout', mock_request.call_args[0][0])
+        self.assertEqual(client._stok, '')
+        self.assertEqual(client._sysauth, '')
+        self.assertFalse(client._logged)
+
+    def test_request_malformed_response_raises_client_error(self) -> None:
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        client._stok = 'stok-token'
+        client._sysauth = 'cookie'
+        client._logged = True
+        client._aes_key = '1234567890123456'
+        client._aes_iv = '6543210987654321'
+        client._hash = sha256(b'admintestpassword').hexdigest()
+        client._seq = 1
+        client._nn = 'ca8f1711cc27576fb0dae0d7df1b6a90465e8ea31ccf46b0004f4c60f6617df' \
+                     '8fa147502e45353b4d3f8ad38cb9aee9a77d33973ce3d7d681bc2fb0ae242e631'
+        client._ee = '010001'
+
+        response = Mock()
+        response.json.side_effect = ValueError('not json')
+        response.text = 'not json'
+        response.headers = {}
+        with patch('tplinkrouterc6u.client.sg.post', return_value=response):
+            with self.assertRaises(ClientError):
+                client.request('admin/status?form=all', 'operation=read')
+
+
 if __name__ == '__main__':
     main()

@@ -257,6 +257,24 @@ class IPv4DHCPLease:
 
 
 @dataclass
+class IPv4PortForward:
+    name: str
+    _ipaddr: IPv4Address
+    external_port: str
+    internal_port: str
+    protocol: str
+    enabled: bool = True
+
+    @property
+    def ipaddr(self):
+        return str(self._ipaddr)
+
+    @property
+    def ipaddress(self):
+        return self._ipaddr
+
+
+@dataclass
 class IPv4Status:
     _wan_macaddr: EUI48 | None = None
     _wan_ipv4_ipaddr: IPv4Address | None = None

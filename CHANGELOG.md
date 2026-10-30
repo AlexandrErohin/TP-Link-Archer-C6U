@@ -6,6 +6,7 @@
 
 - **MR / VR / EX:** `get_dsl_status()` returns DSL sync rates, SNR margin, attenuation and uptime as `DSLStatus` (`WAN_DSL_INTF_CFG` via GL; empty when no active DSL line). EX path is inherited but not hardware-verified ([#246](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/246), [#73](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/73)).
 - **RE505X:** RE505X v1.0 listed as supported via `TplinkRE813XERouter` ([#247](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/247)).
+- **C6U / V1_11 / SG (new-gen LuCI clients):** IPv4 port forwarding (virtual servers, `admin/nat?form=vs`) support — `get_ipv4_port_forwards()`, `add_ipv4_port_forward()`, `update_ipv4_port_forward()`, `delete_ipv4_port_forward()`. Read is verified on Archer AX23 v2.0 fw 1.1.2 Build 20250814 (SG_L1_S2); insert/update/remove use the same wire format the router's own web UI sends (`insert` with `new=<json>`, `update` with `key`/`new`/`old`, `remove` with `key`/`index`).
 
 ### Changed
 
