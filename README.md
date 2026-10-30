@@ -618,6 +618,7 @@ Not all fields are filled by every client:
 - VX420-G2h v1.1
 - VX800v v1
 - XC220-G3v v2.30
+- XGB834v v1.1 (TIM Hub Ultra, reports model `AGGPON`; `TPLinkEXClientGCM` with username `admin`)
 ### <a id="mercusys">MERCUSYS routers</a>
 - AC10 1.20
 - Halo H25BE 1.0
