@@ -51,6 +51,7 @@ from tplinkrouterc6u import (
     TPLinkC50Client,
     TPLinkWR841NClient,
     TplinkRE330Router,
+    TplinkRE505XRouter,
     TplinkRE813XERouter,
     TplinkRe700XRouter,  # alias of TplinkRE813XERouter
     TplinkC3200Router,
@@ -608,6 +609,7 @@ Not all fields are filled by every client:
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
+- RE505X v1.0
 - RE700X
 - RE813XE v1.6
 - TD-W9960 (v1, V1.20)

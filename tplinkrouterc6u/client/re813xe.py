@@ -76,7 +76,7 @@ class TplinkRE813XERouter(AbstractRouter):
 
     @staticmethod
     def _str2bool(v) -> bool | None:
-        return str(v).lower() in ('yes', 'true', 'on') if v is not None else None
+        return str(v).lower() in ('yes', 'true', 'on', '1') if v is not None else None
 
     @staticmethod
     def _map_wire_type(data: str | None, host: bool = True) -> Connection:
@@ -200,6 +200,9 @@ class TplinkRE813XERouter(AbstractRouter):
 
     def authorize(self) -> None:
         password = self._get_encrypted_password()
+
+        if self._logged and self._stok:
+            return
 
         response = post(
             '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host),
@@ -427,6 +430,7 @@ class TplinkRE813XERouter(AbstractRouter):
                 'hidden': cur('hidden', hidden),
                 'encryption': cur('encryption', encryption),
                 'psk_version': cur('psk_version', psk_version),
+                'psk_cipher': cur('psk_cipher', psk_cipher),
                 'psk_key': cur('psk_key', psk_key),
                 'hwmode': cur('hwmode', hwmode),
                 'htmode': cur('htmode', htmode),
@@ -513,5 +517,6 @@ class TplinkRE813XERouter(AbstractRouter):
         return ipv4_status
 
 
-# Alias for callers / docs that follow the RE700X naming from #95.
+# Aliases for callers / docs that follow model naming from #95, #234.
 TplinkRe700XRouter = TplinkRE813XERouter
+TplinkRE505XRouter = TplinkRE813XERouter
