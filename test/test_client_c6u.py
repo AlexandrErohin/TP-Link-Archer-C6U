@@ -1682,9 +1682,9 @@ class TestTPLinkClient(TestCase):
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
                 return [
                     {'internal_port': '54535', 'name': 'qb', 'enable': 'on',
-                     'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL'},
+                     'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'all'},
                     {'internal_port': '443', 'name': 'https', 'enable': 'off',
-                     'external_port': '443-445', 'ipaddr': '192.168.0.4', 'protocol': 'TCP'},
+                     'external_port': '443-445', 'ipaddr': '192.168.0.4', 'protocol': 'tcp'},
                 ]
 
         client = TPLinkRouterTest('', '')
@@ -1698,7 +1698,16 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(forwards[0].protocol, 'ALL')
         self.assertTrue(forwards[0].enabled)
         self.assertEqual(forwards[1].external_port, '443-445')
+        self.assertEqual(forwards[1].protocol, 'TCP')
         self.assertFalse(forwards[1].enabled)
+
+    def test_ipv4_port_forwards_url_matches_client_family(self) -> None:
+        """TplinkRouter strips &operation= from path attrs; SG/V1_11 keep it."""
+        client = self.router_class('', '')
+        self.assertTrue(client._url_ipv4_port_forwards.startswith('admin/nat?form=vs'))
+        reservations_has_op = '&operation=' in client._url_ipv4_reservations
+        forwards_has_op = '&operation=' in client._url_ipv4_port_forwards
+        self.assertEqual(forwards_has_op, reservations_has_op)
 
     def test_get_ipv4_port_forwards_data_envelope(self) -> None:
         """Some models wrap the vs load as {"data": [...], "others": {...}}."""
@@ -1788,8 +1797,9 @@ class TestTPLinkClient(TestCase):
             {'name': 'game', 'ipaddr': '10.0.0.30', 'external_port': '25565',
              'internal_port': '25565', 'protocol': 'UDP', 'enable': 'on'})
 
-        # external port ranges and disabled rules are sent verbatim
-        client.add_ipv4_port_forward('range', '8000-9000', 8000, '10.0.0.30',
+        # external port ranges and disabled rules are sent verbatim;
+        # spaces around '-' are normalized away
+        client.add_ipv4_port_forward('range', '8000 - 9000', 8000, '10.0.0.30',
                                      protocol='TCP', enable=False)
         body = dict(parse_qsl(check_data))
         self.assertEqual(
@@ -1810,6 +1820,8 @@ class TestTPLinkClient(TestCase):
             client.add_ipv4_port_forward('x', 80, 'abc', '10.0.0.30')
         with self.assertRaises(ClientException):
             client.add_ipv4_port_forward('x', 80, 80, '10.0.0.30', protocol='ICMP')
+        with self.assertRaisesRegex(ClientException, 'Invalid IP address'):
+            client.add_ipv4_port_forward('x', 80, 80, 'not-an-ip')
 
     def test_update_ipv4_port_forward(self) -> None:
         check_data = ''
@@ -1822,7 +1834,8 @@ class TestTPLinkClient(TestCase):
                 if 'operation=load' in path or (data and 'operation=load' in data):
                     return [
                         {'internal_port': '54535', 'name': 'qb', 'enable': 'on',
-                         'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL'},
+                         'external_port': '54535', 'ipaddr': '192.168.0.18', 'protocol': 'ALL',
+                         'key': 'row-key'},
                     ]
                 check_data = data
                 return None
@@ -1835,11 +1848,35 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(
             loads(body['old']),
             {'name': 'qb', 'ipaddr': '192.168.0.18', 'external_port': '54535',
-             'internal_port': '54535', 'protocol': 'ALL', 'enable': 'on'})
+             'internal_port': '54535', 'protocol': 'ALL', 'enable': 'on', 'key': 'row-key'})
         self.assertEqual(
             loads(body['new']),
             {'name': 'qb', 'ipaddr': '192.168.0.18', 'external_port': '54535',
-             'internal_port': '54546', 'protocol': 'ALL', 'enable': 'off'})
+             'internal_port': '54546', 'protocol': 'ALL', 'enable': 'off', 'key': 'row-key'})
+
+    def test_update_ipv4_port_forward_rename(self) -> None:
+        check_data = ''
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                nonlocal check_data
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return [
+                        {'internal_port': '80', 'name': 'web', 'enable': 'on',
+                         'external_port': '8080', 'ipaddr': '10.0.0.7', 'protocol': 'TCP'},
+                    ]
+                check_data = data
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.update_ipv4_port_forward('web', new_name='http')
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(body['operation'], 'update')
+        self.assertEqual(body['key'], 'web')
+        self.assertEqual(loads(body['old'])['name'], 'web')
+        self.assertEqual(loads(body['new'])['name'], 'http')
 
     def test_update_delete_ipv4_port_forward_list_envelope(self) -> None:
         """Update/delete also accept list-wrapped loads, not just reads."""
@@ -1868,6 +1905,35 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(writes[1]['operation'], 'remove')
         self.assertEqual(writes[1]['key'], 'https')
         self.assertEqual(writes[1]['index'], '1')
+
+    def test_update_delete_ipv4_port_forward_data_envelope(self) -> None:
+        """Update/delete also accept data-wrapped loads (UI envelope with others)."""
+        writes = []
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                if 'operation=load' in path or (data and 'operation=load' in data):
+                    return {
+                        'data': [
+                            {'internal_port': '80', 'name': 'web', 'enable': 'on',
+                             'external_port': '8080', 'ipaddr': '10.0.0.7', 'protocol': 'UDP'},
+                        ],
+                        'others': {'max_rules': 64},
+                    }
+                writes.append(dict(parse_qsl(data)))
+                return None
+
+        client = TPLinkRouterTest('', '')
+        client.update_ipv4_port_forward('web', protocol='TCP')
+        client.delete_ipv4_port_forward('web')
+        self.assertEqual(len(writes), 2)
+        self.assertEqual(writes[0]['operation'], 'update')
+        self.assertEqual(loads(writes[0]['new'])['protocol'], 'TCP')
+        self.assertEqual(writes[1]['operation'], 'remove')
+        self.assertEqual(writes[1]['key'], 'web')
+        self.assertEqual(writes[1]['index'], '0')
 
     def test_update_ipv4_port_forward_not_found(self) -> None:
         router_class = self.router_class

@@ -756,7 +756,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             ipv4_port_forwards.append(
                 IPv4PortForward(item['name'], get_ip(item['ipaddr']),
                                 str(item['external_port']), str(item['internal_port']),
-                                item['protocol'], self._str2bool(item['enable'])))
+                                str(item['protocol']).upper(),
+                                self._str2bool(item['enable'])))
 
         return ipv4_port_forwards
 
@@ -766,15 +767,19 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         """Validate and build one virtual-server row payload.
 
         ``external_port`` accepts a single port ("443") or a range
-        ("8000-9000"); ``internal_port`` is a single port. ``protocol`` is
-        one of TCP/UDP/ALL (case-insensitive), matching the web UI.
+        ("8000-9000", spaces around ``-`` allowed); ``internal_port`` is a
+        single port. ``protocol`` is one of TCP/UDP/ALL (case-insensitive),
+        matching the web UI.
         """
         if not name or not str(name).strip():
             raise ClientException('Port forward name must not be empty')
 
         def port(v, allow_range: bool) -> str:
             text = str(v).strip()
-            parts = text.split('-') if allow_range else [text]
+            if allow_range and '-' in text:
+                parts = [p.strip() for p in text.split('-')]
+            else:
+                parts = [text]
             if not 1 <= len(parts) <= (2 if allow_range else 1):
                 raise ClientException('Invalid port format: {}'.format(v))
             for part in parts:
@@ -782,16 +787,23 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                     raise ClientException('Invalid port: {}'.format(v))
             if len(parts) == 2 and int(parts[0]) > int(parts[1]):
                 raise ClientException('Invalid descending port range: {}'.format(v))
-            return text
+            return '{}-{}'.format(parts[0], parts[1]) if len(parts) == 2 else parts[0]
 
         protocol = str(protocol).upper()
         if protocol not in ('TCP', 'UDP', 'ALL'):
             raise ClientException(
                 'protocol must be one of TCP/UDP/ALL, got: {}'.format(protocol))
 
+        ip_text = str(ipaddr).strip()
+        parsed_ip = get_ip(ip_text)
+        # get_ip soft-falls back to 0.0.0.0; reject that unless the caller
+        # explicitly asked for the zero address.
+        if str(parsed_ip) == '0.0.0.0' and ip_text != '0.0.0.0':
+            raise ClientException('Invalid IP address: {}'.format(ipaddr))
+
         return {
             'name': str(name).strip(),
-            'ipaddr': str(get_ip(ipaddr)),
+            'ipaddr': str(parsed_ip),
             'external_port': port(external_port, allow_range=True),
             'internal_port': port(internal_port, allow_range=False),
             'protocol': protocol,
@@ -820,8 +832,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         The router matches the row by the ``old`` payload, so both the
         previous and the new row contents are sent (same wire format the
-        web UI uses). Raises ClientException when no rule with ``name``
-        exists.
+        web UI uses). Extra firmware fields on the loaded row are preserved
+        in ``old``/``new`` (same approach as ``set_vpn_client_server``).
+        Raises ClientException when no rule with ``name`` exists.
         """
         raw = self.request(self._url_ipv4_port_forwards, 'operation=load')
         items = self._as_port_forward_list(raw)
@@ -839,16 +852,20 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             internal_port if internal_port is not None else target['internal_port'],
             ipaddr if ipaddr is not None else target['ipaddr'],
             protocol if protocol is not None else target['protocol'])
-        enable = enable if enable is not None else self._str2bool(target.get('enable'))
-        merged['enable'] = 'on' if enable else 'off'
+        old = dict(target)
+        new = {**target, **merged}
+        if enable is not None:
+            new['enable'] = 'on' if enable else 'off'
+        elif 'enable' in target:
+            new['enable'] = target['enable']
+        else:
+            new['enable'] = 'on'
 
-        old = {field: target.get(field) for field in ('name', 'ipaddr', 'external_port',
-                                                      'internal_port', 'protocol', 'enable')}
         path = self._url_ipv4_port_forwards.split('&operation=')[0]
         self.request(path, urlencode({
             'operation': 'update',
             'key': name,
-            'new': dumps(merged),
+            'new': dumps(new),
             'old': dumps(old),
         }))
 
@@ -1018,7 +1035,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     @staticmethod
     def _str2bool(v) -> bool | None:
-        return str(v).lower() in ("yes", "true", "on") if v is not None else None
+        return str(v).lower() in ("yes", "true", "on", "1") if v is not None else None
 
     @staticmethod
     def _map_wire_type(data: str | None, host: bool = True) -> Connection:
@@ -1085,6 +1102,7 @@ class TplinkRouter(TplinkEncryption, TplinkRouterJson):
         self._url_firmware = 'admin/firmware?form=upgrade'
         self._url_ipv4_reservations = 'admin/dhcps?form=reservation'
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
+        self._url_ipv4_port_forwards = 'admin/nat?form=vs'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator'
         self._url_openvpn = 'admin/openvpn?form=config'
         self._url_pptpd = 'admin/pptpd?form=config'

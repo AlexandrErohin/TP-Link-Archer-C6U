@@ -474,7 +474,11 @@ class TestTplinkRouterSGVpnClientStatus(TestCase):
 
 
 class TestTplinkRouterSGSession(TestCase):
-    """Session lifecycle and failure-path tests for TplinkRouterSG."""
+    """Session lifecycle / failure-path coverage for TplinkRouterSG.
+
+    Not specific to port-forwarding; kept alongside the SG client tests that
+    inherit the C6U CRUD suite via TestTPLinkClientSG.
+    """
 
     def test_request_before_authorize_raises(self) -> None:
         client = TplinkRouterSG('http://192.168.0.1', 'testpassword')

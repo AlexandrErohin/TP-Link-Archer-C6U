@@ -145,7 +145,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
 | get_ipv4_port_forwards |   | Gets IPv4 port forwarding (virtual server) rules (Archer / LuCI clients) | [[IPv4PortForward]](#IPv4PortForward) |
 | add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
-| update_ipv4_port_forward | name: str, new_name: str = None, external_port = None, internal_port = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
+| update_ipv4_port_forward | name: str, new_name: str = None, external_port: str \| int = None, internal_port: str \| int = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
 | delete_ipv4_port_forward | name: str | Deletes an IPv4 port forwarding rule by name (Archer / LuCI clients) |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
