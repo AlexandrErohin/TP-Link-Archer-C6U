@@ -727,6 +727,20 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             'index': target_idx,
         }))
 
+    @classmethod
+    def _as_port_forward_list(cls, data) -> list:
+        """Normalize port-forward load payloads across router firmware.
+
+        AX23 v2 sends a bare list; other firmware uses {"data": [...]} or
+        {"list": [...]}. Leave invalid non-empty objects to _as_list so they
+        still raise ClientError rather than silently hiding malformed data.
+        """
+        if isinstance(data, dict):
+            for key in ('data', 'list'):
+                if isinstance(data.get(key), list):
+                    return cls._as_list(data, key, 'IPv4 port forward')
+        return cls._as_list(data, 'data', 'IPv4 port forward')
+
     def get_ipv4_port_forwards(self) -> [IPv4PortForward]:
         """Get the IPv4 virtual-server (port forwarding) rules.
 
@@ -738,7 +752,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         ipv4_port_forwards = []
         data = self.request(self._url_ipv4_port_forwards, 'operation=load')
 
-        for item in self._as_list(data, 'data', 'IPv4 port forward'):
+        for item in self._as_port_forward_list(data):
             ipv4_port_forwards.append(
                 IPv4PortForward(item['name'], get_ip(item['ipaddr']),
                                 str(item['external_port']), str(item['internal_port']),
@@ -766,6 +780,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for part in parts:
                 if not part.isdigit() or not 1 <= int(part) <= 65535:
                     raise ClientException('Invalid port: {}'.format(v))
+            if len(parts) == 2 and int(parts[0]) > int(parts[1]):
+                raise ClientException('Invalid descending port range: {}'.format(v))
             return text
 
         protocol = str(protocol).upper()
@@ -808,7 +824,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         exists.
         """
         raw = self.request(self._url_ipv4_port_forwards, 'operation=load')
-        items = self._as_list(raw, 'data', 'IPv4 port forward')
+        items = self._as_port_forward_list(raw)
         target = None
         for item in items:
             if item.get('name') == name:
@@ -845,7 +861,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         the router the first match is removed.
         """
         raw = self.request(self._url_ipv4_port_forwards, 'operation=load')
-        items = self._as_list(raw, 'data', 'IPv4 port forward')
+        items = self._as_port_forward_list(raw)
         target_idx = None
         for i, item in enumerate(items):
             if item.get('name') == name:
