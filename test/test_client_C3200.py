@@ -1,8 +1,10 @@
 from ipaddress import IPv4Address
 from typing import List
 from unittest import main, TestCase
+from unittest.mock import patch, Mock
 
 from macaddress import EUI48
+from requests.exceptions import SSLError
 
 from tplinkrouterc6u import (
     TplinkC3200Router,
@@ -15,6 +17,22 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkC3200Router(TestCase):
+
+    @patch('tplinkrouterc6u.client.c3200.requests.get')
+    def test_supports_request_error(self, mock_get: Mock) -> None:
+        # A self-signed certificate must not break the provider's detection loop
+        mock_get.side_effect = SSLError('certificate verify failed')
+        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False)
+
+        self.assertFalse(client.supports())
+
+    @patch('tplinkrouterc6u.client.c3200.requests.get')
+    def test_supports_verify_ssl(self, mock_get: Mock) -> None:
+        mock_get.return_value = Mock(status_code=200, text='<title>Archer C3200</title>')
+        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False)
+
+        self.assertTrue(client.supports())
+        mock_get.assert_called_once_with('https://192.168.1.1', timeout=5, verify=False)
 
     # Testing the merge_response method
     def test_merge_response(self) -> None:
