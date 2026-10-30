@@ -21,7 +21,7 @@ from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 class TplinkRE813XERouter(AbstractRouter):
     """
-    TP-Link LuCI Wi-Fi extenders/APs in access-point mode (RE813XE, RE700X, …).
+    TP-Link LuCI Wi-Fi extenders/APs in access-point mode (RE813XE, RE700X, RE505X, …).
 
     ``supports()`` does not key off the marketing model name. It detects this
     firmware family by capability: login succeeds (plaintext is RSA-encrypted
@@ -199,10 +199,11 @@ class TplinkRE813XERouter(AbstractRouter):
             raise ClientException(error) from e
 
     def authorize(self) -> None:
-        password = self._get_encrypted_password()
-
+        # supports() keeps the session; skip re-login to avoid "user conflict".
         if self._logged and self._stok:
             return
+
+        password = self._get_encrypted_password()
 
         response = post(
             '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host),
@@ -515,8 +516,3 @@ class TplinkRE813XERouter(AbstractRouter):
         if lan_ipv4.get('lan_netmask'):
             ipv4_status._lan_ipv4_netmask = get_ip(lan_ipv4['lan_netmask'])
         return ipv4_status
-
-
-# Aliases for callers / docs that follow model naming from #95, #234.
-TplinkRe700XRouter = TplinkRE813XERouter
-TplinkRE505XRouter = TplinkRE813XERouter

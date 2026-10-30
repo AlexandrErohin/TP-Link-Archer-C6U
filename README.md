@@ -51,9 +51,7 @@ from tplinkrouterc6u import (
     TPLinkC50Client,
     TPLinkWR841NClient,
     TplinkRE330Router,
-    TplinkRE505XRouter,
     TplinkRE813XERouter,
-    TplinkRe700XRouter,  # alias of TplinkRE813XERouter
     TplinkC3200Router,
     Connection
 )

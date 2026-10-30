@@ -5,6 +5,15 @@
 ### Added
 
 - **MR / VR / EX:** `get_dsl_status()` returns DSL sync rates, SNR margin, attenuation and uptime as `DSLStatus` (`WAN_DSL_INTF_CFG` via GL; empty when no active DSL line). EX path is inherited but not hardware-verified ([#246](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/246), [#73](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/73)).
+- **RE505X:** RE505X v1.0 listed as supported via `TplinkRE813XERouter` ([#247](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/247)).
+
+### Changed
+
+- **RE813XE / RE700X / RE505X:** removed public aliases `TplinkRe700XRouter` and `TplinkRE505XRouter`; use `TplinkRE813XERouter`.
+
+### Fixed
+
+- **RE813XE / RE700X / RE505X:** `set_wifi()` includes `psk_cipher` in the enable payload (firmware Lua crash without it); `authorize()` is idempotent when a session from `supports()` is already active; `_str2bool` treats `"1"` as true ([#247](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/247)).
 
 ## [5.37.0] - 2026-10-17
 

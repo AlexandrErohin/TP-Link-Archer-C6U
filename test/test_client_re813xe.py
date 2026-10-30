@@ -104,6 +104,13 @@ class TestTplinkRE813XERouter(TestCase):
             client._get_encrypted_password()
         self.assertIn('RSA public key', str(ctx.exception))
 
+    def test_str2bool_accepts_numeric_one(self) -> None:
+        self.assertTrue(TplinkRE813XERouter._str2bool('1'))
+        self.assertTrue(TplinkRE813XERouter._str2bool(1))
+        self.assertFalse(TplinkRE813XERouter._str2bool('0'))
+        self.assertFalse(TplinkRE813XERouter._str2bool('off'))
+        self.assertIsNone(TplinkRE813XERouter._str2bool(None))
+
     @patch('tplinkrouterc6u.client.re813xe.post')
     def test_authorize_sets_tokens(self, mock_post) -> None:
         response = Mock()
@@ -120,6 +127,16 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(client._sysauth, 'cookie-value')
         mock_post.assert_called_once()
         self.assertIn('password=' + 'x' * 200, mock_post.call_args.kwargs['data'])
+
+    @patch('tplinkrouterc6u.client.re813xe.post')
+    def test_authorize_skips_login_when_already_logged_in(self, mock_post) -> None:
+        client = self._client()
+        client._get_encrypted_password = Mock(  # type: ignore[method-assign]
+            side_effect=AssertionError('must not encrypt when session is active'))
+        client.authorize()
+        mock_post.assert_not_called()
+        self.assertTrue(client._logged)
+        self.assertEqual(client._stok, 'stok-token')
 
     @patch('tplinkrouterc6u.client.re813xe.EncryptionWrapper.rsa_encrypt', return_value='cipherhex')
     @patch('tplinkrouterc6u.client.re813xe.post')
@@ -455,6 +472,7 @@ class TestTplinkRE813XERouter(TestCase):
                     'hidden': 'off',
                     'encryption': 'psk2',
                     'psk_version': 'rsn',
+                    'psk_cipher': 'aes',
                     'psk_key': 'secret',
                     'hwmode': '11ax',
                     'htmode': 'HE20',
@@ -478,6 +496,7 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(params['enable'], ['on'])
         self.assertEqual(params['disabled_all'], ['off'])
         self.assertEqual(params['ssid'], ['RE813XE'])
+        self.assertEqual(params['psk_cipher'], ['aes'])
         self.assertEqual(params['txpower'], ['high'])
 
     def test_set_wifi_with_psk_cipher(self) -> None:
@@ -619,11 +638,6 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertFalse(wifi.hidden)
         self.assertEqual(wifi.psk_key, 'secret')
         self.assertEqual(wifi.encryption, 'wpa2/wpa3')
-
-    def test_re700x_alias(self) -> None:
-        from tplinkrouterc6u import TplinkRe700XRouter, TplinkRE505XRouter
-        self.assertIs(TplinkRe700XRouter, TplinkRE813XERouter)
-        self.assertIs(TplinkRE505XRouter, TplinkRE813XERouter)
 
     def test_get_wifi(self) -> None:
         client = self._client()
