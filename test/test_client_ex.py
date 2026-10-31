@@ -631,6 +631,92 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result.lan_ipv4_dhcp_enable, True)
         self.assertEqual(result.remote, None)
 
+    # XGB834v (TIM Hub Ultra): USB, IPTV and Internet WAN connections, the IPTV one listed last
+    MULTI_WAN = ('{"data":[{"enable":"1","MACAddr":"","connIPv4Address":"0.0.0.0","connIPv4Gateway":"0.0.0.0",'
+                 '"name":"usb_ppp3g","connIPv4SubnetMask":"0.0.0.0","connIPv4DnsServer":"",'
+                 '"serviceType":"Unknown","connStatusV4":"Disconnected","X_TP_Uptime":"0","stack":"1,0,0,0,0,0"},'
+                 '{"enable":"0","MACAddr":"02-00-00-00-00-03","connIPv4Address":"0.0.0.0",'
+                 '"connIPv4Gateway":"0.0.0.0","name":"pppoe_835_0","connIPv4SubnetMask":"0.0.0.0",'
+                 '"connIPv4DnsServer":"","serviceType":"Internet,TR069","connStatusV4":"Disconnected",'
+                 '"X_TP_Uptime":"0","stack":"3,0,0,0,0,0"},'
+                 '{"enable":"1","MACAddr":"02-00-00-00-00-05","connIPv4Address":"203.0.113.155",'
+                 '"connIPv4Gateway":"192.168.100.1","name":"pppoe_gpon_835_2","connIPv4SubnetMask":"255.255.255.255",'
+                 '"connIPv4DnsServer":"198.51.100.1,198.51.100.2","serviceType":"Internet,TR069",'
+                 '"connStatusV4":"Connected","X_TP_Uptime":"2228311","stack":"5,0,0,0,0,0"},'
+                 '{"enable":"1","MACAddr":"02-00-00-00-00-06","connIPv4Address":"10.10.10.2",'
+                 '"connIPv4Gateway":"10.10.10.1","name":"ipoe_gpon_836_3_s","connIPv4SubnetMask":"255.255.255.0",'
+                 '"connIPv4DnsServer":"","serviceType":"IPTV","connStatusV4":"Connected","X_TP_Uptime":"2228315",'
+                 '"stack":"6,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_ADT_WAN","success":true}')
+
+    def test_get_status_multi_wan(self) -> None:
+
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.1.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = self.MULTI_WAN
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"}],'
+                                '"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = '{"data":[],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
+        DEV2_MEM_STATUS = ('{"data":{"total":"192780","free":"78400","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"47","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                elif 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                elif 'DEV2_MEM_STATUS' in data_str:
+                    return 200, DEV2_MEM_STATUS
+                elif 'DEV2_PROC_STATUS' in data_str:
+                    return 200, DEV2_PROC_STATUS
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertIsInstance(status, Status)
+        self.assertEqual(status.wan_macaddr, '02-00-00-00-00-05')
+        self.assertEqual(status.wan_ipv4_addr, '203.0.113.155')
+        self.assertEqual(status.wan_ipv4_gateway, '192.168.100.1')
+        self.assertEqual(status.wan_ipv4_uptime, 2228311)
+
+    def test_get_ipv4_status_multi_wan(self) -> None:
+
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.1.1",'
+                        '"IPSubnetMask":"255.255.255.0","DHCPv4Enable":"1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = self.MULTI_WAN
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertIsInstance(result, IPv4Status)
+        self.assertEqual(result.wan_macaddr, '02-00-00-00-00-05')
+        self.assertEqual(result.wan_ipv4_ipaddr, '203.0.113.155')
+        self.assertEqual(result.wan_ipv4_gateway, '192.168.100.1')
+        self.assertEqual(result.wan_ipv4_conntype, 'pppoe_gpon_835_2')
+        self.assertEqual(result.wan_ipv4_netmask, '255.255.255.255')
+        self.assertEqual(result.wan_ipv4_pridns, '198.51.100.1')
+        self.assertEqual(result.wan_ipv4_snddns, '198.51.100.2')
+
     def test_set_wifi(self) -> None:
         response = '{"success":true, "errorcode":0}'
 
