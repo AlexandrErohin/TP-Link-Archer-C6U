@@ -389,6 +389,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return firmware
 
+    def _status_conn_type(self, data: dict) -> str | None:
+        return data.get('conn_type')
+
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
 
@@ -404,18 +407,20 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status.lan_ipv4_dhcp_enable = self._str2bool(data.get('lan_ipv4_dhcp_enable'))
         status.mem_usage = data.get('mem_usage')
         status.cpu_usage = data.get('cpu_usage')
-        status.conn_type = data.get('conn_type')
+        status.conn_type = self._status_conn_type(data)
         status.wired_total = len(data.get('access_devices_wired', []))
         status.wifi_clients_total = len(data.get('access_devices_wireless_host', []))
         status.guest_clients_total = len(data.get('access_devices_wireless_guest', []))
         status.guest_2g_enable = self._str2bool(data.get('guest_2g_enable'))
         status.guest_5g_enable = self._str2bool(data.get('guest_5g_enable'))
+        status.guest_5g_2_enable = self._str2bool(data.get('guest_5g_2_enable'))
         status.guest_6g_enable = self._str2bool(data.get('guest_6g_enable'))
         status.iot_2g_enable = self._str2bool(data.get('iot_2g_enable'))
         status.iot_5g_enable = self._str2bool(data.get('iot_5g_enable'))
         status.iot_6g_enable = self._str2bool(data.get('iot_6g_enable'))
         status.wifi_2g_enable = self._str2bool(data.get('wireless_2g_enable'))
         status.wifi_5g_enable = self._str2bool(data.get('wireless_5g_enable'))
+        status.wifi_5g_2_enable = self._str2bool(data.get('wireless_5g_2_enable'))
         status.wifi_6g_enable = self._str2bool(data.get('wireless_6g_enable'))
         status.wifi_mlo_2g_enable = self._str2bool(data.get('mlo_host_2g_enable'))
         status.wifi_mlo_5g_enable = self._str2bool(data.get('mlo_host_5g_enable'))

@@ -70,12 +70,14 @@ class Status:
     clients_total: int = 0
     guest_2g_enable: bool | None = None
     guest_5g_enable: bool | None = None
+    guest_5g_2_enable: bool | None = None
     guest_6g_enable: bool | None = None
     iot_2g_enable: bool | None = None
     iot_5g_enable: bool | None = None
     iot_6g_enable: bool | None = None
     wifi_2g_enable: bool | None = None
     wifi_5g_enable: bool | None = None
+    wifi_5g_2_enable: bool | None = None
     wifi_6g_enable: bool | None = None
     wifi_mlo_2g_enable: bool | None = None
     wifi_mlo_5g_enable: bool | None = None
@@ -84,6 +86,8 @@ class Status:
     mem_usage: float | None = None
     cpu_usage: float | None = None
     conn_type: str | None = None
+    clients_down_speed: int | None = None
+    clients_up_speed: int | None = None
     devices: list[Device] = field(default_factory=list)
 
     @property
@@ -584,3 +588,228 @@ class PortStatus:
     tx_bad_packets: int | None = None
     rx_good_packets: int | None = None
     rx_bad_packets: int | None = None
+
+
+@dataclass
+class PortModes:
+    wan_aggregation: bool | None = None
+    link_aggregation: bool | None = None
+    iptv: bool | None = None
+
+
+@dataclass
+class UsbStorage:
+    disks: int | None = None
+    # Bytes, summed over the volumes of every disk (None when no size could be read)
+    capacity: int | None = None
+    used: int | None = None
+    free: int | None = None
+
+
+@dataclass
+class UsbSharing:
+    samba: bool | None = None
+    ftp: bool | None = None
+    ftp_internet: bool | None = None
+    media_sharing: bool | None = None
+    time_machine: bool | None = None
+
+
+@dataclass
+class VpnServerSettings:
+    openvpn_enabled: bool | None = None
+    openvpn_protocol: str | None = None
+    openvpn_port: int | None = None
+    openvpn_access: str | None = None
+    pptp_enabled: bool | None = None
+    pptp_unencrypted_access: bool | None = None
+    pptp_samba_access: bool | None = None
+
+
+@dataclass
+class ClientsPerBand:
+    wired: int | None = None
+    wifi_2g: int | None = None
+    wifi_5g: int | None = None
+    wifi_5g_2: int | None = None
+
+
+@dataclass
+class DailyTraffic:
+    # Bytes per day, newest first: index 0 is today
+    downloads: list[int | None] = field(default_factory=list)
+    uploads: list[int | None] = field(default_factory=list)
+
+    @property
+    def download_today(self) -> int | None:
+        return self.downloads[0] if self.downloads else None
+
+    @property
+    def upload_today(self) -> int | None:
+        return self.uploads[0] if self.uploads else None
+
+
+@dataclass
+class WifiNetwork:
+    """One WiFi network as its settings page reads it, without the password.
+
+    Guest networks only fill enable, ssid, hidden and encryption: the radio fields belong to the main network of
+    each band.
+    """
+    enable: bool | None = None
+    ssid: str | None = None
+    hidden: bool | None = None
+    encryption: str | None = None
+    channel: str | None = None
+    current_channel: int | None = None
+    hwmode: str | None = None
+    htmode: str | None = None
+    txpower: str | None = None
+    airtime_fairness: bool | None = None
+    mu_mimo: bool | None = None
+
+
+@dataclass
+class WifiOffPeriod:
+    # Whole hours, 0-24; end may be before start (overnight, e.g. 23 -> 7)
+    start: int
+    end: int
+    # Router day names (sun, mon, tue, wed, thu, fri, sat); empty = every day
+    days: list[str] = field(default_factory=list)
+
+
+@dataclass
+class WifiSchedule:
+    enable: bool | None = None
+    off_periods: int | None = None
+    off_now_2g: bool | None = None
+    off_now_5g: bool | None = None
+    off_now_5g_2: bool | None = None
+    # The off periods themselves, in the router's order (None when the router gave no list)
+    periods: list[WifiOffPeriod] | None = None
+
+
+@dataclass
+class GuestNetworkAccess:
+    each_other: bool | None = None
+    local_network: bool | None = None
+
+
+@dataclass
+class WanSpeed:
+    # Live internet port rate, bytes per second (assumed: the web page shows value / 1024 as KB/s)
+    download: int | None = None
+    upload: int | None = None
+    time: datetime | None = None
+
+
+@dataclass
+class SpeedTest:
+    # The router's own speed test; Mbit/s like the web page (the router reports Mbit/s x 1024)
+    status: str | None = None
+    download: float | None = None
+    upload: float | None = None
+    time: datetime | None = None
+
+
+@dataclass
+class WanPortSpeed:
+    value: str | None = None
+    speed: int | None = None
+    duplex: str | None = None
+    auto_negotiation: bool | None = None
+    supported: list[str] = field(default_factory=list)
+
+
+@dataclass
+class QoSSettings:
+    enabled: bool | None = None
+    mode: str | None = None
+    bandwidth_mode: str | None = None
+    download_bandwidth: float | None = None
+    upload_bandwidth: float | None = None
+
+
+@dataclass
+class SecuritySettings:
+    remote_management: bool | None = None
+    remote_management_any_address: bool | None = None
+    remote_management_http_port: int | None = None
+    remote_management_https_port: int | None = None
+    local_https: bool | None = None
+    dmz: bool | None = None
+    dmz_host: str | None = None
+    upnp: bool | None = None
+    upnp_mappings: int | None = None
+    upnp_mappings_by_protocol: dict[str, int] | None = None
+    port_forwards: int | None = None
+    port_forwards_enabled: int | None = None
+    spi_firewall: bool | None = None
+    ping_from_wan: bool | None = None
+    ping_from_lan: bool | None = None
+    access_control: bool | None = None
+    access_control_mode: str | None = None
+    access_control_blocked: int | None = None
+
+
+@dataclass
+class HomeCareStatus:
+    malicious_content_filter: bool | None = None
+    intrusion_prevention: bool | None = None
+    infected_device_quarantine: bool | None = None
+    protected_days: int | None = None
+    database_checked: datetime | None = None
+    database_updating: bool | None = None
+    rules_version: int | None = None
+
+
+@dataclass
+class BlockedThreats:
+    events: int = 0
+    hits: int = 0
+    by_type: dict[str, int] = field(default_factory=dict)
+    last_time: datetime | None = None
+    last_type: str | None = None
+    last_category_id: int | None = None
+
+
+@dataclass
+class IpMacBinding:
+    enable: bool | None = None
+    arp_entries: int | None = None
+    bindings: int | None = None
+
+
+@dataclass
+class FirmwareUpdate:
+    installed_version: str | None = None
+    latest_version: str | None = None
+    update_available: bool | None = None
+    release_notes: str | None = None
+
+
+@dataclass
+class RebootSchedule:
+    enable: bool | None = None
+    time: str | None = None
+    cycle: str | None = None
+    day: str | None = None
+
+
+@dataclass
+class RouterTime:
+    time: datetime | None = None
+    read_at: datetime | None = None
+    automatic: bool | None = None
+    timezone: str | None = None
+    ntp_servers: list[str] = field(default_factory=list)
+    dst_enable: bool | None = None
+    dst_active: bool | None = None
+    dst_start: str | None = None
+    dst_end: str | None = None
+
+
+@dataclass
+class SystemLog:
+    entries: int | None = None
+    levels: dict[str, int] = field(default_factory=dict)

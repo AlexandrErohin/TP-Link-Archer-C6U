@@ -4,6 +4,7 @@ from enum import Enum
 class Connection(Enum):
     HOST_2G = 'host_2g'
     HOST_5G = 'host_5g'
+    HOST_5G_2 = 'host_5g_2'
     HOST_6G = 'host_6g'
     # MLO: clients appear as HOST_MLO; HOST_MLO_{2,5,6}G are set_wifi switches only.
     HOST_MLO = 'host_mlo'
@@ -12,6 +13,7 @@ class Connection(Enum):
     HOST_MLO_6G = 'host_mlo_6g'
     GUEST_2G = 'guest_2g'
     GUEST_5G = 'guest_5g'
+    GUEST_5G_2 = 'guest_5g_2'
     GUEST_6G = 'guest_6g'
     IOT_2G = 'iot_2g'
     IOT_5G = 'iot_5g'
@@ -20,10 +22,11 @@ class Connection(Enum):
     UNKNOWN = 'unknown'
 
     def is_host_wifi(self) -> bool:
-        return self in [Connection.HOST_2G, Connection.HOST_5G, Connection.HOST_6G, Connection.HOST_MLO]
+        return self in [Connection.HOST_2G, Connection.HOST_5G, Connection.HOST_5G_2, Connection.HOST_6G,
+                        Connection.HOST_MLO]
 
     def is_guest_wifi(self) -> bool:
-        return self in [Connection.GUEST_2G, Connection.GUEST_5G, Connection.GUEST_6G]
+        return self in [Connection.GUEST_2G, Connection.GUEST_5G, Connection.GUEST_5G_2, Connection.GUEST_6G]
 
     def is_iot(self) -> bool:
         return self in [Connection.IOT_2G, Connection.IOT_5G, Connection.IOT_6G]
@@ -36,7 +39,8 @@ class Connection(Enum):
         band = None
         if self in [Connection.HOST_2G, Connection.GUEST_2G, Connection.IOT_2G, Connection.HOST_MLO_2G]:
             band = '2G'
-        elif self in [Connection.HOST_5G, Connection.GUEST_5G, Connection.IOT_5G, Connection.HOST_MLO_5G]:
+        elif self in [Connection.HOST_5G, Connection.HOST_5G_2, Connection.GUEST_5G, Connection.GUEST_5G_2,
+                      Connection.IOT_5G, Connection.HOST_MLO_5G]:
             band = '5G'
         elif self in [Connection.HOST_6G, Connection.GUEST_6G, Connection.IOT_6G, Connection.HOST_MLO_6G]:
             band = '6G'

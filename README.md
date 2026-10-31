@@ -150,6 +150,40 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
+| get_port_modes |   | Whether WAN aggregation, link aggregation and IPTV are on (Archer C5400X) | [PortModes](#port_modes) |
+| nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
+| get_clients_per_band |   | Clients per band, main and guest networks together (Archer C5400X). Counted from the last `get_status()` without a request of its own (it calls `get_status()` only if there was none yet) | [ClientsPerBand](#clients_per_band) |
+| get_daily_traffic |   | Bytes downloaded and uploaded per day by every client together, as the Traffic Monitor chart shows them (Archer C5400X; answers also while the monitor is off). Includes traffic between local clients | [DailyTraffic](#daily_traffic) |
+| get_wan_speed |   | Live internet rate from the Network Map, bytes/s (Archer C5400X) | [WanSpeed](#wan_speed) |
+| get_speed_test |   | Result of the router's own speed test, Mbit/s (Archer C5400X) | [SpeedTest](#speed_test) |
+| start_speed_test |   | Starts the router's own speed test (Archer C5400X). It runs for a while: call get_speed_test until its status is idle or fail, without logging out in between (like the web page) |   |
+| get_wan_port_speed |   | Internet port Speed & Duplex value (`auto`, `1000F`, …) and the choices the router offers (Archer C5400X) | [WanPortSpeed](#wan_port_speed) |
+| get_qos |   | Whether QoS is on and the total bandwidth it shares out, Mbit/s (Archer C5400X) | [QoSSettings](#qos_settings) |
+| get_firmware_update |   | Installed firmware and, from TP-Link's cloud as the web UI shows it, the newest version and whether it is newer (Archer C5400X). Read only: it never starts the upgrade. The cloud part is None without internet or a TP-Link ID | [FirmwareUpdate](#firmware_update) |
+| get_reboot_schedule |   | The scheduled reboot: on/off, time, every day / week / month and which day (Archer C5400X) | [RebootSchedule](#reboot_schedule) |
+| set_reboot_schedule | enable: bool, time: str = None, cycle: str = None, day: str = None | Turn the scheduled reboot on or off (Archer C5400X); what is not given keeps its current value. The router applies it only when its time comes from the internet |   |
+| get_router_time |   | The router clock, its time zone, NTP servers and daylight saving time (Archer C5400X) | [RouterTime](#router_time) |
+| get_system_log |   | How many entries the system log has, per level; never their content, which names clients (Archer C5400X). The list follows the filter chosen on the System Log page | [SystemLog](#system_log) |
+| traffic_monitor_status |   | Is the Traffic Monitor on (Archer C5400X) | bool, None |
+| set_traffic_monitor | enable: bool | Turn the Traffic Monitor on or off (Archer C5400X) |   |
+| smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
+| set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
+| get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
+| get_usb_sharing |   | Whether Samba, FTP, FTP via internet, Media Sharing and Time Machine are on (Archer C5400X) | [UsbSharing](#usb_sharing) |
+| print_server_status |   | Is the USB print server on (Archer C5400X; read format taken from the web page, not yet checked) | bool, None |
+| get_vpn_server_settings |   | OpenVPN and PPTP server settings without certificates or accounts (Archer C5400X) | [VpnServerSettings](#vpn_server_settings) |
+| get_wifi_networks |   | Every WiFi network by form name (`wireless_2g`, `wireless_5g`, `wireless_5g_2`, `guest_2g`, `guest_5g`, `guest_5g_2`), without passwords; networks the router does not have are left out (Archer C5400X) | dict[str, [WifiNetwork](#wifi_network)] |
+| wifi_schedule_status |   | Wireless Off Time Schedule: on or off, number of off periods and which bands it has off right now (Archer C5400X) | [WifiSchedule](#wifi_schedule) |
+| set_wifi_schedule | enable: bool | Turn the Wireless Off Time Schedule on or off, keeping its off periods (Archer C5400X) |   |
+| set_wifi_off_periods | periods: list[[WifiOffPeriod](#wifi_off_period)] | Replace the Wireless Off Time Schedule's off periods (whole hours; does not turn the schedule on or off) (Archer C5400X) |   |
+| set_wifi_off_period | start: int, end: int, days: list[str] | Change the first off period, keeping the others; arguments left out keep their value; with no period yet, one starts at 23 -> 7 every day (Archer C5400X) |   |
+| remove_wifi_off_period |   | Remove the first off period, keeping the others (Archer C5400X) |   |
+| wps_status |   | Is WPS on (Archer C5400X) | bool, None |
+| guest_network_access |   | Whether guests may access each other and the local network (Archer C5400X) | [GuestNetworkAccess](#guest_network_access) |
+| get_security_settings |   | Remote management, local HTTPS, DMZ, UPnP and its port mappings, port forwards, SPI firewall, ping from WAN/LAN and access control (Archer C5400X). Read only; counts, no client names or MACs. Fields of a page the firmware lacks are None | [SecuritySettings](#security_settings) |
+| get_homecare_status |   | HomeCare antivirus: its three protections, days protected and its database (Archer C5400X) | [HomeCareStatus](#homecare_status) |
+| get_blocked_threats |   | How many threats HomeCare blocked, by kind, and the newest one's time, kind and category; never the client, owner, site or attacker (Archer C5400X) | [BlockedThreats](#blocked_threats) |
+| get_ip_mac_binding |   | Whether IP & MAC Binding is on and how many ARP entries and bindings there are (Archer C5400X) | [IpMacBinding](#ip_mac_binding) |
 | reboot |   | reboot router |
 | pppoe_connect |   | Connect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
 | pppoe_disconnect |   | Disconnect PPPoE WAN (XDR/R series only; WAN must be configured for PPPoE) |   |
@@ -172,7 +206,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR; also inherited by EX/VR1200v, EX DSL path untested on hardware; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
-| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E only; call `authorize()` first) | [[PortStatus]](#port_status) |
+| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 | [[PortStatus]](#port_status) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -206,12 +240,14 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | iot_clients_total | Total amount of all iot connected clients | int, None |
 | guest_2g_enable | Is guest wifi 2.4G enabled | bool, None |
 | guest_5g_enable | Is guest wifi 5G enabled | bool, None |
+| guest_5g_2_enable | Is guest wifi on the second 5G band enabled (tri-band) | bool, None |
 | guest_6g_enable | Is guest wifi 6G enabled | bool, None |
 | iot_2g_enable | Is IoT wifi 2.4G enabled | bool, None |
 | iot_5g_enable | Is IoT wifi 5G enabled | bool, None |
 | iot_6g_enable | Is IoT wifi 6G enabled | bool, None |
 | wifi_2g_enable | Is host wifi 2.4G enabled | bool, None |
 | wifi_5g_enable | Is host wifi 5G enabled | bool, None |
+| wifi_5g_2_enable | Is host wifi on the second 5G band enabled (tri-band) | bool, None |
 | wifi_6g_enable | Is host wifi 6G enabled | bool, None |
 | wifi_mlo_2g_enable | Is MLO enabled on 2.4G (EX / C6U-SG when `mlo_host_2g_enable` is present) | bool, None |
 | wifi_mlo_5g_enable | Is MLO enabled on 5G (EX / C6U-SG when `mlo_host_5g_enable` is present) | bool, None |
@@ -220,6 +256,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
 | conn_type | Connection type | str, None |
+| clients_down_speed | What all clients receive, bytes/s (Archer C5400X, Traffic Monitor list). It includes traffic between local clients, so it is not exactly the internet speed | int, None |
+| clients_up_speed | What all clients send, bytes/s, counted the same way as clients_down_speed | int, None |
 | devices | List of all connected devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
@@ -233,8 +271,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | hostname | client hostname | str |
 | packets_sent | total packets sent | int, None |
 | packets_received | total packets received | int, None |
-| down_speed | download speed | int, None |
-| up_speed | upload speed | int, None |
+| down_speed | download speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
+| up_speed | upload speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
 | tx_rate | transmit rate (Mbps) | int, None |
 | rx_rate | receive rate (Mbps) | int, None |
 | online_time | client online time (seconds) | float, None |
@@ -476,7 +514,7 @@ Not all fields are filled by every client:
 ### <a id="port_status">PortStatus</a>
 | Field | Description | Type |
 | --- |---|---|
-| port | Physical port number (1-based) | int |
+| port | Physical port number (1-based; 0 is the Internet port on the Archer C5400X) | int |
 | enabled | Port administratively enabled | bool, None |
 | link_up | Link is up | bool, None |
 | auto_negotiation | Auto-negotiation configured | bool, None |
@@ -492,10 +530,220 @@ Not all fields are filled by every client:
 | rx_good_packets | Received good packets | int, None |
 | rx_bad_packets | Received bad packets | int, None |
 
+### <a id="port_modes">PortModes</a>
+| Field | Description | Type |
+| --- |---|---|
+| wan_aggregation | A LAN port works as a second WAN port | bool, None |
+| link_aggregation | Two LAN ports are aggregated | bool, None |
+| iptv | IPTV/VLAN port setup is on | bool, None |
+
+### <a id="usb_storage">UsbStorage</a>
+| Field | Description | Type |
+| --- |---|---|
+| disks | USB disks connected | int, None |
+| capacity | Total size of every volume, in bytes (K/M/G/T read as powers of 1000, like the web page) | int, None |
+| used | Used space, in bytes | int, None |
+| free | Free space, in bytes | int, None |
+
+### <a id="usb_sharing">UsbSharing</a>
+| Field | Description | Type |
+| --- |---|---|
+| samba | Samba (Network Neighborhood) sharing is on | bool, None |
+| ftp | FTP server is on | bool, None |
+| ftp_internet | FTP via internet is on | bool, None |
+| media_sharing | Media Sharing (DLNA) is on | bool, None |
+| time_machine | Time Machine backups are on | bool, None |
+
+### <a id="vpn_server_settings">VpnServerSettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| openvpn_enabled | OpenVPN server is on | bool, None |
+| openvpn_protocol | OpenVPN service type (`udp` / `tcp`) | str, None |
+| openvpn_port | OpenVPN service port | int, None |
+| openvpn_access | What OpenVPN clients reach (`home` = home network only, `internet` = internet and home network) | str, None |
+| pptp_enabled | PPTP server is on | bool, None |
+| pptp_unencrypted_access | PPTP allows unencrypted connections | bool, None |
+| pptp_samba_access | PPTP clients may reach Samba (Network Place) | bool, None |
+
+### <a id="clients_per_band">ClientsPerBand</a>
+| Field | Description | Type |
+| --- |---|---|
+| wired | Wired clients | int, None |
+| wifi_2g | Clients on 2.4 GHz (main and guest networks) | int, None |
+| wifi_5g | Clients on 5 GHz (the first 5 GHz band on tri-band routers) | int, None |
+| wifi_5g_2 | Clients on the second 5 GHz band; None on routers without it | int, None |
+
+### <a id="daily_traffic">DailyTraffic</a>
+| Field | Description | Type |
+| --- |---|---|
+| downloads | Bytes downloaded per day, newest first (index 0 = today); up to 7 days | list[int, None] |
+| uploads | Bytes uploaded per day, same order | list[int, None] |
+| download_today | downloads[0] | int, None |
+| upload_today | uploads[0] | int, None |
+
+### <a id="wifi_network">WifiNetwork</a>
+Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is no password field.
+
+| Field | Description | Type |
+| --- |---|---|
+| enable | The network is on | bool, None |
+| ssid | Network name | str, None |
+| hidden | The name is hidden | bool, None |
+| encryption | Security: `psk`, `none`… | str, None |
+| channel | Configured channel: `auto` or a number | str, None |
+| current_channel | Channel in use | int, None |
+| hwmode | Wireless mode, e.g. `bgn`, `anac_5` | str, None |
+| htmode | Channel width, e.g. `auto`, `20`, `40`, `80` | str, None |
+| txpower | Transmit power: `low`, `middle`, `high` | str, None |
+| airtime_fairness | Airtime Fairness is on | bool, None |
+| mu_mimo | MU-MIMO is on | bool, None |
+
+### <a id="wifi_schedule">WifiSchedule</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | The Wireless Off Time Schedule is on | bool, None |
+| off_periods | Number of off periods in the schedule | int, None |
+| off_now_2g | The schedule has the 2.4 GHz band off right now | bool, None |
+| off_now_5g | The schedule has the 5 GHz band off right now | bool, None |
+| off_now_5g_2 | The schedule has the second 5 GHz band off right now | bool, None |
+| periods | The off periods, in the router's order | list[[WifiOffPeriod](#wifi_off_period)], None |
+
+### <a id="wifi_off_period">WifiOffPeriod</a>
+| Field | Description | Type |
+| --- |---|---|
+| start | Hour the WiFi goes off, 0-24 | int |
+| end | Hour it comes back, 0-24; before start means overnight | int |
+| days | Router day names (`sun` .. `sat`); empty = every day | list[str] |
+
+### <a id="guest_network_access">GuestNetworkAccess</a>
+| Field | Description | Type |
+| --- |---|---|
+| each_other | Guests may access each other | bool, None |
+| local_network | Guests may access the local network | bool, None |
+
+### <a id="wan_speed">WanSpeed</a>
+| Field | Description | Type |
+| --- |---|---|
+| download | Internet download rate, bytes/s | int, None |
+| upload | Internet upload rate, bytes/s | int, None |
+| time | When the router took the sample | datetime, None |
+
+### <a id="speed_test">SpeedTest</a>
+| Field | Description | Type |
+| --- |---|---|
+| status | `idle`, `down_test`, `up_test` or `fail` | str, None |
+| download | Download speed, Mbit/s (None while measuring or if it never ran) | float, None |
+| upload | Upload speed, Mbit/s | float, None |
+| time | When the test ran (None if never) | datetime, None |
+
+### <a id="wan_port_speed">WanPortSpeed</a>
+| Field | Description | Type |
+| --- |---|---|
+| value | Value as the router gives it, e.g. `auto`, `1000F`, `100F` | str, None |
+| speed | Speed in Mbps from the value (None for `auto`) | int, None |
+| duplex | `full` / `half` from the value | str, None |
+| auto_negotiation | The value is `auto` | bool, None |
+| supported | Values the router offers | list[str] |
+
+### <a id="qos_settings">QoSSettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| enabled | QoS is on | bool, None |
+| mode | QoS mode, e.g. `custom` | str, None |
+| bandwidth_mode | `auto` (from the last speed test) or manual | str, None |
+| download_bandwidth | Total download bandwidth, Mbit/s | float, None |
+| upload_bandwidth | Total upload bandwidth, Mbit/s | float, None |
+
+### <a id="security_settings">SecuritySettings</a>
+| Field | Description | Type |
+| --- |---|---|
+| remote_management | Remote management (web access from the internet) is on | bool, None |
+| remote_management_any_address | Remote management is allowed from any address (not only a specified one) | bool, None |
+| remote_management_http_port | Remote management HTTP port | int, None |
+| remote_management_https_port | Remote management HTTPS port | int, None |
+| local_https | Local management over HTTPS is on | bool, None |
+| dmz | DMZ is on | bool, None |
+| dmz_host | DMZ host IP address, only while the DMZ is on | str, None |
+| upnp | UPnP is on | bool, None |
+| upnp_mappings | Port mappings opened through UPnP | int, None |
+| upnp_mappings_by_protocol | UPnP port mappings per protocol, e.g. `{'UDP': 3, 'TCP': 1}` | dict, None |
+| port_forwards | Port forwarding (virtual server) rules | int, None |
+| port_forwards_enabled | Port forwarding rules that are on | int, None |
+| spi_firewall | SPI firewall is on | bool, None |
+| ping_from_wan | The router answers pings from the internet | bool, None |
+| ping_from_lan | The router answers pings from the LAN | bool, None |
+| access_control | Access control is on | bool, None |
+| access_control_mode | `blacklist` or `whitelist` | str, None |
+| access_control_blocked | Devices in the access control block list (blacklist mode only) | int, None |
+
+### <a id="homecare_status">HomeCareStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| malicious_content_filter | Malicious content filter is on | bool, None |
+| intrusion_prevention | Intrusion prevention system is on | bool, None |
+| infected_device_quarantine | Infected device quarantine is on | bool, None |
+| protected_days | Days the antivirus has been protecting the network | int, None |
+| database_checked | When the antivirus database was last found up to date (UTC) | datetime, None |
+| database_updating | The antivirus database is updating | bool, None |
+| rules_version | Version of the antivirus rule list | int, None |
+
+### <a id="blocked_threats">BlockedThreats</a>
+| Field | Description | Type |
+| --- |---|---|
+| events | Entries in the blocked threats history | int |
+| hits | Times those threats were blocked | int |
+| by_type | Entries per kind: `block` (malicious site), `prevent` (intrusion), `infected_block` (infected device) | dict |
+| last_time | Time of the newest entry (UTC) | datetime, None |
+| last_type | Kind of the newest entry | str, None |
+| last_category_id | Category id of the newest entry (see `admin/security?form=category`) | int, None |
+
+### <a id="ip_mac_binding">IpMacBinding</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | IP & MAC Binding is on | bool, None |
+| arp_entries | Entries in the ARP list | int, None |
+| bindings | IP & MAC bindings | int, None |
+
+### <a id="firmware_update">FirmwareUpdate</a>
+| Field | Description | Type |
+| --- |---|---|
+| installed_version | Returns like - 1.2.1 Build 20250928 rel.12879(5553) | str, None |
+| latest_version | Newest version TP-Link's cloud has for the router; the installed one when it is up to date | str, None |
+| update_available | The newest version is not the installed one | bool, None |
+| release_notes | What the newest version changes | str, None |
+
+### <a id="reboot_schedule">RebootSchedule</a>
+| Field | Description | Type |
+| --- |---|---|
+| enable | The scheduled reboot is on | bool, None |
+| time | Router time of the reboot, like 03:00 | str, None |
+| cycle | day, week or month | str, None |
+| day | Mon ... Sun when weekly, 1 ... 28 when monthly | str, None |
+
+### <a id="router_time">RouterTime</a>
+| Field | Description | Type |
+| --- |---|---|
+| time | Router clock, in its own time zone (naive) | datetime, None |
+| read_at | This computer's clock (UTC) when the router clock was read, to measure its offset | datetime, None |
+| automatic | The time comes from the NTP servers (not set by hand or from a browser) | bool, None |
+| timezone | Router time zone code, like 20 | str, None |
+| ntp_servers | NTP servers | list[str] |
+| dst_enable | Daylight saving time is on | bool, None |
+| dst_active | Daylight saving time applies now | bool, None |
+| dst_start | When it starts, like 2nd Sun Mar 2am | str, None |
+| dst_end | When it ends, like 1st Sun Nov 2am | str, None |
+
+### <a id="system_log">SystemLog</a>
+| Field | Description | Type |
+| --- |---|---|
+| entries | Entries in the system log | int, None |
+| levels | Entries per level (lower case), like {"info": 140, "warning": 3} | dict[str, int] |
+
 ## Enum
 ### <a id="connection">Connection</a>
 - Connection.HOST_2G - host wifi 2.4G
 - Connection.HOST_5G - host wifi 5G
+- Connection.HOST_5G_2 - host wifi second 5G band (tri-band C5400X `set_wifi` and its clients)
 - Connection.HOST_6G - host wifi 6G
 - Connection.HOST_MLO - host MLO client connection (EX; multi-link)
 - Connection.HOST_MLO_2G - MLO enable switch for 2.4G (EX `set_wifi` only)
@@ -503,6 +751,7 @@ Not all fields are filled by every client:
 - Connection.HOST_MLO_6G - MLO enable switch for 6G (EX `set_wifi` only)
 - Connection.GUEST_2G - guest wifi 2.4G
 - Connection.GUEST_5G - guest wifi 5G
+- Connection.GUEST_5G_2 - guest wifi second 5G band (tri-band C5400X `set_wifi` and its clients)
 - Connection.GUEST_6G - guest wifi 6G
 - Connection.IOT_2G - IoT wifi 2.4G
 - Connection.IOT_5G - IoT wifi 5G
