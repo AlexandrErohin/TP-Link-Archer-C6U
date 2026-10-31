@@ -16,7 +16,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 ## Usage
 - Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
 - EX series (and some password-only UIs such as EX920): use username `user` — `admin` is rejected even when the web UI does not ask for a username
-- Use Local Password which is for Log In with Local Password. Login with TP-LINK ID doesnt work
+- Use Local Password which is for Log In with Local Password. If your router is bound to a TP-Link ID and only offers the TP-Link ID login, see [TP-Link ID Login](#tplink_id)
 - If you use `https` connection - You need to turn on "Local Management via HTTPS" (advanced->system->administration) in the router web UI
 
 ```python
@@ -28,6 +28,7 @@ from tplinkrouterc6u import (
     TplinkRouter,
     TplinkC1200Router,
     TplinkC5400XRouter,
+    TplinkCloudLoginRouter,
     TPLinkMRClient, # Class for MR series routers which supports old firmwares with AES cipher CBC mode
     TPLinkMRClientGCM, # Class for MR series routers which supports AES cipher GCM mode
     TPLinkMR200Client,
@@ -68,6 +69,8 @@ logger = Logger('test')
 # C5400X / RE813XE / RE700X / similar: use web encrypted password (see Web Encrypted Password below)
 # router = TplinkC5400XRouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
+# Router bound to a TP-Link ID: TP-Link ID password and email as username (see TP-Link ID Login below)
+# router = TplinkCloudLoginRouter('http://192.168.0.1', 'TPLinkIDPassword', 'you@example.com', logger=logger)
 
 try:
     # Or: with router:  # authorize on enter, logout on exit
@@ -129,6 +132,13 @@ or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get we
 4. Open the JavaScript console of your browser (usually by pressing F12 and then clicking on "Console").
 5. Type `document.getElementById("login-password").value;`
 6. Copy the returned value as password and use it.
+
+### <a id="tplink_id">TP-Link ID Login</a>
+Some routers can be bound to a TP-Link ID for remote management with the Tether app. Once bound, the login page only asks for the TP-Link ID email and password.
+
+`TplinkCloudLoginRouter` logs in the same way the web page does for that form, so you can use the TP-Link ID credentials directly and keep the router bound:
+- Use your TP-Link ID email as username and your TP-Link ID password as password (plain, not the web encrypted one)
+- `TplinkRouterProvider.get_client` picks it automatically when the username is an email
 
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
