@@ -130,9 +130,10 @@ class TplinkEncryption(TplinkRequest):
 
         if is_valid_json is False or response.status_code == 403:
             self._logged = False
-            self._request_pwd()
-            self._request_seq()
-            response = self._try_login()
+            if getattr(self, '_retry_login_on_403', True):
+                self._request_pwd()
+                self._request_seq()
+                response = self._try_login()
 
         data = response.text
         try:

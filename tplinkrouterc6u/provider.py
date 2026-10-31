@@ -76,6 +76,42 @@ class TplinkRouterProvider:
         raise ClientException(message)
 
     @staticmethod
+    def discover(host: str, verify_ssl: bool = True, timeout: int = 30):
+        """Fingerprint known LuCI families without sending credentials."""
+        from tplinkrouterc6u.discovery import discover_router
+        return discover_router(host, verify_ssl=verify_ssl, timeout=timeout)
+
+    @staticmethod
+    def get_client_safe(host: str, password: str, username: str = 'admin',
+                        logger: Logger = None, verify_ssl: bool = True,
+                        timeout: int = 30) -> AbstractRouter:
+        """Select one client passively, then authorize at most once.
+
+        Unlike get_client(), this never probes multiple passwords or silently
+        falls back to another authentication implementation. Unsupported
+        families must be selected explicitly or use legacy discovery.
+        """
+        from tplinkrouterc6u.discovery import DetectionError
+        result = TplinkRouterProvider.discover(host, verify_ssl, timeout)
+        clients = {
+            'TplinkRouterSG': TplinkRouterSG,
+            'TplinkRouterV1_11': TplinkRouterV1_11,
+            'TplinkRouter': TplinkRouter,
+        }
+        cls = clients.get(result.client_name)
+        if cls is None:
+            raise DetectionError(
+                'Router protocol not identified by read-only fingerprint; '
+                'select a client explicitly instead of trying passwords.')
+        router = cls(host, password, username, logger, verify_ssl, timeout)
+        # Classic LuCI historically retries login on malformed/403 responses.
+        # For safe detection, a failed login must never trigger a second try.
+        if isinstance(router, TplinkRouter):
+            router._retry_login_on_403 = False
+        router.authorize()
+        return router
+
+    @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
         return {
             TplinkRE813XERouter.__name__: TplinkRE813XERouter,
