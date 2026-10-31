@@ -4,7 +4,6 @@ from unittest import main, TestCase
 from unittest.mock import patch, Mock
 
 from macaddress import EUI48
-from requests.exceptions import SSLError
 
 from tplinkrouterc6u import (
     TplinkC3200Router,
