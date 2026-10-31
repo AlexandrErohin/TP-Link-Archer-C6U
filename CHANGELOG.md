@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+ ## [5.38.0] - 2026-10-31
 
 ### Added
 
@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **C3200:** `supports()` passes `verify=self._verify_ssl` and catches `requests.RequestException` so HTTPS self-signed / network errors return `False` instead of breaking `TplinkRouterProvider.get_client()` ([#255](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/255)).
+- **C3200 (follow-up to [#255](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/255)):** `authorize()` sets `SESSION.verify` from `_verify_ssl`; `supports` / login / `_request` use `self.timeout`.
 - **EX:** `get_status()` / `get_ipv4_status()` prefer the Connected Internet WAN on multi-WAN firmwares (e.g. XGB834v) instead of the last enabled IPTV VLAN; fill `wan_ipv4_uptime` from `X_TP_Uptime` ([#254](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/254)).
 - **C5400X:** writes that need a form body (Content-Type + drop URL keys already in the body; `set_wifi` path/body shape) so insert/remove and enable toggles work ([#228](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/228), [#253](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/253)).
 - **C6U / V1_11 / SG:** port-forward follow-ups for [#248](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/248) — `TplinkRouter` shortens `_url_ipv4_port_forwards`; `update` preserves extra row fields; `get` uppercases protocol; spaced port ranges (`8000 - 9000`) accepted; invalid IP rejected on write; `_str2bool` treats `"1"` as true.

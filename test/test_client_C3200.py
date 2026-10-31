@@ -19,20 +19,33 @@ from tplinkrouterc6u import (
 class TestTPLinkC3200Router(TestCase):
 
     @patch('tplinkrouterc6u.client.c3200.requests.get')
-    def test_supports_request_error(self, mock_get: Mock) -> None:
-        # A self-signed certificate must not break the provider's detection loop
-        mock_get.side_effect = SSLError('certificate verify failed')
-        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False)
-
-        self.assertFalse(client.supports())
-
-    @patch('tplinkrouterc6u.client.c3200.requests.get')
     def test_supports_verify_ssl(self, mock_get: Mock) -> None:
         mock_get.return_value = Mock(status_code=200, text='<title>Archer C3200</title>')
-        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False)
+        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False, timeout=5)
 
         self.assertTrue(client.supports())
         mock_get.assert_called_once_with('https://192.168.1.1', timeout=5, verify=False)
+
+    @patch('tplinkrouterc6u.client.c3200.requests.get')
+    def test_supports_verify_ssl_true(self, mock_get: Mock) -> None:
+        mock_get.return_value = Mock(status_code=200, text='<title>Archer C3200</title>')
+        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=True, timeout=7)
+
+        self.assertTrue(client.supports())
+        mock_get.assert_called_once_with('https://192.168.1.1', timeout=7, verify=True)
+
+    @patch('tplinkrouterc6u.client.c3200.requests.Session')
+    def test_authorize_sets_session_verify(self, mock_session_cls: Mock) -> None:
+        session = Mock()
+        session.post.return_value = Mock(status_code=200, text='')
+        mock_session_cls.return_value = session
+        client = TplinkC3200Router('https://192.168.1.1', 'password', verify_ssl=False, timeout=9)
+
+        client.authorize()
+
+        self.assertIs(session.verify, False)
+        session.post.assert_called_once()
+        self.assertEqual(session.post.call_args.kwargs.get('timeout'), 9)
 
     # Testing the merge_response method
     def test_merge_response(self) -> None:

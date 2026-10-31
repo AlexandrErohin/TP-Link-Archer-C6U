@@ -909,7 +909,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - VX420-G2h v1.1
 - VX800v v1
 - XC220-G3v v2.30
-- XGB834v v1.1 (TIM Hub Ultra, reports model `AGGPON`; `TPLinkEXClientGCM` with username `admin`; multi-WAN Internet pick + `X_TP_Uptime` via a one-shot detail probe)
+- XGB834v v1.1
 ### <a id="mercusys">MERCUSYS routers</a>
 - AC10 1.20
 - Halo H25BE 1.0

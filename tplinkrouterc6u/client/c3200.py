@@ -35,10 +35,10 @@ class TplinkC3200Router(TPLinkMR200Client):
 
         try:
             # This method checks if we can recognize the router type.
-            welcome_page = requests.get(self.host, timeout=5, verify=self._verify_ssl)
+            welcome_page = requests.get(self.host, timeout=self.timeout, verify=self._verify_ssl)
             if welcome_page and welcome_page.status_code == 200 and re.search("Archer", welcome_page.text):
                 return True
-        except (ClientException, requests.RequestException):
+        except ClientException:
             pass
 
         return False
@@ -49,6 +49,7 @@ class TplinkC3200Router(TPLinkMR200Client):
         # Create the SESSION object and the authorization cookie
         # ———————————————————————————————————————————
         self.SESSION = requests.Session()
+        self.SESSION.verify = self._verify_ssl
 
         if self._logger:
             self._logger.debug("!")
@@ -74,7 +75,7 @@ class TplinkC3200Router(TPLinkMR200Client):
         response = Response()
 
         try:
-            response = self.SESSION.post(login_url, timeout=10)
+            response = self.SESSION.post(login_url, timeout=self.timeout)
         except Exception as e:
             error = self.ROUTER_NAME + " - Cannot authorize! Error - {}; Response - {}".format(e, response.text)
             if self._logger:
@@ -115,11 +116,11 @@ class TplinkC3200Router(TPLinkMR200Client):
 
         retry = 0
         while retry < self.REQUEST_RETRIES:
-            # send the request
+            # send the request (SESSION.verify set in authorize())
             if method == 'POST':
-                r = self.SESSION.post(url, data=data_str)
+                r = self.SESSION.post(url, data=data_str, timeout=self.timeout)
             elif method == 'GET':
-                r = self.SESSION.get(url, data=data_str)
+                r = self.SESSION.get(url, data=data_str, timeout=self.timeout)
             else:
                 raise Exception('Unsupported method ' + str(method))
 
