@@ -648,11 +648,31 @@ class TestTPLinkEXClient(TestCase):
                  '"connIPv4DnsServer":"","serviceType":"IPTV","connStatusV4":"Connected","X_TP_Uptime":"2228315",'
                  '"stack":"6,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_ADT_WAN","success":true}')
 
-    def test_get_status_multi_wan(self) -> None:
+    # Same layout without serviceType / connStatusV4 / X_TP_Uptime (legacy last-enabled wins = IPTV)
+    MULTI_WAN_NO_DETAIL = (
+        '{"data":[{"enable":"1","MACAddr":"","connIPv4Address":"0.0.0.0","connIPv4Gateway":"0.0.0.0",'
+        '"name":"usb_ppp3g","connIPv4SubnetMask":"0.0.0.0","connIPv4DnsServer":"","stack":"1,0,0,0,0,0"},'
+        '{"enable":"1","MACAddr":"02-00-00-00-00-05","connIPv4Address":"203.0.113.155",'
+        '"connIPv4Gateway":"192.168.100.1","name":"pppoe_gpon_835_2","connIPv4SubnetMask":"255.255.255.255",'
+        '"connIPv4DnsServer":"198.51.100.1,198.51.100.2","stack":"5,0,0,0,0,0"},'
+        '{"enable":"1","MACAddr":"02-00-00-00-00-06","connIPv4Address":"10.10.10.2",'
+        '"connIPv4Gateway":"10.10.10.1","name":"ipoe_gpon_836_3_s","connIPv4SubnetMask":"255.255.255.0",'
+        '"connIPv4DnsServer":"","stack":"6,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_ADT_WAN","success":true}')
 
+    # Internet present but Disconnected; IPTV Connected — prefer Internet over IPTV
+    MULTI_WAN_INTERNET_DOWN = (
+        '{"data":[{"enable":"1","MACAddr":"02-00-00-00-00-05","connIPv4Address":"203.0.113.155",'
+        '"connIPv4Gateway":"192.168.100.1","name":"pppoe_gpon_835_2","connIPv4SubnetMask":"255.255.255.255",'
+        '"connIPv4DnsServer":"198.51.100.1","serviceType":"Internet,TR069","connStatusV4":"Disconnected",'
+        '"X_TP_Uptime":"0","stack":"5,0,0,0,0,0"},'
+        '{"enable":"1","MACAddr":"02-00-00-00-00-06","connIPv4Address":"10.10.10.2",'
+        '"connIPv4Gateway":"10.10.10.1","name":"ipoe_gpon_836_3_s","connIPv4SubnetMask":"255.255.255.0",'
+        '"connIPv4DnsServer":"","serviceType":"IPTV","connStatusV4":"Connected","X_TP_Uptime":"99",'
+        '"stack":"6,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_ADT_WAN","success":true}')
+
+    def _ex_status_client(self, wan_payload: str, fail_detail: bool = False):
         DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.1.1","stack":"1,0,0,0,0,0"}],'
                         '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
-        DEV2_ADT_WAN = self.MULTI_WAN
         DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"}],'
                                 '"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}')
         DEV2_HOST_ENTRY = '{"data":[],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
@@ -662,24 +682,32 @@ class TestTPLinkEXClient(TestCase):
                             '"oid":"DEV2_PROC_STATUS","success":true}')
 
         class TPLinkEXClientTest(TPLinkEXClient):
-            self._token = True
+            _token = True
 
             def _request(self, url, method='POST', data_str=None, encrypt=False):
+                self.paths.append(data_str or '')
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
-                elif 'DEV2_ADT_WAN' in data_str:
-                    return 200, DEV2_ADT_WAN
-                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                if 'DEV2_ADT_WAN' in data_str:
+                    if fail_detail and 'serviceType' in data_str:
+                        raise ClientException('unsupported attr')
+                    return 200, wan_payload
+                if 'DEV2_ADT_WIFI_COMMON' in data_str:
                     return 200, DEV2_ADT_WIFI_COMMON
-                elif 'DEV2_HOST_ENTRY' in data_str:
+                if 'DEV2_HOST_ENTRY' in data_str:
                     return 200, DEV2_HOST_ENTRY
-                elif 'DEV2_MEM_STATUS' in data_str:
+                if 'DEV2_MEM_STATUS' in data_str:
                     return 200, DEV2_MEM_STATUS
-                elif 'DEV2_PROC_STATUS' in data_str:
+                if 'DEV2_PROC_STATUS' in data_str:
                     return 200, DEV2_PROC_STATUS
                 raise ClientException()
 
         client = TPLinkEXClientTest('', '')
+        client.paths = []
+        return client
+
+    def test_get_status_multi_wan(self) -> None:
+        client = self._ex_status_client(self.MULTI_WAN)
         status = client.get_status()
 
         self.assertIsInstance(status, Status)
@@ -687,16 +715,17 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.wan_ipv4_addr, '203.0.113.155')
         self.assertEqual(status.wan_ipv4_gateway, '192.168.100.1')
         self.assertEqual(status.wan_ipv4_uptime, 2228311)
+        self.assertTrue(client._wan_detail_support)
+        self.assertEqual(sum(1 for path in client.paths if 'DEV2_ADT_WAN' in path), 2)
 
     def test_get_ipv4_status_multi_wan(self) -> None:
-
         DEV2_ADT_LAN = ('{"data":[{"MACAddress":"bf:75:44:4c:dc:9e","IPAddress":"192.168.1.1",'
                         '"IPSubnetMask":"255.255.255.0","DHCPv4Enable":"1","stack":"1,0,0,0,0,0"}],'
                         '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
         DEV2_ADT_WAN = self.MULTI_WAN
 
         class TPLinkEXClientTest(TPLinkEXClient):
-            self._token = True
+            _token = True
 
             def _request(self, url, method='POST', data_str=None, encrypt=False):
                 if 'DEV2_ADT_LAN' in data_str:
@@ -716,6 +745,31 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result.wan_ipv4_netmask, '255.255.255.255')
         self.assertEqual(result.wan_ipv4_pridns, '198.51.100.1')
         self.assertEqual(result.wan_ipv4_snddns, '198.51.100.2')
+
+    def test_get_status_multi_wan_without_detail_fields(self) -> None:
+        # No serviceType: keep legacy last-enabled behaviour (IPTV)
+        client = self._ex_status_client(self.MULTI_WAN_NO_DETAIL)
+        client._wan_detail_support = False
+        status = client.get_status()
+        self.assertEqual(status.wan_ipv4_addr, '10.10.10.2')
+        self.assertIsNone(status.wan_ipv4_uptime)
+        self.assertEqual(sum(1 for path in client.paths if 'DEV2_ADT_WAN' in path), 1)
+
+    def test_get_status_multi_wan_internet_down_prefers_internet(self) -> None:
+        client = self._ex_status_client(self.MULTI_WAN_INTERNET_DOWN)
+        status = client.get_status()
+        self.assertEqual(status.wan_ipv4_addr, '203.0.113.155')
+        self.assertEqual(status.wan_ipv4_uptime, 0)
+
+    def test_get_status_wan_detail_probe_latches_off(self) -> None:
+        client = self._ex_status_client(self.MULTI_WAN_NO_DETAIL, fail_detail=True)
+        status = client.get_status()
+        self.assertFalse(client._wan_detail_support)
+        # Fallback to basic batch (no serviceType) → last enabled = IPTV
+        self.assertEqual(status.wan_ipv4_addr, '10.10.10.2')
+        client.paths = []
+        client.get_status()
+        self.assertEqual(sum(1 for path in client.paths if 'DEV2_ADT_WAN' in path), 1)
 
     def test_set_wifi(self) -> None:
         response = '{"success":true, "errorcode":0}'

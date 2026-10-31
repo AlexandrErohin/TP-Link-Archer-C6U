@@ -72,11 +72,16 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.pstack = pstack
             self.attrs = attrs
 
+    # Optional multi-WAN / uptime fields; probed separately so firmwares that reject unknown attrs stay safe
+    _WAN_DETAIL_ATTRS = ['serviceType', 'connStatusV4', 'X_TP_Uptime']
+
     def __init__(self, host: str, password: str, username: str = 'user', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._url_rsa_key = 'cgi/getGDPRParm'
+        # Like MR _ipv6_support: ask for serviceType / connStatusV4 / X_TP_Uptime once; latch off on failure
+        self._wan_detail_support = True
 
     def supports(self) -> bool:
         try:
@@ -122,26 +127,45 @@ class TPLinkEXClient(TPLinkMRClientBase):
         return firmware
 
     def _select_wan(self, wan: dict | list | None) -> list:
-        '''
-        Returns the enabled WAN connections to read the WAN fields from.
-        Multi-WAN firmwares (e.g. XGB834v / TIM Hub Ultra) list USB, IPTV and Internet connections side by side,
-        so the connected Internet one is preferred when the firmware reports it.
-        '''
+        # Enabled WAN rows to read fields from. Multi-WAN firmwares (e.g. XGB834v) list USB, IPTV and
+        # Internet side by side; prefer Connected Internet, then any Internet, then Connected non-IPTV,
+        # else the legacy last-enabled behaviour. Several Connected Internet rows: the first wins.
         items = [item for item in self._to_list(wan)
-                 if not (int(item['enable']) == 0 and wan.__class__ == list)]
+                 if not (int(item.get('enable', '0') or '0') == 0 and wan.__class__ == list)]
         for item in items:
             if 'Internet' in item.get('serviceType', '') and item.get('connStatusV4') == 'Connected':
                 return [item]
-
+        for item in items:
+            if 'Internet' in item.get('serviceType', ''):
+                return [item]
+        for item in items:
+            if item.get('connStatusV4') == 'Connected' and 'IPTV' not in item.get('serviceType', ''):
+                return [item]
         return items
+
+    def _probe_wan_detail(self, attrs: list[str]):
+        # Separate DEV2_ADT_WAN request for optional attrs (same idea as MR WAN_IP_CONN IPv6 probe).
+        # EX req_act returns one data slot per act; unwrap that slot. Latch off on None/error.
+        if not self._wan_detail_support:
+            return None
+        try:
+            _, values = self.req_act([
+                self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN', attrs=list(attrs) + self._WAN_DETAIL_ATTRS),
+            ])
+            # values is [data]; data None means the firmware omitted the payload
+            if values and values[0] is not None:
+                return values[0]
+            self._wan_detail_support = False
+        except Exception:
+            self._wan_detail_support = False
+        return None
 
     def get_status(self) -> Status:
         status = Status()
+        wan_attrs = ['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']
         acts = [
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN', attrs=['MACAddress', 'IPAddress']),
-            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
-                         attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway', 'serviceType',
-                                'connStatusV4', 'X_TP_Uptime']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN', attrs=wan_attrs),
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_WIFI_COMMON'),
             self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY',
                          attrs=['active', 'X_TP_LanConnType', 'physAddress', 'IPAddress', 'hostName']),
@@ -161,12 +185,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
         status._lan_ipv4_addr = get_ip(values[0]['IPAddress'])
 
         wan = values[1] if len(values) > 1 else None
+        wan_detail = self._probe_wan_detail(wan_attrs)
+        if wan_detail is not None:
+            wan = wan_detail
         for item in self._select_wan(wan):
             status._wan_macaddr = get_mac(item['MACAddr']) if item.get('MACAddr') else None
             status._wan_ipv4_addr = get_ip(item['connIPv4Address']) if item.get('connIPv4Address') else None
             status._wan_ipv4_gateway = get_ip(item['connIPv4Gateway']) if item.get('connIPv4Address') else None
             uptime = item.get('X_TP_Uptime', '')
-            status.wan_ipv4_uptime = int(uptime) if uptime.isdigit() else None
+            status.wan_ipv4_uptime = int(uptime) if str(uptime or '').isdigit() else None
 
         if len(values) > 2 and values[2]:
             networks = values[2] if values[2].__class__ == list else [values[2]]
@@ -307,12 +334,12 @@ class TPLinkEXClient(TPLinkMRClientBase):
         return dhcp_leases
 
     def get_ipv4_status(self) -> IPv4Status:
+        wan_attrs = ['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway', 'name', 'connIPv4SubnetMask',
+                     'connIPv4DnsServer']
         acts = [
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN',
                          attrs=['MACAddress', 'IPAddress', 'IPSubnetMask', 'DHCPv4Enable']),
-            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
-                         attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway', 'name', 'connIPv4SubnetMask',
-                                'connIPv4DnsServer', 'serviceType', 'connStatusV4']),
+            self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN', attrs=wan_attrs),
         ]
         _, values = self.req_act(acts)
 
@@ -326,6 +353,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ipv4_status.lan_ipv4_dhcp_enable = bool(int(get_value(values, [0, 'DHCPv4Enable'], '0')))
 
         wan = values[1] if values and len(values) > 1 else None
+        wan_detail = self._probe_wan_detail(wan_attrs)
+        if wan_detail is not None:
+            wan = wan_detail
         for item in self._select_wan(wan):
             ipv4_status._wan_macaddr = get_mac(get_value(item, ['MACAddr'], '00:00:00:00:00:00'))
             ipv4_status._wan_ipv4_ipaddr = get_ip(get_value(item, ['connIPv4Address'], '0.0.0.0'))
