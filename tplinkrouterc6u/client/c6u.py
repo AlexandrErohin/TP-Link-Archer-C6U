@@ -277,23 +277,28 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def authorize(self) -> bool:
         pass
 
+    _WIFI_FORM_NAMES = {
+        Connection.HOST_2G: 'wireless_2g',
+        Connection.HOST_5G: 'wireless_5g',
+        Connection.HOST_6G: 'wireless_6g',
+        Connection.GUEST_2G: 'guest_2g',
+        Connection.GUEST_5G: 'guest_5g',
+        Connection.GUEST_6G: 'guest_6g',
+        Connection.IOT_2G: 'iot_2g',
+        Connection.IOT_5G: 'iot_5g',
+        Connection.IOT_6G: 'iot_6g',
+    }
+
+    def _wifi_write_prefixed(self) -> bool:
+        # Most LuCI firmwares expect wireless_2g_ssid-style keys when writing more than enable.
+        # C5400X (and C1200 via inheritance) needs bare keys so enable is not duplicated in URL+body.
+        return True
+
     def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
                  encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
                  hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
                  disabled_all: str = None, portal_password: str = None) -> None:
-        values = {
-            Connection.HOST_2G: 'wireless_2g',
-            Connection.HOST_5G: 'wireless_5g',
-            Connection.HOST_6G: 'wireless_6g',
-            Connection.GUEST_2G: 'guest_2g',
-            Connection.GUEST_5G: 'guest_5g',
-            Connection.GUEST_6G: 'guest_6g',
-            Connection.IOT_2G: 'iot_2g',
-            Connection.IOT_5G: 'iot_5g',
-            Connection.IOT_6G: 'iot_6g',
-        }
-
-        value = values.get(wifi)
+        value = self._WIFI_FORM_NAMES.get(wifi)
         if not value:
             raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
 
@@ -302,55 +307,45 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             raise ValueError("At least one wireless setting must be provided")
 
         data = "operation=write"
+        enable_only = all(v is None for v in [ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
+                                              htmode, channel, txpower, disabled_all, portal_password])
+        # Backward compatibility: enable-only writes stay unprefixed on base LuCI clients
+        use_prefix = self._wifi_write_prefixed() and not enable_only
+
+        def key(name: str) -> str:
+            return f'{value}_{name}' if use_prefix else name
 
         if enable is not None:
-            # Backward compatibility with existing tests
-            if all(v is None for v in [ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
-                                       htmode, channel, txpower, disabled_all, portal_password]):
-                data += f"&enable={'on' if enable else 'off'}"
-            else:
-                data += f"&{value}_enable={'on' if enable else 'off'}"
+            data += f"&{key('enable')}={'on' if enable else 'off'}"
         if ssid is not None:
-            data += f"&{value}_ssid={ssid}"
+            data += f"&{key('ssid')}={ssid}"
         if hidden is not None:
-            data += f"&{value}_hidden={hidden}"
+            data += f"&{key('hidden')}={hidden}"
         if encryption is not None:
-            data += f"&{value}_encryption={encryption}"
+            data += f"&{key('encryption')}={encryption}"
         if psk_version is not None:
-            data += f"&{value}_psk_version={psk_version}"
+            data += f"&{key('psk_version')}={psk_version}"
         if psk_cipher is not None:
-            data += f"&{value}_psk_cipher={psk_cipher}"
+            data += f"&{key('psk_cipher')}={psk_cipher}"
         if psk_key is not None:
-            data += f"&{value}_psk_key={psk_key}"
+            data += f"&{key('psk_key')}={psk_key}"
         if hwmode is not None:
-            data += f"&{value}_hwmode={hwmode}"
+            data += f"&{key('hwmode')}={hwmode}"
         if htmode is not None:
-            data += f"&{value}_htmode={htmode}"
+            data += f"&{key('htmode')}={htmode}"
         if channel is not None:
-            data += f"&{value}_channel={channel}"
+            data += f"&{key('channel')}={channel}"
         if txpower is not None:
-            data += f"&{value}_txpower={txpower}"
+            data += f"&{key('txpower')}={txpower}"
         if disabled_all is not None:
-            data += f"&{value}_disabled_all={disabled_all}"
+            data += f"&{key('disabled_all')}={disabled_all}"
         if portal_password is not None:
-            data += f"&{value}_portal_password={portal_password}"
+            data += f"&{key('portal_password')}={portal_password}"
 
-        path = f"admin/wireless?form={value}"
-        self.request(path, data)
+        self.request(f"admin/wireless?form={value}", data)
 
     def get_wifi(self, wifi: Connection) -> WifiStatus:
-        values = {
-            Connection.HOST_2G: 'wireless_2g',
-            Connection.HOST_5G: 'wireless_5g',
-            Connection.HOST_6G: 'wireless_6g',
-            Connection.GUEST_2G: 'guest_2g',
-            Connection.GUEST_5G: 'guest_5g',
-            Connection.GUEST_6G: 'guest_6g',
-            Connection.IOT_2G: 'iot_2g',
-            Connection.IOT_5G: 'iot_5g',
-            Connection.IOT_6G: 'iot_6g',
-        }
-        value = values.get(wifi)
+        value = self._WIFI_FORM_NAMES.get(wifi)
         if not value:
             raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
 

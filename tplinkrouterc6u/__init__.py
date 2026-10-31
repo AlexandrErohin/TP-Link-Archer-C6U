@@ -47,6 +47,7 @@ from tplinkrouterc6u.common.dataclass import (
     VpnClientServer,
     VpnClientDevice,
     PortStatus,
+    RouterPortStatus,
     PortModes,
     UsbStorage,
     UsbSharing,

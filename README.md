@@ -152,14 +152,14 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
 | get_port_modes |   | Whether WAN aggregation, link aggregation and IPTV are on (Archer C5400X) | [PortModes](#port_modes) |
 | nat_boost_status |   | Is NAT Boost (hardware NAT acceleration) on (Archer C5400X); None if the firmware has none. While it is off the Traffic Monitor counts every client's traffic | bool, None |
-| get_clients_per_band |   | Clients per band, main and guest networks together (Archer C5400X). Counted from the last `get_status()` without a request of its own (it calls `get_status()` only if there was none yet) | [ClientsPerBand](#clients_per_band) |
+| get_clients_per_band | status: [Status](#status) = None | Clients per band, main and guest networks together (Archer C5400X). Pass a `Status` from a recent `get_status()` to avoid an extra poll; otherwise fetches one | [ClientsPerBand](#clients_per_band) |
 | get_daily_traffic |   | Bytes downloaded and uploaded per day by every client together, as the Traffic Monitor chart shows them (Archer C5400X; answers also while the monitor is off). Includes traffic between local clients | [DailyTraffic](#daily_traffic) |
 | get_wan_speed |   | Live internet rate from the Network Map, bytes/s (Archer C5400X) | [WanSpeed](#wan_speed) |
 | get_speed_test |   | Result of the router's own speed test, Mbit/s (Archer C5400X) | [SpeedTest](#speed_test) |
-| start_speed_test |   | Starts the router's own speed test (Archer C5400X). It runs for a while: call get_speed_test until its status is idle or fail, without logging out in between (like the web page) |   |
+| start_speed_test |   | Starts the router's own speed test (Archer C5400X). Loads the WAN for a while — avoid binding to a casual HA button. Call get_speed_test until its status is idle or fail, without logging out in between (like the web page) |   |
 | get_wan_port_speed |   | Internet port Speed & Duplex value (`auto`, `1000F`, …) and the choices the router offers (Archer C5400X) | [WanPortSpeed](#wan_port_speed) |
 | get_qos |   | Whether QoS is on and the total bandwidth it shares out, Mbit/s (Archer C5400X) | [QoSSettings](#qos_settings) |
-| get_firmware_update |   | Installed firmware and, from TP-Link's cloud as the web UI shows it, the newest version and whether it is newer (Archer C5400X). Read only: it never starts the upgrade. The cloud part is None without internet or a TP-Link ID | [FirmwareUpdate](#firmware_update) |
+| get_firmware_update |   | Installed firmware and, from TP-Link's cloud as the web UI shows it, the newest version and whether it is newer (Archer C5400X). Read only: it never starts the upgrade. Cloud fields stay empty/`None` without WAN or a TP-Link ID (local-only integrations should treat that as expected) | [FirmwareUpdate](#firmware_update) |
 | get_reboot_schedule |   | The scheduled reboot: on/off, time, every day / week / month and which day (Archer C5400X) | [RebootSchedule](#reboot_schedule) |
 | set_reboot_schedule | enable: bool, time: str = None, cycle: str = None, day: str = None | Turn the scheduled reboot on or off (Archer C5400X); what is not given keeps its current value. The router applies it only when its time comes from the internet |   |
 | get_router_time |   | The router clock, its time zone, NTP servers and daylight saving time (Archer C5400X) | [RouterTime](#router_time) |
@@ -167,7 +167,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | traffic_monitor_status |   | Is the Traffic Monitor on (Archer C5400X) | bool, None |
 | set_traffic_monitor | enable: bool | Turn the Traffic Monitor on or off (Archer C5400X) |   |
 | smart_connect_status |   | Is Smart Connect (one network on every band) on (Archer C5400X) | bool, None |
-| set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password; turning it off does not bring the old ones back |   |
+| set_smart_connect | enable: bool | Turn Smart Connect on or off (Archer C5400X). Like the router web page, turning it on also gives the 5 GHz bands the 2.4 GHz name, security and password (URL intentionally has two `form=` params, as the web UI does); turning it off does not bring the old ones back |   |
 | get_usb_storage |   | USB disks connected and, with a disk, its total, used and free space (Archer C5400X; sizes not yet checked with a disk) | [UsbStorage](#usb_storage) |
 | get_usb_sharing |   | Whether Samba, FTP, FTP via internet, Media Sharing and Time Machine are on (Archer C5400X) | [UsbSharing](#usb_sharing) |
 | print_server_status |   | Is the USB print server on (Archer C5400X; read format taken from the web page, not yet checked) | bool, None |
@@ -206,7 +206,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR; also inherited by EX/VR1200v, EX DSL path untested on hardware; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
-| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 | [[PortStatus]](#port_status) |
+| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first) → [PortStatus](#port_status). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 → [RouterPortStatus](#router_port_status) | [PortStatus](#port_status) / [RouterPortStatus](#router_port_status) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -256,8 +256,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | mem_usage | Memory usage in percentage between 0 and 1 | float, None |
 | cpu_usage | CPU usage in percentage between 0 and 1 | float, None |
 | conn_type | Connection type | str, None |
-| clients_down_speed | What all clients receive, bytes/s (Archer C5400X, Traffic Monitor list). It includes traffic between local clients, so it is not exactly the internet speed | int, None |
-| clients_up_speed | What all clients send, bytes/s, counted the same way as clients_down_speed | int, None |
+| clients_down_speed | What current `devices` receive, bytes/s (Archer C5400X, Traffic Monitor list; orphan/stale MAC rows are ignored). Includes traffic between local clients, so it is not exactly the internet speed | int, None |
+| clients_up_speed | What current `devices` send, bytes/s, counted the same way as clients_down_speed | int, None |
 | devices | List of all connected devices | list[[Device](#device)] |
 
 ### <a id="device">Device</a>
@@ -514,7 +514,7 @@ Not all fields are filled by every client:
 ### <a id="port_status">PortStatus</a>
 | Field | Description | Type |
 | --- |---|---|
-| port | Physical port number (1-based; 0 is the Internet port on the Archer C5400X) | int |
+| port | Physical port number (1-based) | int |
 | enabled | Port administratively enabled | bool, None |
 | link_up | Link is up | bool, None |
 | auto_negotiation | Auto-negotiation configured | bool, None |
@@ -529,6 +529,15 @@ Not all fields are filled by every client:
 | tx_bad_packets | Transmitted bad packets | int, None |
 | rx_good_packets | Received good packets | int, None |
 | rx_bad_packets | Received bad packets | int, None |
+
+### <a id="router_port_status">RouterPortStatus</a>
+Link state of a router Internet/LAN port (Archer C5400X Network Map). Separate from switch [PortStatus](#port_status) (no admin enable, flow control, LAG or counters).
+| Field | Description | Type |
+| --- |---|---|
+| port | Port number (0 = Internet, then LAN 1–8) | int |
+| link_up | Link is up | bool, None |
+| negotiated_speed | Negotiated speed in Mbps | int, None |
+| negotiated_duplex | Negotiated duplex (`half` / `full`) | str, None |
 
 ### <a id="port_modes">PortModes</a>
 | Field | Description | Type |

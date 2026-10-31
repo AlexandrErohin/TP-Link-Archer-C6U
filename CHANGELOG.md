@@ -4,6 +4,7 @@
 
 ### Added
 
+- **C5400X:** large read/write API — second 5 GHz band (`HOST_5G_2` / `GUEST_5G_2`), Smart Connect, Traffic Monitor / per-client speeds, security/HomeCare, USB, WiFi schedule, ports (`RouterPortStatus`), WAN/QoS/speed test, firmware update check, reboot schedule, router time, system log counts, and related dataclasses ([#253](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/253)).
 - **MR / VR / EX:** `get_dsl_status()` returns DSL sync rates, SNR margin, attenuation and uptime as `DSLStatus` (`WAN_DSL_INTF_CFG` via GL; empty when no active DSL line). EX path is inherited but not hardware-verified ([#246](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/246), [#73](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/73)).
 - **RE505X:** RE505X v1.0 listed as supported via `TplinkRE813XERouter` ([#247](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/247)).
 - **C6U / V1_11 / SG (new-gen LuCI clients):** IPv4 port forwarding (virtual servers, `admin/nat?form=vs`) support — `get_ipv4_port_forwards()`, `add_ipv4_port_forward()`, `update_ipv4_port_forward()`, `delete_ipv4_port_forward()`. Read is verified on Archer AX23 v2.0 fw 1.1.2 Build 20250814 (SG_L1_S2); insert/update/remove use the same wire format the router's own web UI sends (`insert` with `new=<json>`, `update` with `key`/`new`/`old`, `remove` with `key`/`index`) ([#248](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/248)).
@@ -11,9 +12,11 @@
 ### Changed
 
 - **RE813XE / RE700X / RE505X:** removed public aliases `TplinkRe700XRouter` and `TplinkRE505XRouter`; use `TplinkRE813XERouter`.
+- **C5400X / C1200 (follow-up to [#253](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/253)):** Traffic Monitor enrich on `get_status()` is off for C1200 by default (`_status_traffic_enrich`); `get_clients_per_band(status=None)` accepts a ready `Status` to skip an extra poll; `get_port_status()` returns `RouterPortStatus`; LED read is `led_status()` (`get_led()` removed); `clients_*_speed` totals only current `devices`; traffic/`authorize`/USB soft-fail paths use `ClientError`/`ClientException`.
 
 ### Fixed
 
+- **C5400X:** writes that need a form body (Content-Type + drop URL keys already in the body; `set_wifi` path/body shape) so insert/remove and enable toggles work ([#228](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/228), [#253](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/253)).
 - **C6U / V1_11 / SG:** port-forward follow-ups for [#248](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/248) — `TplinkRouter` shortens `_url_ipv4_port_forwards`; `update` preserves extra row fields; `get` uppercases protocol; spaced port ranges (`8000 - 9000`) accepted; invalid IP rejected on write; `_str2bool` treats `"1"` as true.
 - **RE813XE / RE700X / RE505X:** `set_wifi()` includes `psk_cipher` in the enable payload (firmware Lua crash without it); `authorize()` is idempotent when a session from `supports()` is already active; `_str2bool` treats `"1"` as true ([#247](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/247)).
 

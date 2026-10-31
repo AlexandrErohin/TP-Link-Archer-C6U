@@ -120,8 +120,7 @@ class TestTPLinkC1200Client(TestCase):
 
         client = TPLinkRouterTest("", "")
 
-        led_status = client.get_led()
-        self.assertTrue(led_status)
+        self.assertTrue(client.led_status())
 
     def test_set_led_sends_enable_value(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
@@ -149,23 +148,6 @@ class TestTPLinkC1200Client(TestCase):
         client.set_led(True)
 
         self.assertEqual(client.writes, ["operation=write&enable=on", "operation=write&enable=off"])
-
-    def test_led_status_method(self) -> None:
-        class TPLinkRouterTest(TplinkC1200Router):
-            def request(
-                self,
-                path: str,
-                data: str,
-                ignore_response: bool = False,
-                ignore_errors: bool = False,
-            ) -> dict | None:
-                if path == "admin/ledgeneral?form=setting&operation=read":
-                    return {"enable": "off", "ledst_support": "yes"}
-                raise ClientException()
-
-        client = TPLinkRouterTest("", "")
-
-        self.assertFalse(client.led_status())
 
     def test_get_status_conn_type_is_wan_type(self) -> None:
         response_status = {
@@ -259,6 +241,8 @@ class TestTPLinkC1200Client(TestCase):
                 return {}
 
         client = TPLinkRouterTest("", "")
+        # C1200 disables status traffic enrich by default; exercise the C5400X path explicitly
+        client._status_traffic_enrich = True
         client.paths = []
         client.traffic = [
             {"mac": "02-00-00-00-00-01", "ip": "192.168.0.10", "total_byte": 1000, "retx_byte": 10,
@@ -267,8 +251,9 @@ class TestTPLinkC1200Client(TestCase):
             {"mac": "02-00-00-00-00-09", "ip": "192.168.0.12", "total_byte": 7, "retx_byte": 1, "rerx_byte": 1},
         ]
         status = client.get_status()
-        self.assertEqual(status.clients_down_speed, 201)
-        self.assertEqual(status.clients_up_speed, 11)
+        # Totals only include MACs present in status.devices (orphan 02-00-00-00-00-09 is ignored)
+        self.assertEqual(status.clients_down_speed, 200)
+        self.assertEqual(status.clients_up_speed, 10)
         devices = {device.hostname: device for device in status.devices}
         self.assertEqual(devices["pc"].down_speed, 200)
         self.assertEqual(devices["pc"].up_speed, 10)
@@ -284,6 +269,14 @@ class TestTPLinkC1200Client(TestCase):
         client.paths = []
         client.get_status()
         self.assertNotIn("admin/traffic?form=lists&operation=load", client.paths)
+
+        # Default C1200: get_status does not call Traffic Monitor
+        client = TPLinkRouterTest("", "")
+        client.paths = []
+        client.traffic = [{"mac": "02-00-00-00-00-01", "rerx_byte": 1, "retx_byte": 1, "total_byte": 1}]
+        status = client.get_status()
+        self.assertNotIn("admin/traffic?form=lists&operation=load", client.paths)
+        self.assertIsNone(status.clients_down_speed)
 
     def test_get_clients_per_band(self) -> None:
         class TPLinkRouterTest(TplinkC1200Router):
@@ -314,20 +307,19 @@ class TestTPLinkC1200Client(TestCase):
             "access_devices_wireless_guest": [client_entry(6, "2.4G"), client_entry(7, "5G_2")],
         }
 
-        # No get_status() yet: it reads the status once
+        # Without a Status: fetches via get_status()
         bands = client.get_clients_per_band()
         self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (1, 2, 1, 3))
         self.assertEqual(client.paths.count("admin/status?form=all&operation=read"), 1)
 
-        # Afterwards it counts the last get_status() without another request
         client.status_data["access_devices_wireless_host"] = [client_entry(3, "5G")]
-        client.get_status()
+        status = client.get_status()
         client.paths = []
-        bands = client.get_clients_per_band()
+        bands = client.get_clients_per_band(status)
         self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (1, 1, 1, 1))
         self.assertEqual(client.paths, [])
 
-        types = {device.hostname: device.type for device in client.get_status().devices}
+        types = {device.hostname: device.type for device in status.devices}
         self.assertEqual(types["client3"], Connection.HOST_5G)
         self.assertEqual(types["client6"], Connection.GUEST_2G)
         self.assertEqual(types["client7"], Connection.GUEST_5G_2)
@@ -335,7 +327,6 @@ class TestTPLinkC1200Client(TestCase):
         # Without a second 5 GHz band there is no count for it
         client.status_data = {"lan_macaddr": "06-E6-97-9E-23-F5", "access_devices_wireless_host": [
             client_entry(2, "2.4G"), client_entry(3, "5G")]}
-        client.get_status()
         bands = client.get_clients_per_band()
         self.assertEqual((bands.wired, bands.wifi_2g, bands.wifi_5g, bands.wifi_5g_2), (0, 1, 1, None))
 

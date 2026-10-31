@@ -15,9 +15,9 @@ from tplinkrouterc6u.common.dataclass import (
     HomeCareStatus,
     IpMacBinding,
     PortModes,
-    PortStatus,
     QoSSettings,
     RebootSchedule,
+    RouterPortStatus,
     RouterTime,
     SecuritySettings,
     SpeedTest,
@@ -131,6 +131,12 @@ def _wifi_off_periods(entries) -> list[WifiOffPeriod] | None:
 
 
 class TplinkC5400XRouter(TplinkBaseRouter):
+    _WIFI_FORM_NAMES = {
+        **TplinkBaseRouter._WIFI_FORM_NAMES,
+        Connection.HOST_5G_2: 'wireless_5g_2',
+        Connection.GUEST_5G_2: 'guest_5g_2',
+    }
+
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
@@ -138,7 +144,8 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         # "no such callback" and write parameters (e.g. enable=on) are dropped
         self._headers_request['Content-Type'] = 'application/x-www-form-urlencoded'
         self._traffic_lists = True
-        self._last_status = None
+        # Extra Traffic Monitor POST on every get_status(); C1200 turns this off (unverified there)
+        self._status_traffic_enrich = True
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
         # Once the body is read, a parameter that is also in the URL arrives twice ("no such callback" for
@@ -150,12 +157,15 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             path = '{}?{}'.format(base, query) if query else base
         return super().request(path, data, ignore_response, ignore_errors)
 
+    def _wifi_write_prefixed(self) -> bool:
+        return False
+
     def supports(self) -> bool:
         return len(self.password) >= 200
 
     def authorize(self) -> None:
         if len(self.password) < 200:
-            raise Exception('You need to use web encrypted password instead. Check the documentation!')
+            raise ClientException('You need to use web encrypted password instead. Check the documentation!')
 
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 
@@ -181,8 +191,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
 
     def get_status(self) -> Status:
         status = super().get_status()
-        self._last_status = status
-        if not self._traffic_lists:
+        if not self._status_traffic_enrich or not self._traffic_lists:
             return status
         try:
             rows = self.request('admin/traffic?form=lists&operation=load', 'operation=load')
@@ -192,11 +201,10 @@ class TplinkC5400XRouter(TplinkBaseRouter):
 
         # There is no game_accelerator list here; the Traffic Monitor page's list has, per MAC and IP (rows of
         # old IPs stay), the live bytes/s the client receives (rerx_byte) and sends (retx_byte) and its total_byte.
-        # It counts internet traffic (checked against a ~90 Mbit/s download) and traffic between local clients
+        # It counts internet traffic (checked against a ~90 Mbit/s download) and traffic between local clients.
+        # Totals only include MACs currently in status.devices so stale/orphan rows do not inflate them.
         traffic = {}
         rows = rows if isinstance(rows, list) else []
-        status.clients_down_speed = sum(int(row.get('rerx_byte') or 0) for row in rows)
-        status.clients_up_speed = sum(int(row.get('retx_byte') or 0) for row in rows)
         for row in rows:
             if not row.get('mac'):
                 continue
@@ -204,10 +212,17 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             down, up, total = traffic.get(mac, (0, 0, 0))
             traffic[mac] = (down + int(row.get('rerx_byte') or 0), up + int(row.get('retx_byte') or 0),
                             total + int(row.get('total_byte') or 0))
+        down_total = up_total = 0
         for device in status.devices:
-            if device.macaddr in traffic and device.down_speed is None:
-                device.down_speed, device.up_speed, device.traffic_usage = traffic[device.macaddr]
-
+            if device.macaddr not in traffic:
+                continue
+            down, up, total = traffic[device.macaddr]
+            down_total += down
+            up_total += up
+            if device.down_speed is None:
+                device.down_speed, device.up_speed, device.traffic_usage = down, up, total
+        status.clients_down_speed = down_total
+        status.clients_up_speed = up_total
         return status
 
     def _status_conn_type(self, data: dict) -> str | None:
@@ -221,10 +236,11 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             return Connection.HOST_5G_2 if host else Connection.GUEST_5G_2
         return TplinkBaseRouter._map_wire_type(data, host)
 
-    def get_clients_per_band(self) -> ClientsPerBand:
-        # Counted from the client list of the last get_status() (no request of its own; it calls get_status() only
-        # when there is none yet). Main and guest networks together; wifi_5g_2 is None without a second 5 GHz band
-        status = self._last_status if self._last_status is not None else self.get_status()
+    def get_clients_per_band(self, status: Status | None = None) -> ClientsPerBand:
+        # Pass a Status from a recent get_status() to avoid an extra poll; otherwise fetches one.
+        # Main and guest networks together; wifi_5g_2 is None without a second 5 GHz band
+        if status is None:
+            status = self.get_status()
         types = [device.type for device in status.devices]
         return ClientsPerBand(
             wired=types.count(Connection.WIRED),
@@ -268,15 +284,11 @@ class TplinkC5400XRouter(TplinkBaseRouter):
                          'operation=write&enable={}'.format('on' if enable else 'off'))
 
     def led_status(self) -> bool | None:
-        return self.get_led()
-
-    def get_led(self) -> bool | None:
-
         data = self.request('admin/ledgeneral?form=setting&operation=read', 'operation=read')
-        led_status = data.get('enable') if 'enable' in data else None
-        if led_status == 'on':
+        enable = data.get('enable') if 'enable' in data else None
+        if enable == 'on':
             return True
-        elif led_status == 'off':
+        elif enable == 'off':
             return False
         else:
             return None
@@ -308,11 +320,12 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             return None
         return {'on': True, 'off': False}.get(data.get('hw_enable'))
 
-    def get_port_status(self) -> list[PortStatus]:
+    def get_port_status(self) -> list[RouterPortStatus]:
         # The port table of the Network Map: one row per port, the Internet port first (wan_status / wan_speed /
         # wan_duplex), then lan1_* .. lan8_*. Port 0 is the Internet port, like that table. Status words from the
         # web page: connected, unconnected (LAN) or disconnected (Internet); the speed is 0 or "" without a link.
-        # A negotiated speed means the cable is linked even if the Internet port says disconnected (no internet)
+        # A negotiated speed means the cable is linked even if the Internet port says disconnected (no internet).
+        # Returns RouterPortStatus (not PortStatus / TL-SG108E): only link, speed and duplex.
         data = self.request('admin/status?form=router&operation=read', 'operation=read')
         fields = {}
         for row in data if isinstance(data, list) else [data]:
@@ -325,7 +338,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             speed = _number(fields[port].get('speed'))
             speed = speed if speed and speed > 0 else None
             duplex = str(fields[port].get('duplex') or '').lower()
-            ports.append(PortStatus(
+            ports.append(RouterPortStatus(
                 port=port,
                 link_up=True if speed else {'connected': True, 'unconnected': False, 'disconnected': False,
                                             'unplugged': False}.get(str(fields[port].get('status') or '').lower()),
@@ -352,9 +365,9 @@ class TplinkC5400XRouter(TplinkBaseRouter):
                          upload=_mbit(data.get('up_speed')), time=time)
 
     def start_speed_test(self) -> None:
-        # The "Test again" button of Network Map > Speed Test. The router downloads and uploads for a while (the
-        # internet is busy meanwhile); the web page then calls get_speed_test() every few seconds in the same session
-        # until status is idle or fail
+        # The "Test again" button of Network Map > Speed Test. Loads the WAN for a while (do not bind to a casual HA
+        # button); the web page then calls get_speed_test() every few seconds in the same session until status is
+        # idle or fail
         self.request('admin/status?form=speedtest', 'operation=start')
 
     def get_wan_port_speed(self) -> WanPortSpeed:
@@ -475,6 +488,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
     def get_firmware_update(self) -> FirmwareUpdate:
         # Read only. The installed version, then what the web UI shows about TP-Link's cloud: the update count of
         # its top bar (check_upgrade) and the newest version on the Firmware Upgrade page (cloud_upgrade, load).
+        # Without WAN or a TP-Link ID the cloud fields stay empty/None (expected for local-only use).
         # operation=upgrade on that same cloud_upgrade form starts the online upgrade: it is never sent here
         data = self.request('admin/firmware?form=upgrade&operation=read', 'operation=read')
         update = FirmwareUpdate(installed_version=data.get('firmware_version') or None)
@@ -587,6 +601,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             return
         # Like the web page: Smart Connect is one network on every band, so the 5 GHz bands get the 2.4 GHz
         # name and security. Turning it off does not bring their old settings back.
+        # Dual form= in the URL (form=wireless_5g&form=wireless_5g_2) is intentional: the web UI sends it that way.
         data = self.request('admin/wireless?form=wireless_2g', 'operation=read')
         values = {}
         for key in ('enable', 'ssid', 'hidden', 'encryption', 'psk_version', 'psk_cipher', 'psk_key', 'disabled_all'):
@@ -703,61 +718,6 @@ class TplinkC5400XRouter(TplinkBaseRouter):
         data = self.request('admin/wireless?form=guest&operation=read', 'operation=read')
         return GuestNetworkAccess(each_other=_flag(data.get('isolate')), local_network=_flag(data.get('access')))
 
-    def set_wifi(self, wifi: Connection, enable: bool = None, ssid: str = None, hidden: str = None,
-                 encryption: str = None, psk_version: str = None, psk_cipher: str = None, psk_key: str = None,
-                 hwmode: str = None, htmode: str = None, channel: int = None, txpower: str = None,
-                 disabled_all: str = None) -> None:
-        values = {
-            Connection.HOST_2G: 'wireless_2g',
-            Connection.HOST_5G: 'wireless_5g',
-            Connection.HOST_5G_2: 'wireless_5g_2',
-            Connection.HOST_6G: 'wireless_6g',
-            Connection.GUEST_2G: 'guest_2g',
-            Connection.GUEST_5G: 'guest_5g',
-            Connection.GUEST_5G_2: 'guest_5g_2',
-            Connection.GUEST_6G: 'guest_6g',
-            Connection.IOT_2G: 'iot_2g',
-            Connection.IOT_5G: 'iot_5g',
-            Connection.IOT_6G: 'iot_6g',
-        }
-
-        value = values.get(wifi)
-        if not value:
-            raise ValueError(f"Invalid Wi-Fi connection type: {wifi}")
-
-        if all(v is None for v in [enable, ssid, hidden, encryption, psk_version, psk_cipher, psk_key, hwmode,
-                                   htmode, channel, txpower, disabled_all]):
-            raise ValueError("At least one wireless setting must be provided")
-
-        data = "operation=write"
-
-        if enable is not None:
-            data += f"&enable={'on' if enable else 'off'}"
-        if ssid is not None:
-            data += f"&ssid={ssid}"
-        if hidden is not None:
-            data += f"&hidden={hidden}"
-        if encryption is not None:
-            data += f"&encryption={encryption}"
-        if psk_version is not None:
-            data += f"&psk_version={psk_version}"
-        if psk_cipher is not None:
-            data += f"&psk_cipher={psk_cipher}"
-        if psk_key is not None:
-            data += f"&psk_key={psk_key}"
-        if hwmode is not None:
-            data += f"&hwmode={hwmode}"
-        if htmode is not None:
-            data += f"&htmode={htmode}"
-        if channel is not None:
-            data += f"&channel={channel}"
-        if txpower is not None:
-            data += f"&txpower={txpower}"
-        if disabled_all is not None:
-            data += f"&disabled_all={disabled_all}"
-
-        self.request(f"admin/wireless?form={value}", data)
-
     def get_usb_storage(self) -> UsbStorage:
         # USB disks (USB Settings > Sharing Access). With no disk the list is an empty object. The size of each disk
         # comes from its volumes (contents&serial=...), as the web page reads them: not checked with a disk yet
@@ -778,7 +738,7 @@ class TplinkC5400XRouter(TplinkBaseRouter):
             try:
                 volumes = self.request('admin/disk_setting?form=contents&serial={}&operation=load'
                                        .format(quote(str(disk['serial']), safe='')), 'operation=load')
-            except Exception:
+            except (ClientError, ClientException):
                 continue
             for volume in volumes if isinstance(volumes, list) else []:
                 size, left = _usb_size(volume.get('capacity')), _usb_size(volume.get('free'))

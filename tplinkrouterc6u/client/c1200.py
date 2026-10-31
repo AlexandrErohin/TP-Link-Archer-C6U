@@ -1,3 +1,4 @@
+from logging import Logger
 from re import search
 from requests import post, Response
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
@@ -11,6 +12,13 @@ class TplinkC1200Router(TplinkC5400XRouter):
     _pwdNN = ''
     _pwdEE = ''
     _encryption = EncryptionWrapper()
+
+    def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
+                 verify_ssl: bool = True, timeout: int = 30) -> None:
+        super().__init__(host, password, username, logger, verify_ssl, timeout)
+        # Write-fix (Content-Type + URL dedup) stays shared; Traffic Monitor enrich on get_status() is
+        # C5400X-verified only (set _status_traffic_enrich=True to opt in on C1200).
+        self._status_traffic_enrich = False
 
     def supports(self) -> bool:
         if len(self.password) > 125:
