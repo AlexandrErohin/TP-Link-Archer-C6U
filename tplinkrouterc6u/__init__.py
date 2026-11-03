@@ -40,6 +40,7 @@ from tplinkrouterc6u.common.dataclass import (
     SMS,
     LTEStatus,
     DSLStatus,
+    RepeaterStatus,
     ServingCell,
     VPNStatus,
     WifiStatus,

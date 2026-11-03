@@ -520,6 +520,66 @@ class DSLStatus:
 
 
 @dataclass
+class RepeaterStatus:
+    """Wireless backhaul of a range extender in repeater mode, as the extender reports it.
+
+    ``rssi_*`` is the signal of the upstream access point in dBm. ``rx_rate_*`` and
+    ``tx_rate_*`` are PHY link rates in Mbps, not measured throughput. ``bssid_*`` is
+    the MAC address of the upstream access point radio on that band.
+
+    RSSI and PHY rates are ``None`` unless that band's connection reads ``connected``,
+    so a dropped backhaul never shows stale values. This includes an unknown state:
+    ``connection_*`` is ``None`` when the firmware does not report it, and
+    ``'disconnected'`` (or another value) when it does.
+
+    ``mesh_enable`` and ``mesh_sync_status`` are separate on purpose: a node can have
+    mesh enabled but not synced. ``mesh_sync_status`` is the raw firmware value.
+
+    Any other field is ``None`` when the firmware does not report it.
+    """
+    connection_2g: str | None = None
+    connection_5g: str | None = None
+    internet_status: str | None = None
+    ipconn_status: str | None = None
+    ssid_2g: str | None = None
+    ssid_5g: str | None = None
+    _bssid_2g: EUI48 | None = None
+    _bssid_5g: EUI48 | None = None
+    rssi_2g: int | None = None
+    rssi_5g: int | None = None
+    rx_rate_2g: int | None = None
+    tx_rate_2g: int | None = None
+    rx_rate_5g: int | None = None
+    tx_rate_5g: int | None = None
+    mesh_enable: bool | None = None
+    mesh_sync_status: str | None = None
+
+    @property
+    def connected_2g(self) -> bool:
+        return self.connection_2g == 'connected'
+
+    @property
+    def connected_5g(self) -> bool:
+        return self.connection_5g == 'connected'
+
+    @property
+    def bssid_2g(self) -> str | None:
+        return str(self._bssid_2g) if self._bssid_2g is not None else None
+
+    @property
+    def bssid_2g_macaddress(self) -> EUI48 | None:
+        return self._bssid_2g
+
+    @property
+    def bssid_5g(self) -> str | None:
+        return str(self._bssid_5g) if self._bssid_5g is not None else None
+
+    @property
+    def bssid_5g_macaddress(self) -> EUI48 | None:
+        return self._bssid_5g
+
+
+@dataclass
 class VPNStatus:
     openvpn_enable: bool | None = None
     pptpvpn_enable: bool | None = None
