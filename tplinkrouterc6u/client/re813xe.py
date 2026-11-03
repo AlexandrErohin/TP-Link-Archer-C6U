@@ -112,8 +112,13 @@ class TplinkRE813XERouter(AbstractRouter):
             get_ip(item.get('ipaddr', item.get('ip', ''))),
             item.get('name', ''),
         )
-        device.down_speed = item.get('rxrate', item.get('rx_rate'))
-        device.up_speed = item.get('txrate', item.get('tx_rate'))
+        # rxrate / txrate are PHY link rates in Mbps, so they belong in rx_rate / tx_rate.
+        # down_speed / up_speed keep the same values for backward compatibility; removing
+        # that duplicate is a separate, announced change.
+        device.rx_rate = item.get('rxrate', item.get('rx_rate'))
+        device.tx_rate = item.get('txrate', item.get('tx_rate'))
+        device.down_speed = device.rx_rate
+        device.up_speed = device.tx_rate
         return device
 
     def get_firmware(self) -> Firmware:

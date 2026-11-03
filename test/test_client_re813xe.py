@@ -389,6 +389,13 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(len(guest), 2)
         self.assertEqual(guest[0].type, Connection.GUEST_2G)
         self.assertEqual(guest[0].down_speed, 150)
+        # rxrate / txrate are PHY link rates in Mbps: they fill rx_rate / tx_rate, and
+        # down_speed / up_speed keep the same values for backward compatibility.
+        rates = {d.macaddr: (d.rx_rate, d.tx_rate, d.down_speed, d.up_speed) for d in status.devices}
+        self.assertEqual(rates['7C-2C-67-D9-E9-14'], (108, 150, 108, 150))
+        self.assertEqual(rates['26-96-9F-67-1E-C5'], (648, 960, 648, 960))
+        self.assertEqual(rates['B0-4A-39-98-20-AD'], (150, 150, 150, 150))
+        self.assertEqual(rates['FC-3C-D7-2A-DE-10'], (52, 65, 52, 65))
 
     def test_get_ipv4_status(self) -> None:
         client = self._client()
