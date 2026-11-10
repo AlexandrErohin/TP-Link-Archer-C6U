@@ -1,6 +1,6 @@
 # Changelog
 
-## [UNRELEASED] - 2026-11-10
+## [5.39.0] - 2026-11-10
 
 ### Added
 
@@ -10,6 +10,7 @@
 ### Fixed
 
 - **C1200 / C5400X:** `TplinkC1200Router.authorize()` retries local login with PKCS#1 v1.5 padding when zero padding gets `login failed`, so Archer C5400X (and similar firmwares) accept the plain local password via `TplinkRouterProvider` / `TplinkC1200Router` without copying the web-encrypted value ([#251](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/251), [#252](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/252)).
+- **C6U / SG:** do not add `smart_network` / `game_accelerator`-only clients whose `onlineTime` is `0` (history rows after disconnect, e.g. Archer AX23). Primary-list clients are unchanged. A brand-new smart-only client that briefly reports `0` may appear on the next poll ([#260](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/260), related [#106](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/106)).
 
 ### Changed
 
