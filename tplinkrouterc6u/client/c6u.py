@@ -462,6 +462,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                     continue
 
                 if mac not in devices:
+                    if item.get('onlineTime', item.get('online_time')) in (0, '0'):
+                        continue
                     conn = self._map_wire_type(item.get('deviceTag'), not item.get('isGuest'))
                     devices[mac] = Device(conn, get_mac(item.get('mac', '00:00:00:00:00:00')),
                                           get_ip(item.get('ip', '0.0.0.0')), item.get('deviceName', ''))
