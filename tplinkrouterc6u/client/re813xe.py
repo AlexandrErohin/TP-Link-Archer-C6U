@@ -148,8 +148,8 @@ class TplinkRE813XERouter(AbstractRouter):
         # rxrate / txrate are PHY link rates in Mbps, so they belong in rx_rate / tx_rate.
         # down_speed / up_speed keep the same values for backward compatibility; removing
         # that duplicate is a separate, announced change.
-        device.rx_rate = item.get('rxrate', item.get('rx_rate'))
-        device.tx_rate = item.get('txrate', item.get('tx_rate'))
+        device.rx_rate = TplinkRE813XERouter._to_int(item.get('rxrate', item.get('rx_rate')))
+        device.tx_rate = TplinkRE813XERouter._to_int(item.get('txrate', item.get('tx_rate')))
         device.down_speed = device.rx_rate
         device.up_speed = device.tx_rate
         return device

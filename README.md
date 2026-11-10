@@ -276,8 +276,8 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | hostname | client hostname | str |
 | packets_sent | total packets sent | int, None |
 | packets_received | total packets received | int, None |
-| down_speed | download speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
-| up_speed | upload speed (Archer C5400X: bytes/s, from the Traffic Monitor list) | int, None |
+| down_speed | download / receive speed (Archer C5400X: bytes/s from Traffic Monitor; RE813XE family: currently the same PHY Mbps as `rx_rate`, for compatibility) | int, None |
+| up_speed | upload / transmit speed (Archer C5400X: bytes/s from Traffic Monitor; RE813XE family: currently the same PHY Mbps as `tx_rate`, for compatibility) | int, None |
 | tx_rate | transmit rate (Mbps) | int, None |
 | rx_rate | receive rate (Mbps) | int, None |
 | online_time | client online time (seconds) | float, None |

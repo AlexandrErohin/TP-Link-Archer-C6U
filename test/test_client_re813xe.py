@@ -436,6 +436,17 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(rates['B0-4A-39-98-20-AD'], (150, 150, 150, 150))
         self.assertEqual(rates['FC-3C-D7-2A-DE-10'], (52, 65, 52, 65))
 
+    def test_device_from_item_coerces_string_phy_rates(self) -> None:
+        device = TplinkRE813XERouter._device_from_item(
+            Connection.HOST_2G,
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ipaddr': '192.168.0.10', 'name': 'phone',
+             'rxrate': '108', 'txrate': '150'},
+        )
+        self.assertEqual((device.rx_rate, device.tx_rate, device.down_speed, device.up_speed),
+                         (108, 150, 108, 150))
+        self.assertIsInstance(device.rx_rate, int)
+        self.assertIsInstance(device.tx_rate, int)
+
     def test_get_ipv4_status(self) -> None:
         client = self._client()
 

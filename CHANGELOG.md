@@ -5,16 +5,16 @@
 ### Added
 
 - **RE813XE / RE700X / RE605X / RE505X:** `get_repeater_status()` returns wireless backhaul state as `RepeaterStatus` (upstream RSSI/PHY rates, BSSID/SSID, internet/IP connection, mesh enable/sync). Forms the firmware answers with `no such callback` are skipped on later calls; other errors are not latched ([#258](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/258)).
+- **RE813XE / RE700X / RE605X / RE505X:** `get_status()` fills `Device.rx_rate` / `tx_rate` from client `rxrate` / `txrate` (PHY Mbps, same idea as C6U). `down_speed` / `up_speed` still carry the same values for Home Assistant compatibility ([#259](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/259)).
 
 ### Fixed
 
 - **C1200 / C5400X:** `TplinkC1200Router.authorize()` retries local login with PKCS#1 v1.5 padding when zero padding gets `login failed`, so Archer C5400X (and similar firmwares) accept the plain local password via `TplinkRouterProvider` / `TplinkC1200Router` without copying the web-encrypted value ([#251](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/251), [#252](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/252)).
-- **C1200:** before the PKCS#1 retry, refresh the login RSA key; map PKCS#1 `ValueError` (password too long for the key) back to the usual authorize failure instead of an uncaught error; `_is_login_failed` catches `Exception` only.
-- **RE813XE:** `get_repeater_status()` coerces RSSI/PHY rates to `int` and `mesh_sync_status` to `str` so string-encoded JSON numbers and integer sync values stay typed.
 
 ### Changed
 
 - **Docs:** README notes that C5400X plain password works through the provider / `TplinkC1200Router`; web-encrypted password remains required for direct `TplinkC5400XRouter` / RE813XE-style clients.
+- **Docs:** `Device.down_speed` / `up_speed` note that on the RE813XE family they currently duplicate PHY Mbps (`rx_rate` / `tx_rate`), unlike C5400X Traffic Monitor bytes/s.
 
 ## [5.38.0] - 2026-10-31
 
