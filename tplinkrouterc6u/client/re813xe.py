@@ -87,6 +87,19 @@ class TplinkRE813XERouter(AbstractRouter):
         return str(v).lower() in ('yes', 'true', 'on', '1') if v is not None else None
 
     @staticmethod
+    def _to_int(value) -> int | None:
+        if value is None or value == '':
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _to_str(value) -> str | None:
+        return None if value is None else str(value)
+
+    @staticmethod
     def _map_wire_type(data: str | None, host: bool = True) -> Connection:
         if data is None:
             return Connection.UNKNOWN
@@ -374,12 +387,12 @@ class TplinkRE813XERouter(AbstractRouter):
         mesh = self._request_if_supported('admin/easy_mesh?form=mesh_info')
 
         status = RepeaterStatus()
-        status.connection_2g = repeater.get('repeater_conn_24g')
-        status.connection_5g = repeater.get('repeater_conn_5g')
-        status.internet_status = repeater.get('internet_status')
-        status.ipconn_status = repeater.get('ipconn_status')
-        status.ssid_2g = root.get('ap_ssid_24g')
-        status.ssid_5g = root.get('ap_ssid_5g')
+        status.connection_2g = self._to_str(repeater.get('repeater_conn_24g'))
+        status.connection_5g = self._to_str(repeater.get('repeater_conn_5g'))
+        status.internet_status = self._to_str(repeater.get('internet_status'))
+        status.ipconn_status = self._to_str(repeater.get('ipconn_status'))
+        status.ssid_2g = self._to_str(root.get('ap_ssid_24g'))
+        status.ssid_5g = self._to_str(root.get('ap_ssid_5g'))
         if root.get('ap_mac_24g'):
             status._bssid_2g = get_mac(root['ap_mac_24g'])
         if root.get('ap_mac_5g'):
@@ -387,15 +400,15 @@ class TplinkRE813XERouter(AbstractRouter):
         # RSSI and PHY rates are readings of a live link: report them only for a
         # connected band, so a dropped backhaul never shows stale values.
         if status.connected_2g:
-            status.rssi_2g = root.get('ap_rssi_24g')
-            status.rx_rate_2g = root.get('2grxrate')
-            status.tx_rate_2g = root.get('2gtxrate')
+            status.rssi_2g = self._to_int(root.get('ap_rssi_24g'))
+            status.rx_rate_2g = self._to_int(root.get('2grxrate'))
+            status.tx_rate_2g = self._to_int(root.get('2gtxrate'))
         if status.connected_5g:
-            status.rssi_5g = root.get('ap_rssi_5g')
-            status.rx_rate_5g = root.get('5grxrate')
-            status.tx_rate_5g = root.get('5gtxrate')
+            status.rssi_5g = self._to_int(root.get('ap_rssi_5g'))
+            status.rx_rate_5g = self._to_int(root.get('5grxrate'))
+            status.tx_rate_5g = self._to_int(root.get('5gtxrate'))
         status.mesh_enable = self._str2bool(mesh.get('mesh_enable'))
-        status.mesh_sync_status = mesh.get('sync_status')
+        status.mesh_sync_status = self._to_str(mesh.get('sync_status'))
         return status
 
     def get_ipv4_reservations(self) -> list:

@@ -881,6 +881,27 @@ class TestTplinkRE813XERouter(TestCase):
         self.assertEqual(repeater.internet_status, 'connected')
         self.assertTrue(repeater.mesh_enable)
 
+    def test_get_repeater_status_coerces_string_numbers_and_sync_status(self) -> None:
+        # Some firmwares may JSON-encode rates/RSSI as strings and sync_status as an int.
+        forms = deepcopy(REPEATER_FORMS)
+        forms['admin/status?form=rootAP'].update({
+            'ap_rssi_24g': '-59', 'ap_rssi_5g': '-63',
+            '2grxrate': '5', '2gtxrate': '144', '5grxrate': '526', '5gtxrate': '650',
+        })
+        forms['admin/easy_mesh?form=mesh_info']['sync_status'] = 0
+        client, _ = self._repeater_client(forms)
+
+        repeater = client.get_repeater_status()
+
+        self.assertEqual(repeater.rssi_2g, -59)
+        self.assertEqual(repeater.rssi_5g, -63)
+        self.assertEqual(repeater.rx_rate_2g, 5)
+        self.assertEqual(repeater.tx_rate_2g, 144)
+        self.assertEqual(repeater.rx_rate_5g, 526)
+        self.assertEqual(repeater.tx_rate_5g, 650)
+        self.assertEqual(repeater.mesh_sync_status, '0')
+        self.assertIsInstance(repeater.mesh_sync_status, str)
+
     def test_provider_registers_before_c5400x(self) -> None:
         from tplinkrouterc6u import TplinkRouterProvider, TplinkC5400XRouter
         clients = list(TplinkRouterProvider.get_clients().keys())
