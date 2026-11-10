@@ -65,8 +65,10 @@ logger = Logger('test')
 # router = TplinkRouter('http://192.168.0.1', 'password')
 # You may also pass username if it is different and a logger to log errors as
 # router = TplinkRouter('http://192.168.0.1', 'password', 'admin2', logger=logger)
-# C5400X / RE813XE / RE700X / similar: use web encrypted password (see Web Encrypted Password below)
+# C5400X: plain local password works with get_client() / TplinkC1200Router (PKCS#1 fallback).
+# TplinkC5400XRouter still needs the web-encrypted value (see Web Encrypted Password below).
 # router = TplinkC5400XRouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
+# RE813XE / RE700X / similar: use web encrypted password
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 
 try:
@@ -121,8 +123,10 @@ The TP-Link Web Interface only supports up to 1 user logged in at a time (for se
 So before action you need to authorize and after logout. You can also use `with router:` (calls `authorize()` / `logout()` automatically).
 
 ### <a id="encrypted_pass">Web Encrypted Password</a>
+For Archer C5400X (and firmwares that reject zero-padded RSA login), the **plain local password** works with `TplinkRouterProvider.get_client()` or `TplinkC1200Router` — the client retries with PKCS#1 v1.5 padding like the web UI. You do not need the browser-copied value for that path.
+
 If you got exception - `use web encrypted password instead. Check the documentation!`
-or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get web encrypted password by these actions:
+or you use `TplinkC5400XRouter` / `TplinkRE813XERouter` (RE813XE, RE700X, …) directly, get the web encrypted password by these actions:
 1. Go to the login page of your router. (default: 192.168.0.1).
 2. Type in the password you use to login into the password field.
 3. Click somewhere else on the page so that the password field is not selected anymore.

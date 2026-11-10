@@ -52,9 +52,15 @@ class TplinkC1200Router(TplinkC5400XRouter):
         if not self._pkcs1 and self._is_login_failed(response):
             # Some firmwares (e.g. Archer C5400X) only accept PKCS#1 v1.5 padding, like their web UI does
             self._pkcs1 = True
-            response = self._try_login()
-            if self._is_login_failed(response):
+            self._request_pwd()
+            try:
+                response = self._try_login()
+            except ClientException:
+                # Password too long for PKCS#1 (or encrypt failed): keep the zero-padding failure
                 self._pkcs1 = False
+            else:
+                if self._is_login_failed(response):
+                    self._pkcs1 = False
 
         data = response.text
         try:
@@ -102,7 +108,12 @@ class TplinkC1200Router(TplinkC5400XRouter):
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
 
         if self._pkcs1:
-            crypted_pwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
+            try:
+                crypted_pwd = self._encryption.rsa_encrypt(self.password, self._pwdNN, self._pwdEE)
+            except ValueError as e:
+                raise ClientException(
+                    'TplinkRouter - C1200 - Password too long for PKCS#1 RSA encryption'
+                ) from e
         else:
             crypted_pwd = self._encryption.encrypt_password_C1200(self.password, self._pwdNN, self._pwdEE)
 
@@ -120,7 +131,7 @@ class TplinkC1200Router(TplinkC5400XRouter):
     def _is_login_failed(response: Response) -> bool:
         try:
             return response.json().get('errorcode') == 'login failed'
-        except BaseException:
+        except Exception:
             return False
 
     @staticmethod

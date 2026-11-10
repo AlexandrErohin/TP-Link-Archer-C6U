@@ -1,6 +1,17 @@
 # Changelog
 
- ## [5.38.0] - 2026-10-31
+## [UNRELEASED] - 2026-11-10
+
+### Fixed
+
+- **C1200 / C5400X:** `TplinkC1200Router.authorize()` retries local login with PKCS#1 v1.5 padding when zero padding gets `login failed`, so Archer C5400X (and similar firmwares) accept the plain local password via `TplinkRouterProvider` / `TplinkC1200Router` without copying the web-encrypted value ([#251](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/251), [#252](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/252)).
+- **C1200:** before the PKCS#1 retry, refresh the login RSA key; map PKCS#1 `ValueError` (password too long for the key) back to the usual authorize failure instead of an uncaught error; `_is_login_failed` catches `Exception` only.
+
+### Changed
+
+- **Docs:** README notes that C5400X plain password works through the provider / `TplinkC1200Router`; web-encrypted password remains required for direct `TplinkC5400XRouter` / RE813XE-style clients.
+
+## [5.38.0] - 2026-10-31
 
 ### Added
 

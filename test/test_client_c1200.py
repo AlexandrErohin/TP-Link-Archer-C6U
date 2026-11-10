@@ -1582,24 +1582,44 @@ class TestTPLinkC1200Client(TestCase):
 class FakeLoginRouter:
     """Answers the login form like a router that accepts one RSA padding."""
 
-    def __init__(self, password: str, accepts_pkcs1: bool, accepts_zero: bool) -> None:
+    def __init__(
+        self,
+        password: str,
+        accepts_pkcs1: bool,
+        accepts_zero: bool,
+        *,
+        first_login_forbidden: bool = False,
+        rotate_key_after_fail: bool = False,
+    ) -> None:
         self.key = RSA.generate(1024)
         self.password = password
         self.accepts_pkcs1 = accepts_pkcs1
         self.accepts_zero = accepts_zero
+        self.first_login_forbidden = first_login_forbidden
+        self.rotate_key_after_fail = rotate_key_after_fail
         self.logins = 0
+        self.pwd_reads = 0
 
     def post(self, url: str, params: dict | None = None, data: str = '', **kwargs) -> Mock:
         if params == {'operation': 'read'}:
+            self.pwd_reads += 1
             return self._response({
                 'success': True,
                 'data': {'password': [format(self.key.n, 'x'), format(self.key.e, 'x')]},
             })
 
+        if self.first_login_forbidden and self.logins == 0:
+            self.logins += 1
+            response = Mock(status_code=403, text='Forbidden', headers={})
+            response.json.side_effect = ValueError('no json')
+            return response
+
         self.logins += 1
         encrypted = bytes.fromhex(data.split('password=')[1])
         if self._matches(encrypted):
             return self._response({'success': True, 'data': {'stok': 'abc123'}})
+        if self.rotate_key_after_fail:
+            self.key = RSA.generate(1024)
         return self._response({'errorcode': 'login failed', 'success': False,
                                'data': {'failureCount': 1, 'errorcode': '-5001', 'attemptsAllowed': 9}})
 
@@ -1632,6 +1652,7 @@ class TestTPLinkC1200Login(TestCase):
         self.assertEqual(client._sysauth, 'def456')
         self.assertFalse(client._pkcs1)
         self.assertEqual(router.logins, 1)
+        self.assertEqual(router.pwd_reads, 1)
 
     def test_authorize_falls_back_to_pkcs1(self) -> None:
         router = FakeLoginRouter('secret', accepts_pkcs1=True, accepts_zero=False)
@@ -1641,6 +1662,7 @@ class TestTPLinkC1200Login(TestCase):
         self.assertEqual(client._stok, 'abc123')
         self.assertTrue(client._pkcs1)
         self.assertEqual(router.logins, 2)
+        self.assertEqual(router.pwd_reads, 2)
 
         with patch('tplinkrouterc6u.client.c1200.post', side_effect=router.post):
             client.authorize()
@@ -1652,6 +1674,41 @@ class TestTPLinkC1200Login(TestCase):
         with self.assertRaises(AuthorizeError):
             self._authorize(router, 'wrong')
         self.assertEqual(router.logins, 2)
+
+    def test_authorize_403_then_falls_back_to_pkcs1(self) -> None:
+        router = FakeLoginRouter(
+            'secret', accepts_pkcs1=True, accepts_zero=False, first_login_forbidden=True)
+
+        client = self._authorize(router, 'secret')
+
+        self.assertEqual(client._stok, 'abc123')
+        self.assertTrue(client._pkcs1)
+        # 403 + zero-padding fail + PKCS#1 success
+        self.assertEqual(router.logins, 3)
+        self.assertGreaterEqual(router.pwd_reads, 2)
+
+    def test_authorize_refreshes_key_before_pkcs1_retry(self) -> None:
+        router = FakeLoginRouter(
+            'secret', accepts_pkcs1=True, accepts_zero=False, rotate_key_after_fail=True)
+
+        client = self._authorize(router, 'secret')
+
+        self.assertEqual(client._stok, 'abc123')
+        self.assertTrue(client._pkcs1)
+        self.assertEqual(router.logins, 2)
+        self.assertEqual(router.pwd_reads, 2)
+
+    def test_authorize_pkcs1_password_too_long(self) -> None:
+        # PKCS#1 v1.5 max payload for a 1024-bit key is 117 bytes; zero padding still encrypts
+        password = 'a' * 120
+        router = FakeLoginRouter(password, accepts_pkcs1=True, accepts_zero=False)
+        client = TplinkC1200Router('http://192.168.0.1', password)
+
+        with self.assertRaises(AuthorizeError):
+            with patch('tplinkrouterc6u.client.c1200.post', side_effect=router.post):
+                client.authorize()
+        self.assertFalse(client._pkcs1)
+        self.assertEqual(router.logins, 1)
 
 
 if __name__ == "__main__":
