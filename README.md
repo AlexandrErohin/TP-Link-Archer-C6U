@@ -208,6 +208,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_lte_status | | Get lte info for LTE routers | [LTEStatus](#lte_status)  |
 | get_lte_serving_cells | | Get serving cells info for EX series routers | [[ServingCell]](#serving_cell) |
 | get_dsl_status | | Get DSL line status: sync rates, SNR margin, attenuation (MR/VR; also inherited by EX/VR1200v, EX DSL path untested on hardware; empty `DSLStatus` when there is no active DSL line) | [DSLStatus](#dsl_status) |
+| get_repeater_status | | Get the wireless backhaul of a range extender in repeater mode: upstream RSSI, PHY rates, BSSID/SSID, internet and mesh state (RE813XE family; forms the firmware does not have are skipped) | [RepeaterStatus](#repeater_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
 | get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first) → [PortStatus](#port_status). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 → [RouterPortStatus](#router_port_status) | [PortStatus](#port_status) / [RouterPortStatus](#router_port_status) |
@@ -502,6 +503,22 @@ Not all fields are filled by every client:
 | resource_blocks | Number of resource blocks allocated in the NR cell | int |
 | rsrp | dBm | int |
 | rsrq | dBm | int |
+
+### <a id="repeater_status">RepeaterStatus</a>
+| Field | Description | Type |
+| --- |---|---|
+| connection_2g / connection_5g | backhaul connection state per band as reported by the extender. Example: connected | str, None |
+| connected_2g / connected_5g | is the backhaul on this band connected; `False` also when the state is unknown (`connection_*` is `None`) | bool |
+| internet_status | internet state as reported by the extender. Example: connected | str, None |
+| ipconn_status | IP connection state as reported by the extender. Example: connected | str, None |
+| ssid_2g / ssid_5g | SSID of the upstream access point | str, None |
+| bssid_2g / bssid_5g | MAC address of the upstream access point radio | str, None |
+| bssid_2g_macaddress / bssid_5g_macaddress | MAC address of the upstream access point radio | macaddress.EUI48, None |
+| rssi_2g / rssi_5g | signal of the upstream access point in dBm; `None` unless `connected_*` is `True` | int, None |
+| rx_rate_2g / rx_rate_5g | backhaul receive PHY rate in Mbps (not throughput); `None` unless `connected_*` is `True` | int, None |
+| tx_rate_2g / tx_rate_5g | backhaul transmit PHY rate in Mbps (not throughput); `None` unless `connected_*` is `True` | int, None |
+| mesh_enable | is mesh enabled on the extender | bool, None |
+| mesh_sync_status | mesh sync state, raw firmware value. Kept separate from `mesh_enable`: mesh can be enabled but not synced | str, None |
 
 ### <a id="WifiStatus">WifiStatus</a>
 | Field | Description | Type |

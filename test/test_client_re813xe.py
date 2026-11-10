@@ -1,10 +1,49 @@
+from copy import deepcopy
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs
 from requests.exceptions import ConnectionError, Timeout
+from macaddress import EUI48
 
-from tplinkrouterc6u import TplinkRE813XERouter, Connection, Firmware, Status, IPv4Status, WifiStatus
+from tplinkrouterc6u import (
+    TplinkRE813XERouter, Connection, Firmware, Status, IPv4Status, WifiStatus, RepeaterStatus,
+)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
+
+
+# Captured from a live RE700X v1.0 (firmware 1.3.15 Build 20251124) in repeater mode.
+# Only SSIDs, MAC addresses and the IP address are anonymised. In this capture both bands share
+# one SSID and internet_status == ipconn_status, so tests cannot detect a swap of those pairs.
+RE700X_ROOT_AP = {
+    'ap_ssid_5g': 'upstream-ssid', 'ap_channel_24g': 0, 'ap_channel_5g': 0, 'ap_signal_5g': '2',
+    'ap_mac_5g': 'AA-BB-CC-00-00-02', 'ap_security_24g': '3', 'status': 1, 'show5gFlag': 'true',
+    'ap_rssi_24g': -59, '5grxrate': 526, 'ap_enable_24g': 'enable', 'show2gFlag': 'true',
+    'ap_signal_24g': '2', '2gtxrate': 144, '2grxrate': 5, 'ap_security_status_5g': '3',
+    'ap_enable_5g': 'enable', '5gtxrate': 650, 'ap_mac_24g': 'AA-BB-CC-00-00-00',
+    'ap_security_status_24g': '3', 'ap_security_5g': '3', 'ap_ssid_24g': 'upstream-ssid', 'ap_rssi_5g': -63,
+}
+RE700X_REPEATER = {
+    'repeater_conn_5g': 'connected', 'repeater_conn_wired_mesh': 'disconnected', 'wired_dhcp': '0',
+    'repeater_mac_24g': '02:00:00:00:00:3C', 'repeater_enable_5g': 'enable', 'wirelink_status_2': 'disconnected',
+    'guest_ssid_5g': '', 'wirelink_status_0': 'disconnected', 'show2gFlag': 'true',
+    'wirelink_status_1': 'disconnected', 'repeater_security_24g': '2', 'repeater_type': '1',
+    'wired_ip': '192.168.0.4', 'guest_enable_24g': 'disable', 'internet_status': 'connected',
+    'guest_mac_24g': '', 'guest_mac_5g': '', 'ipconn_status': 'connected', 'wired_type': '0',
+    'wirelink_status_3': 'disconnected', 'repeater_security_5g': '2', 'wirelink_status_4': 'disconnected',
+    'repeater_channel_5g': 48, 'repeater_conn_24g': 'connected', 'guest_ssid_24g': '',
+    'guest_enable_5g': 'disable', 'repeater_ssid_24g': 'upstream-ssid', 'repeater_channel_24g': 1,
+    'repeater_enable_24g': 'enable', 'show5gFlag': 'true', 'repeater_ssid_5g': 'upstream-ssid',
+    'repeater_mac_5g': '02:00:00:00:00:3B',
+}
+RE700X_MESH_INFO = {
+    'mesh_enable': 'on', 'led_sync_show': False, 'time_sync_enable': 'off', 'time': 30, 'sync_status': '0',
+    'status': 0, 'ap_support_mesh': 1, 'time_sync_show': False, 'led_sync_enable': 'off',
+}
+REPEATER_FORMS: dict = {
+    'admin/status?form=rootAP': RE700X_ROOT_AP,
+    'admin/status?form=repeater': RE700X_REPEATER,
+    'admin/easy_mesh?form=mesh_info': RE700X_MESH_INFO,
+}
 
 
 class TestTplinkRE813XERouter(TestCase):
@@ -672,6 +711,175 @@ class TestTplinkRE813XERouter(TestCase):
         client.request = request  # type: ignore[method-assign]
         client.reboot()
         self.assertEqual(calls, [('admin/system?form=reboot', 'operation=write', True)])
+
+    def _repeater_client(self, forms: dict) -> tuple[TplinkRE813XERouter, list]:
+        client = self._client()
+        calls = []
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            calls.append((path, data))
+            reply = forms[path]
+            if isinstance(reply, Exception):
+                raise reply
+            return reply
+
+        client.request = request  # type: ignore[method-assign]
+        return client, calls
+
+    def test_get_repeater_status_re700x_fixtures(self) -> None:
+        client, calls = self._repeater_client(deepcopy(REPEATER_FORMS))
+
+        repeater = client.get_repeater_status()
+
+        self.assertIsInstance(repeater, RepeaterStatus)
+        self.assertEqual(sorted(calls), sorted((path, 'operation=read') for path in REPEATER_FORMS))
+        self.assertEqual(repeater.connection_2g, 'connected')
+        self.assertEqual(repeater.connection_5g, 'connected')
+        self.assertTrue(repeater.connected_2g)
+        self.assertTrue(repeater.connected_5g)
+        self.assertEqual(repeater.internet_status, 'connected')
+        self.assertEqual(repeater.ipconn_status, 'connected')
+        self.assertEqual(repeater.ssid_2g, 'upstream-ssid')
+        self.assertEqual(repeater.ssid_5g, 'upstream-ssid')
+        self.assertEqual(repeater.bssid_2g, 'AA-BB-CC-00-00-00')
+        self.assertEqual(repeater.bssid_5g, 'AA-BB-CC-00-00-02')
+        self.assertIsInstance(repeater.bssid_5g_macaddress, EUI48)
+        self.assertEqual(repeater.rssi_2g, -59)
+        self.assertEqual(repeater.rssi_5g, -63)
+        self.assertEqual(repeater.rx_rate_2g, 5)
+        self.assertEqual(repeater.tx_rate_2g, 144)
+        self.assertEqual(repeater.rx_rate_5g, 526)
+        self.assertEqual(repeater.tx_rate_5g, 650)
+        # Mesh enabled but not synced must stay two separate values.
+        self.assertTrue(repeater.mesh_enable)
+        self.assertEqual(repeater.mesh_sync_status, '0')
+
+    def test_get_repeater_status_disconnected_band_reports_no_readings(self) -> None:
+        # A band that is not connected must not report RSSI or PHY rates for that band.
+        # Derived state: one field of the real capture changed. 'disconnected' is the
+        # firmware's own word (repeater_conn_wired_mesh in the same capture).
+        bands = {
+            '2g': ('repeater_conn_24g', 'AA-BB-CC-00-00-00', '5g', (-63, 526, 650)),
+            '5g': ('repeater_conn_5g', 'AA-BB-CC-00-00-02', '2g', (-59, 5, 144)),
+        }
+        for band, (conn_key, bssid, other, other_readings) in bands.items():
+            with self.subTest(band=band):
+                forms = deepcopy(REPEATER_FORMS)
+                forms['admin/status?form=repeater'][conn_key] = 'disconnected'
+                client, _ = self._repeater_client(forms)
+
+                repeater = client.get_repeater_status()
+
+                self.assertEqual(getattr(repeater, f'connection_{band}'), 'disconnected')
+                self.assertFalse(getattr(repeater, f'connected_{band}'))
+                for field in ('rssi', 'rx_rate', 'tx_rate'):
+                    self.assertIsNone(getattr(repeater, f'{field}_{band}'))
+                # The upstream access point identity is configuration, not a reading: keep it.
+                self.assertEqual(getattr(repeater, f'ssid_{band}'), 'upstream-ssid')
+                self.assertEqual(getattr(repeater, f'bssid_{band}'), bssid)
+                # The connected band is unaffected.
+                self.assertEqual(
+                    tuple(getattr(repeater, f'{field}_{other}') for field in ('rssi', 'rx_rate', 'tx_rate')),
+                    other_readings)
+
+    def test_get_repeater_status_unknown_connection_reports_no_readings(self) -> None:
+        # With the repeater form unsupported the connection state is unknown (None, not
+        # 'disconnected'). RSSI and PHY rates are then not reported; SSID and BSSID are kept.
+        forms = deepcopy(REPEATER_FORMS)
+        forms['admin/status?form=repeater'] = ClientError(
+            'Response with error; Request admin/status?form=repeater'
+            ' - Response {"errorcode": "no such callback", "success": false}')
+        client, _ = self._repeater_client(forms)
+
+        repeater = client.get_repeater_status()
+
+        for band in ('2g', '5g'):
+            self.assertIsNone(getattr(repeater, f'connection_{band}'))
+            self.assertFalse(getattr(repeater, f'connected_{band}'))
+            for field in ('rssi', 'rx_rate', 'tx_rate'):
+                self.assertIsNone(getattr(repeater, f'{field}_{band}'))
+            self.assertEqual(getattr(repeater, f'ssid_{band}'), 'upstream-ssid')
+        self.assertEqual(repeater.bssid_2g, 'AA-BB-CC-00-00-00')
+        self.assertEqual(repeater.bssid_5g, 'AA-BB-CC-00-00-02')
+        self.assertIsNone(repeater.internet_status)
+
+    def test_get_repeater_status_unsupported_form_is_skipped_after_first_reply(self) -> None:
+        # The firmware answers a missing form with {"errorcode": "no such callback", "success": false}
+        # (seen on RE605X for admin/extend?form=guest_settings). Only that reply marks a form
+        # unsupported; the other forms are still read on every call.
+        forms = deepcopy(REPEATER_FORMS)
+        forms['admin/easy_mesh?form=mesh_info'] = ClientError(
+            'TplinkRouter - TplinkRE813XERouter - Response with error; Request admin/easy_mesh?form=mesh_info'
+            ' - Response {"errorcode": "no such callback", "success": false}')
+        client, calls = self._repeater_client(forms)
+
+        first = client.get_repeater_status()
+        second = client.get_repeater_status()
+
+        for repeater in (first, second):
+            self.assertIsNone(repeater.mesh_enable)
+            self.assertIsNone(repeater.mesh_sync_status)
+            self.assertEqual(repeater.rssi_5g, -63)
+            self.assertEqual(repeater.internet_status, 'connected')
+        paths = [path for path, _ in calls]
+        self.assertEqual(paths.count('admin/easy_mesh?form=mesh_info'), 1)
+        self.assertEqual(paths.count('admin/status?form=rootAP'), 2)
+        self.assertEqual(paths.count('admin/status?form=repeater'), 2)
+
+    def test_get_repeater_status_other_errors_raise_and_are_not_latched(self) -> None:
+        # Transient failures (#244 contract): this call fails, the next call reads the form again.
+        for error in (ClientError('Response with error; Request admin/status?form=rootAP - Response 500'),
+                      Timeout('timeout'), ConnectionError('connection reset')):
+            forms = deepcopy(REPEATER_FORMS)
+            forms['admin/status?form=rootAP'] = error
+            client, calls = self._repeater_client(forms)
+
+            with self.assertRaises(type(error)):
+                client.get_repeater_status()
+
+            forms['admin/status?form=rootAP'] = deepcopy(RE700X_ROOT_AP)
+            repeater = client.get_repeater_status()
+            self.assertEqual(repeater.rssi_5g, -63)
+            self.assertEqual([path for path, _ in calls].count('admin/status?form=rootAP'), 2)
+            self.assertEqual(client._unsupported_forms, set())
+
+    def test_get_repeater_status_zero_rate_is_kept(self) -> None:
+        # A connected band can report a PHY rate of 0 (RE605X fixture in #241); 0 is a value, not None.
+        # Derived state: one field of the real capture changed per case.
+        for key, field in (('2grxrate', 'rx_rate_2g'), ('2gtxrate', 'tx_rate_2g'),
+                           ('5grxrate', 'rx_rate_5g'), ('5gtxrate', 'tx_rate_5g')):
+            with self.subTest(key=key):
+                forms = deepcopy(REPEATER_FORMS)
+                forms['admin/status?form=rootAP'][key] = 0
+                client, _ = self._repeater_client(forms)
+
+                self.assertEqual(getattr(client.get_repeater_status(), field), 0)
+
+    def test_get_repeater_status_mesh_off(self) -> None:
+        # Derived state: mesh_enable 'off'. 'off' is the firmware's own value for the
+        # time_sync_enable / led_sync_enable switches in the same capture.
+        forms = deepcopy(REPEATER_FORMS)
+        forms['admin/easy_mesh?form=mesh_info']['mesh_enable'] = 'off'
+        client, _ = self._repeater_client(forms)
+
+        repeater = client.get_repeater_status()
+
+        self.assertIs(repeater.mesh_enable, False)
+        self.assertEqual(repeater.mesh_sync_status, '0')
+
+    def test_get_repeater_status_ignores_non_dict_reply(self) -> None:
+        # request() can return a list; a form that does not answer with an object is ignored.
+        forms = deepcopy(REPEATER_FORMS)
+        forms['admin/status?form=rootAP'] = [RE700X_ROOT_AP]
+        client, _ = self._repeater_client(forms)
+
+        repeater = client.get_repeater_status()
+
+        self.assertIsNone(repeater.rssi_5g)
+        self.assertIsNone(repeater.bssid_2g)
+        self.assertIsNone(repeater.bssid_5g)
+        self.assertEqual(repeater.internet_status, 'connected')
+        self.assertTrue(repeater.mesh_enable)
 
     def test_provider_registers_before_c5400x(self) -> None:
         from tplinkrouterc6u import TplinkRouterProvider, TplinkC5400XRouter

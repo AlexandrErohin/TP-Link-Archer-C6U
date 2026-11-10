@@ -15,6 +15,7 @@ from tplinkrouterc6u.common.dataclass import (
     IPv4Status,
     Firmware,
     WifiStatus,
+    RepeaterStatus,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 
@@ -33,6 +34,10 @@ class TplinkRE813XERouter(AbstractRouter):
     RE700X-style guest status uses ``admin/status?form=guest`` and
     ``admin/extend?form=guest_settings`` when present; missing endpoints are
     ignored so one client covers both firmwares.
+
+    In repeater mode, ``get_repeater_status()`` reads the wireless backhaul.
+    A form the firmware answers with "no such callback" is not asked again;
+    any other error is raised and the form is read again on the next call.
     """
 
     def __init__(
@@ -73,6 +78,9 @@ class TplinkRE813XERouter(AbstractRouter):
         # the firmware likely lacks the endpoint — stop asking every poll.
         self._perf_status = True
         self._perf_ok = False
+        # Optional repeater forms the firmware answered with "no such callback".
+        # Only that explicit reply marks a form unsupported; any other error is raised.
+        self._unsupported_forms: set[str] = set()
 
     @staticmethod
     def _str2bool(v) -> bool | None:
@@ -97,6 +105,18 @@ class TplinkRE813XERouter(AbstractRouter):
         if data.startswith('iot_6'):
             return Connection.IOT_6G
         return Connection.UNKNOWN
+
+    def _request_if_supported(self, path: str) -> dict:
+        if path in self._unsupported_forms:
+            return {}
+        try:
+            data = self.request(path, 'operation=read')
+        except ClientError as e:
+            if 'no such callback' not in str(e):
+                raise
+            self._unsupported_forms.add(path)
+            return {}
+        return data if isinstance(data, dict) else {}
 
     def _request_optional(self, path: str, data: str = 'operation=read'):
         try:
@@ -340,6 +360,42 @@ class TplinkRE813XERouter(AbstractRouter):
                 if not self._perf_ok:
                     self._perf_status = False
 
+        return status
+
+    def get_repeater_status(self) -> RepeaterStatus:
+        """Wireless backhaul of the extender in repeater mode.
+
+        Reads ``admin/status?form=rootAP`` (upstream access point, RSSI, PHY rates),
+        ``admin/status?form=repeater`` (connection and internet state) and
+        ``admin/easy_mesh?form=mesh_info`` (mesh enable and sync state).
+        """
+        root = self._request_if_supported('admin/status?form=rootAP')
+        repeater = self._request_if_supported('admin/status?form=repeater')
+        mesh = self._request_if_supported('admin/easy_mesh?form=mesh_info')
+
+        status = RepeaterStatus()
+        status.connection_2g = repeater.get('repeater_conn_24g')
+        status.connection_5g = repeater.get('repeater_conn_5g')
+        status.internet_status = repeater.get('internet_status')
+        status.ipconn_status = repeater.get('ipconn_status')
+        status.ssid_2g = root.get('ap_ssid_24g')
+        status.ssid_5g = root.get('ap_ssid_5g')
+        if root.get('ap_mac_24g'):
+            status._bssid_2g = get_mac(root['ap_mac_24g'])
+        if root.get('ap_mac_5g'):
+            status._bssid_5g = get_mac(root['ap_mac_5g'])
+        # RSSI and PHY rates are readings of a live link: report them only for a
+        # connected band, so a dropped backhaul never shows stale values.
+        if status.connected_2g:
+            status.rssi_2g = root.get('ap_rssi_24g')
+            status.rx_rate_2g = root.get('2grxrate')
+            status.tx_rate_2g = root.get('2gtxrate')
+        if status.connected_5g:
+            status.rssi_5g = root.get('ap_rssi_5g')
+            status.rx_rate_5g = root.get('5grxrate')
+            status.tx_rate_5g = root.get('5gtxrate')
+        status.mesh_enable = self._str2bool(mesh.get('mesh_enable'))
+        status.mesh_sync_status = mesh.get('sync_status')
         return status
 
     def get_ipv4_reservations(self) -> list:
