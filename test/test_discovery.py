@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from tplinkrouterc6u.discovery import discover_router, DetectionError, DetectionResult
 from tplinkrouterc6u.provider import TplinkRouterProvider
+from tplinkrouterc6u.client.ax72 import TplinkRouterAX72
 from tplinkrouterc6u.client.c6u import TplinkRouter
 
 
@@ -18,38 +19,57 @@ class TestPassiveDiscovery(TestCase):
         self.assertEqual(result.client_name, 'TplinkRouterSG')
         self.assertEqual(post.call_count, 1)
         self.assertEqual(post.call_args.kwargs['data'], 'operation=read')
+        self.assertEqual(post.call_args.kwargs['headers'],
+                         {'Referer': 'http://router/webpages/index.html',
+                          'Content-Type': 'application/x-www-form-urlencoded'})
         self.assertEqual(post.call_args.kwargs['timeout'], 5)
 
     @patch('tplinkrouterc6u.discovery.post')
     def test_v1_11_uses_read_only_key_length(self, post):
         config = Mock()
         config.json.return_value = {'data': {'certification': []}}
+        auth = Mock()
+        auth.json.return_value = {'data': {'key': ['B' * 256, '010001']}}
         keys = Mock()
         keys.json.return_value = {
             'data': {'password': ['A' * 512, '010001']}}
-        post.side_effect = [config, keys]
+        post.side_effect = [config, auth, keys]
         result = discover_router('router')
         self.assertEqual(result.client_name, 'TplinkRouterV1_11')
-        self.assertEqual(post.call_count, 2)
-        self.assertTrue(all(call.kwargs['data'] == 'operation=read'
-                            for call in post.call_args_list))
+        self.assertEqual(post.call_count, 3)
+        self.assertEqual(post.call_args_list[0].kwargs['data'], 'operation=read')
+        self.assertTrue(all(call.kwargs['params'] == {'operation': 'read'}
+                            for call in post.call_args_list[1:]))
 
     @patch('tplinkrouterc6u.discovery.post')
     def test_classic_key(self, post):
-        config, keys = Mock(), Mock()
+        config, auth, keys = Mock(), Mock(), Mock()
         config.json.return_value = {'data': {}}
+        auth.json.return_value = {'data': {'key': ['B' * 256, '010001']}}
         keys.json.return_value = {
             'data': {'password': ['A' * 256, '010001']}}
-        post.side_effect = [config, keys]
+        post.side_effect = [config, auth, keys]
         self.assertEqual(discover_router('router').client_name, 'TplinkRouter')
 
     @patch('tplinkrouterc6u.discovery.post')
-    def test_unknown_key_fails_closed(self, post):
-        config, keys = Mock(), Mock()
+    def test_ax72_auth_key_is_not_misread_as_classic(self, post):
+        config, auth = Mock(), Mock()
         config.json.return_value = {'data': {}}
+        auth.json.return_value = {'data': {'key': ['B' * 128, '010001']}}
+        post.side_effect = [config, auth]
+        result = discover_router('router')
+        self.assertEqual(result.client_name, 'TplinkRouterAX72')
+        self.assertEqual(result.confidence, 'medium')
+        self.assertEqual(post.call_count, 2)
+
+    @patch('tplinkrouterc6u.discovery.post')
+    def test_unknown_key_fails_closed(self, post):
+        config, auth, keys = Mock(), Mock(), Mock()
+        config.json.return_value = {'data': {}}
+        auth.json.return_value = {'data': {'key': ['B' * 64, '010001']}}
         keys.json.return_value = {
             'data': {'password': ['not-hex', '010001']}}
-        post.side_effect = [config, keys]
+        post.side_effect = [config, auth, keys]
         self.assertIsNone(discover_router('router').client_name)
 
     @patch.object(TplinkRouterProvider, 'discover')
@@ -68,6 +88,16 @@ class TestPassiveDiscovery(TestCase):
                    side_effect=RuntimeError('invalid password')) as auth:
             with self.assertRaisesRegex(RuntimeError, 'invalid password'):
                 TplinkRouterProvider.get_client_safe('router', 'bad-password')
+            auth.assert_called_once()
+
+    @patch.object(TplinkRouterProvider, 'discover')
+    def test_ax72_selection_authorizes_once(self, discover):
+        discover.return_value = DetectionResult(
+            'TplinkRouterAX72', 'medium', '512-bit LuCI auth key')
+        with patch.object(TplinkRouterAX72, 'authorize') as auth, \
+             patch.object(TplinkRouterAX72, 'logout'):
+            router = TplinkRouterProvider.get_client_safe('router', 'bad-password')
+            self.assertIsInstance(router, TplinkRouterAX72)
             auth.assert_called_once()
 
     @patch.object(TplinkRouterProvider, 'discover')

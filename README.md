@@ -130,6 +130,35 @@ or you have TP-link C5400X, RE813XE, RE700X or similar device you need to get we
 5. Type `document.getElementById("login-password").value;`
 6. Copy the returned value as password and use it.
 
+
+## Safe, passive-first router discovery (opt-in)
+
+The legacy `TplinkRouterProvider.get_client(...)` auto-selection is retained
+for backward compatibility. It can try several authentication mechanisms and
+is **not** appropriate for routers with strict login-lockout behavior, and the
+client it returns is not authorized yet — call `authorize()` before use.
+
+For a cautious first attempt, use `TplinkRouterProvider.discover(host)` to
+fingerprint known LuCI variants without credentials or login attempts:
+
+```python
+from tplinkrouterc6u import TplinkRouterProvider
+result = TplinkRouterProvider.discover('http://192.168.0.1')
+print(result.client_name, result.confidence, result.evidence)
+# Optionally authenticate just the one detected backend:
+router = TplinkRouterProvider.get_client_safe(
+    'http://192.168.0.1', 'local-password')
+```
+
+The opt-in `get_client_safe` method selects a single SG, AX72, V1_11 or
+classic LuCI backend and attempts authentication at most once, returning an
+already-logged-in session. It does not call `supports()` or fall back to other
+logins if authentication fails. Unknown firmware raises `DetectionError`;
+select a known client explicitly rather than guessing. Key sizes are only a
+medium-confidence fingerprint, not proof of a signing scheme, and supported
+model coverage remains limited. Additional router families need their own
+verified read-only fingerprints before joining this API.
+
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
 
@@ -942,32 +971,3 @@ The sanity check test.py illustrates a few tests and runs through a list of quer
 - Run `python -m unittest discover ./test`
 
 ## Thanks To
- - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
- - [Encryption for TP-Link W9960](https://github.com/Electry/TPLink-W9960-APIClient) by [@Electry](https://github.com/Electry)
-
-## Safe, passive-first router discovery (opt-in)
-
-The legacy `TplinkRouterProvider.get_client(...)` auto-selection is retained
-for backward compatibility. It can try several authentication mechanisms and
-is **not** appropriate for routers with strict login-lockout behavior.
-
-For a cautious first attempt, use `TplinkRouterProvider.discover(host)` to
-fingerprint known LuCI variants without credentials or login attempts:
-
-```python
-from tplinkrouterc6u import TplinkRouterProvider
-result = TplinkRouterProvider.discover('http://192.168.0.1')
-print(result.client_name, result.confidence, result.evidence)
-# Optionally authenticate just the one detected backend:
-router = TplinkRouterProvider.get_client_safe(
-    'http://192.168.0.1', 'local-password')
-```
-
-The opt-in `get_client_safe` method selects a single SG, V1_11 or classic
-LuCI backend and attempts authentication at most once. It does not call
-`supports()` or fall back to other logins if authentication fails. Unknown
-firmware raises `DetectionError`; select a known client explicitly rather
-than guessing. Key size is only a medium-confidence discriminator, not proof
-of compatibility, and supported model coverage remains limited. Additional
-router families need their own verified read-only fingerprints before joining
-this API.

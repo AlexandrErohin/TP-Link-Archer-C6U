@@ -34,6 +34,12 @@ class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
+        """Auto-select a client by trying supports() in turn.
+
+        Note: the returned client is not yet authorized; call authorize()
+        before using it. See also get_client_safe() for a passive-first
+        alternative that returns a logged-in session.
+        """
         for client_name, client in TplinkRouterProvider.get_clients().items():
             if isinstance(client, TplinkC1200Router):
                 continue
@@ -90,11 +96,14 @@ class TplinkRouterProvider:
         Unlike get_client(), this never probes multiple passwords or silently
         falls back to another authentication implementation. Unsupported
         families must be selected explicitly or use legacy discovery.
+        Returns an already-authorized session; get_client() by contrast
+        returns a client on which authorize() still has to be called.
         """
         from tplinkrouterc6u.discovery import DetectionError
         result = TplinkRouterProvider.discover(host, verify_ssl, timeout)
         clients = {
             'TplinkRouterSG': TplinkRouterSG,
+            'TplinkRouterAX72': TplinkRouterAX72,
             'TplinkRouterV1_11': TplinkRouterV1_11,
             'TplinkRouter': TplinkRouter,
         }
