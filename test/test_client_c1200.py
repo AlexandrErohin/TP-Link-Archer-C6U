@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 from unittest import main, TestCase
 from unittest.mock import Mock, patch
-from json import loads
+from json import loads, dumps
 from urllib.parse import parse_qsl
+from Crypto.Cipher import PKCS1_v1_5
+from Crypto.PublicKey import RSA
+from Crypto.Util.number import bytes_to_long, long_to_bytes
 from tplinkrouterc6u import (
     TplinkC1200Router,
     WifiOffPeriod,
@@ -13,6 +16,7 @@ from tplinkrouterc6u import (
     HomeCareStatus,
     BlockedThreats,
     IpMacBinding,
+    AuthorizeError,
 )
 
 
@@ -1573,6 +1577,81 @@ class TestTPLinkC1200Client(TestCase):
         self.assertIsNone(settings.pptp_enabled)
         self.assertIsNone(settings.pptp_unencrypted_access)
         self.assertIsNone(settings.pptp_samba_access)
+
+
+class FakeLoginRouter:
+    """Answers the login form like a router that accepts one RSA padding."""
+
+    def __init__(self, password: str, accepts_pkcs1: bool, accepts_zero: bool) -> None:
+        self.key = RSA.generate(1024)
+        self.password = password
+        self.accepts_pkcs1 = accepts_pkcs1
+        self.accepts_zero = accepts_zero
+        self.logins = 0
+
+    def post(self, url: str, params: dict | None = None, data: str = '', **kwargs) -> Mock:
+        if params == {'operation': 'read'}:
+            return self._response({
+                'success': True,
+                'data': {'password': [format(self.key.n, 'x'), format(self.key.e, 'x')]},
+            })
+
+        self.logins += 1
+        encrypted = bytes.fromhex(data.split('password=')[1])
+        if self._matches(encrypted):
+            return self._response({'success': True, 'data': {'stok': 'abc123'}})
+        return self._response({'errorcode': 'login failed', 'success': False,
+                               'data': {'failureCount': 1, 'errorcode': '-5001', 'attemptsAllowed': 9}})
+
+    def _matches(self, encrypted: bytes) -> bool:
+        if self.accepts_pkcs1 and PKCS1_v1_5.new(self.key).decrypt(encrypted, None) == self.password.encode():
+            return True
+        plain = long_to_bytes(pow(bytes_to_long(encrypted), self.key.d, self.key.n))
+        return self.accepts_zero and plain.rstrip(b'\x00') == self.password.encode()
+
+    @staticmethod
+    def _response(body: dict) -> Mock:
+        response = Mock(status_code=200, text=dumps(body), headers={'set-cookie': 'sysauth=def456; path=/'})
+        response.json.return_value = body
+        return response
+
+
+class TestTPLinkC1200Login(TestCase):
+    def _authorize(self, router: FakeLoginRouter, password: str) -> TplinkC1200Router:
+        client = TplinkC1200Router('http://192.168.0.1', password)
+        with patch('tplinkrouterc6u.client.c1200.post', side_effect=router.post):
+            client.authorize()
+        return client
+
+    def test_authorize_zero_padding(self) -> None:
+        router = FakeLoginRouter('secret', accepts_pkcs1=False, accepts_zero=True)
+
+        client = self._authorize(router, 'secret')
+
+        self.assertEqual(client._stok, 'abc123')
+        self.assertEqual(client._sysauth, 'def456')
+        self.assertFalse(client._pkcs1)
+        self.assertEqual(router.logins, 1)
+
+    def test_authorize_falls_back_to_pkcs1(self) -> None:
+        router = FakeLoginRouter('secret', accepts_pkcs1=True, accepts_zero=False)
+
+        client = self._authorize(router, 'secret')
+
+        self.assertEqual(client._stok, 'abc123')
+        self.assertTrue(client._pkcs1)
+        self.assertEqual(router.logins, 2)
+
+        with patch('tplinkrouterc6u.client.c1200.post', side_effect=router.post):
+            client.authorize()
+        self.assertEqual(router.logins, 3)
+
+    def test_authorize_wrong_password(self) -> None:
+        router = FakeLoginRouter('secret', accepts_pkcs1=True, accepts_zero=True)
+
+        with self.assertRaises(AuthorizeError):
+            self._authorize(router, 'wrong')
+        self.assertEqual(router.logins, 2)
 
 
 if __name__ == "__main__":
