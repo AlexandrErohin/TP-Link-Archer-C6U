@@ -28,6 +28,7 @@ from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
 from tplinkrouterc6u.client.vr1200v import TplinkVR1200vRouter
+from tplinkrouterc6u.discovery import DetectionResult
 
 
 class TplinkRouterProvider:
@@ -82,7 +83,7 @@ class TplinkRouterProvider:
         raise ClientException(message)
 
     @staticmethod
-    def discover(host: str, verify_ssl: bool = True, timeout: int = 30):
+    def discover(host: str, verify_ssl: bool = True, timeout: int = 30) -> DetectionResult:
         """Fingerprint known LuCI families without sending credentials."""
         from tplinkrouterc6u.discovery import discover_router
         return discover_router(host, verify_ssl=verify_ssl, timeout=timeout)
@@ -93,8 +94,8 @@ class TplinkRouterProvider:
                         timeout: int = 30) -> AbstractRouter:
         """Select one client passively, then authorize at most once.
 
-        Unlike get_client(), this never probes multiple passwords or silently
-        falls back to another authentication implementation. Unsupported
+        Unlike get_client(), this never tries multiple client implementations
+        or silently falls back to another authentication path. Unsupported
         families must be selected explicitly or use legacy discovery.
         Returns an already-authorized session; get_client() by contrast
         returns a client on which authorize() still has to be called.

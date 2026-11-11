@@ -1,5 +1,11 @@
 # Changelog
 
+## [5.40.0] - 2026-11-11
+
+### Added
+
+- **Provider:** opt-in passive-first discovery — `TplinkRouterProvider.discover()` fingerprints SG / AX72 / V1_11 / classic LuCI without credentials; `get_client_safe()` authorizes that one backend at most once and returns a logged-in session. Legacy `get_client()` unchanged ([#256](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/256)).
+
 ## [5.39.0] - 2026-11-10
 
 ### Added

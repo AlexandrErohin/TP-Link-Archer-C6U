@@ -2,6 +2,8 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+from requests.exceptions import RequestException
+
 from tplinkrouterc6u.discovery import discover_router, DetectionError, DetectionResult
 from tplinkrouterc6u.provider import TplinkRouterProvider
 from tplinkrouterc6u.client.ax72 import TplinkRouterAX72
@@ -25,6 +27,17 @@ class TestPassiveDiscovery(TestCase):
         self.assertEqual(post.call_args.kwargs['timeout'], 5)
 
     @patch('tplinkrouterc6u.discovery.post')
+    def test_eu_ce_red_certification(self, post):
+        response = Mock()
+        response.json.return_value = {
+            'data': {'certification': ['EU CE RED']}}
+        post.return_value = response
+        result = discover_router('http://router')
+        self.assertEqual(result.client_name, 'TplinkRouterSG')
+        self.assertEqual(result.confidence, 'high')
+        self.assertEqual(post.call_count, 1)
+
+    @patch('tplinkrouterc6u.discovery.post')
     def test_v1_11_uses_read_only_key_length(self, post):
         config = Mock()
         config.json.return_value = {'data': {'certification': []}}
@@ -36,6 +49,7 @@ class TestPassiveDiscovery(TestCase):
         post.side_effect = [config, auth, keys]
         result = discover_router('router')
         self.assertEqual(result.client_name, 'TplinkRouterV1_11')
+        self.assertEqual(result.evidence, '≥2048-bit LuCI password RSA key')
         self.assertEqual(post.call_count, 3)
         self.assertEqual(post.call_args_list[0].kwargs['data'], 'operation=read')
         self.assertTrue(all(call.kwargs['params'] == {'operation': 'read'}
@@ -60,6 +74,17 @@ class TestPassiveDiscovery(TestCase):
         result = discover_router('router')
         self.assertEqual(result.client_name, 'TplinkRouterAX72')
         self.assertEqual(result.confidence, 'medium')
+        self.assertEqual(post.call_count, 2)
+
+    @patch('tplinkrouterc6u.discovery.post')
+    def test_sg_sized_auth_key_without_config_fails_closed(self, post):
+        """SG also serves a 512-bit auth key; do not guess AX72 if config failed."""
+        auth = Mock()
+        auth.json.return_value = {'data': {'key': ['B' * 128, '010001']}}
+        post.side_effect = [RequestException('config unreachable'), auth]
+        result = discover_router('router')
+        self.assertIsNone(result.client_name)
+        self.assertEqual(result.confidence, 'unknown')
         self.assertEqual(post.call_count, 2)
 
     @patch('tplinkrouterc6u.discovery.post')

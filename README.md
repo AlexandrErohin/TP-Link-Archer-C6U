@@ -163,6 +163,13 @@ medium-confidence fingerprint, not proof of a signing scheme, and supported
 model coverage remains limited. Additional router families need their own
 verified read-only fingerprints before joining this API.
 
+SG and AX72 both expose a 512-bit auth key; discovery only returns AX72 when
+`device_config` was read successfully and did not report an SG/CE_RED
+certification. Classic LuCI historically retries login once after a malformed
+or 403 response; `get_client_safe` disables that second try so a wrong password
+never burns two attempts — on a few firmwares a correct password that gets a
+transient first 403 may therefore need a manual retry.
+
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
 
@@ -992,3 +999,5 @@ The sanity check test.py illustrates a few tests and runs through a list of quer
 - Run `python -m unittest discover ./test`
 
 ## Thanks To
+ - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
+ - [Encryption for TP-Link W9960](https://github.com/Electry/TPLink-W9960-APIClient) by [@Electry](https://github.com/Electry)
