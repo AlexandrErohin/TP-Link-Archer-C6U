@@ -259,6 +259,7 @@ class IPv4ReservationsInfo:
 
     @property
     def is_full(self) -> bool:
+        # False when max_rules is unknown — not proof that the table has free slots.
         return self.max_rules is not None and self.used >= self.max_rules
 
 

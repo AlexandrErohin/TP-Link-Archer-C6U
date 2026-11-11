@@ -268,6 +268,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._logged = False
         self._sysauth = None
         self._data_block = 'data'
+        # Sibling metadata from the last valid request() envelope (e.g. others.max_rules).
+        # Only meaningful immediately after that request; loaders clear it first.
+        self._last_response_others = None
         self._smart_network = True
         self._wan_ipv4_dynamic = True
         self._easymesh = True
@@ -697,7 +700,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._last_response_others = None
         data = self.request(self._url_ipv4_reservations, 'operation=load')
         rows = self._as_list(data, 'list', 'IPv4 reservation')
-        others = getattr(self, '_last_response_others', None) or {}
+        others = self._last_response_others or {}
         max_rules = None
         try:
             if others.get('max_rules') not in (None, ''):
@@ -706,11 +709,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             max_rules = None
         return rows, max_rules
 
+    @staticmethod
+    def _reservation_name(item: dict) -> str:
+        # Empty comment must not hide a filled hostname (AX UI stores the name in hostname).
+        return item.get('comment') or item.get('hostname') or ''
+
     def _reservation_from_row(self, item: dict) -> IPv4Reservation:
-        return IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), item.get('comment', item.get('hostname')),
+        return IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), self._reservation_name(item),
                                self._str2bool(item['enable']))
 
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
+    def get_ipv4_reservations(self) -> list[IPv4Reservation]:
         rows, _ = self._load_ipv4_reservation_rows()
         return [self._reservation_from_row(item) for item in rows]
 
@@ -748,7 +756,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 continue
             if row_mac == mac:
                 raise ClientException('A reservation for MAC {} already exists'.format(mac))
-            if str(item.get('ip', '')).strip() == ip:
+            row_ip = str(item.get('ip', '')).strip()
+            if row_ip and str(get_ip(row_ip)) == ip:
                 raise ClientException('IP {} is already reserved for {}'.format(ip, item.get('mac')))
 
     def add_ipv4_reservation(self, macaddr: str, ipaddr: str, comment: str = '', enable: bool = True,
@@ -788,7 +797,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         if verify:
             rows, _ = self._load_ipv4_reservation_rows()
             _, row = self._find_reservation_row(rows, mac)
-            if row is None or str(row.get('ip', '')).strip() != ip:
+            if row is None or str(get_ip(str(row.get('ip', '')).strip())) != ip:
                 raise ClientException(
                     'Router accepted the reservation {} -> {} but did not store it'.format(mac, ip))
 
@@ -805,10 +814,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         With ``verify`` (default) a MAC/IP already used by another row is
         refused and the table is reloaded afterwards; ClientException is
-        raised when MAC, IP or enable did not persist. A new ``comment`` is
-        sent as both ``comment`` and ``hostname`` (Archer AX1800 v1.20 ignores
-        a rename that only changes ``comment``); the returned reservation is
-        the row the router actually stored.
+        raised when MAC, IP, enable or comment/hostname did not persist. A new
+        ``comment`` is sent as both ``comment`` and ``hostname`` (Archer AX1800
+        v1.20 ignores a rename that only changes ``comment``); the returned
+        reservation is the row the router actually stored.
         """
         rows, _ = self._load_ipv4_reservation_rows()
         _, target = self._find_reservation_row(rows, old_macaddr)
@@ -817,7 +826,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         current_mac = str(get_mac(target['mac']))
         new_mac = str(get_mac(macaddr)) if macaddr is not None else current_mac
-        new_ip = self._parse_reservation_ip(ipaddr) if ipaddr is not None else str(target.get('ip', '')).strip()
+        if ipaddr is not None:
+            new_ip = self._parse_reservation_ip(ipaddr)
+        else:
+            new_ip = str(get_ip(str(target.get('ip', '')).strip()))
         if verify:
             self._check_reservation_conflicts(rows, new_mac, new_ip, ignore_mac=current_mac)
 
@@ -844,8 +856,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         rows, _ = self._load_ipv4_reservation_rows()
         _, row = self._find_reservation_row(rows, new_mac)
-        if row is None or str(row.get('ip', '')).strip() != new_ip or (
-                enable is not None and self._str2bool(row.get('enable')) != enable):
+        if row is None or str(get_ip(str(row.get('ip', '')).strip())) != new_ip or (
+                enable is not None and self._str2bool(row.get('enable')) != enable) or (
+                comment is not None and self._reservation_name(row) != comment):
             raise ClientException('Router accepted the update of reservation {} but did not store it'
                                   .format(old_macaddr))
         if new_mac != current_mac and self._find_reservation_row(rows, current_mac)[1] is not None:

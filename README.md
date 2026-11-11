@@ -388,7 +388,7 @@ families. `internet_status`, hardware/firmware versions and `wired_ports` are De
 | max_rules | table capacity reported by the router (`others.max_rules`), None if not reported | int, None |
 | used | number of reservations | int |
 | free | free slots, None if `max_rules` is unknown | int, None |
-| is_full | whether the table is full | bool |
+| is_full | whether the table is full (`False` when `max_rules` is unknown — not proof that slots remain) | bool |
 
 ### <a id="IPv4DHCPLease">IPv4DHCPLease</a>
 | Field | Description | Type |
@@ -860,7 +860,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer AX11000 V1
 - Archer AX12 v1.0
 - Archer AX17 v1.0
-- Archer AX1800
+- Archer AX1800 v1.20
 - Archer AX20 (v1.0, v3.0)
 - Archer AX21 (v1.20, v3.0, v4.6)
 - Archer AX23 (v1.0, v1.2)

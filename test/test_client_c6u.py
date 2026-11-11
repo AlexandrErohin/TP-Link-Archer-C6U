@@ -2,7 +2,7 @@ from unittest import main, TestCase
 from unittest.mock import patch, Mock
 from macaddress import EUI48
 from ipaddress import IPv4Address, IPv6Address
-from json import loads
+from json import dumps, loads
 from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
     TplinkRouter,
@@ -1617,15 +1617,18 @@ class TestTPLinkClient(TestCase):
         client, _ = self._reservation_router([
             {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto', 'enable': 'on'},
             {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+            # Empty comment must fall back to hostname (AX UI name field).
+            {'mac': '02-00-00-00-00-20', 'ip': '10.0.0.20', 'comment': '', 'hostname': 'phone', 'enable': 'on'},
         ])
         info = client.get_ipv4_reservations_info()
         self.assertEqual(info.max_rules, 64)
-        self.assertEqual(info.used, 2)
-        self.assertEqual(info.free, 62)
+        self.assertEqual(info.used, 3)
+        self.assertEqual(info.free, 61)
         self.assertFalse(info.is_full)
         self.assertEqual(info.reservations[0].hostname, 'auto')
         self.assertEqual(info.reservations[1].macaddr, 'AA-BB-CC-DD-EE-FF')
         self.assertFalse(info.reservations[1].enabled)
+        self.assertEqual(info.reservations[2].hostname, 'phone')
 
     def test_get_ipv4_reservations_info_without_max(self) -> None:
         client, _ = self._reservation_router([], max_rules=None, envelope='list')
@@ -1685,6 +1688,9 @@ class TestTPLinkClient(TestCase):
             client.add_ipv4_reservation('02-00-00-00-00-16', '10.0.0.117')
         with self.assertRaises(ClientException):
             client.add_ipv4_reservation('02-00-00-00-00-17', '10.0.0.116')
+        # Normalised IP match (whitespace) must still count as a duplicate.
+        with self.assertRaises(ClientException):
+            client.add_ipv4_reservation('02-00-00-00-00-17', ' 10.0.0.116 ')
         with self.assertRaises(ClientException):
             client.add_ipv4_reservation('02-00-00-00-00-17', 'not-an-ip')
         self.assertTrue(all('operation=load' in d or 'operation=load' in p for p, d in calls))
@@ -1722,6 +1728,7 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(new, {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.120', 'comment': 'renamed',
                                'hostname': 'renamed', 'enable': 'off'})
         self.assertEqual(result.ipaddr, '10.0.0.120')
+        self.assertEqual(result.hostname, 'renamed')
         self.assertFalse(result.enabled)
 
     def test_update_ipv4_reservation_errors(self) -> None:
@@ -1741,6 +1748,15 @@ class TestTPLinkClient(TestCase):
         client, _ = self._reservation_router(rows, drop_writes=True)
         with self.assertRaises(ClientException) as ctx:
             client.update_ipv4_reservation('02-00-00-00-00-16', ipaddr='10.0.0.120')
+        self.assertIn('did not store', str(ctx.exception))
+
+        # Comment-only update must fail verify when the router keeps the old name.
+        client, _ = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto',
+             'enable': 'on'},
+        ], drop_writes=True)
+        with self.assertRaises(ClientException) as ctx:
+            client.update_ipv4_reservation('02-00-00-00-00-16', comment='renamed')
         self.assertIn('did not store', str(ctx.exception))
 
     def test_delete_ipv4_reservation(self) -> None:
@@ -2995,6 +3011,25 @@ class TestIPv4ListEnvelope(TestCase):
         # A later response without "others" must not leak the previous value.
         response.json.return_value = {'success': True, 'data': []}
         self.assertIsNone(client.get_ipv4_reservations_info().max_rules)
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_reservations_info_reads_others_through_aes_decrypt(self, mock_post: Mock) -> None:
+        """Classic AES clients keep others inside the decrypted JSON envelope."""
+        inner = dumps({
+            'success': True,
+            'data': [{'mac': '02-00-00-00-00-01', 'ip': '10.0.0.1', 'comment': 'a', 'enable': 'on'}],
+            'others': {'max_rules': 32},
+        })
+        response = Mock()
+        response.json.return_value = {'data': 'ciphertext'}
+        mock_post.return_value = response
+        client = TplinkRouter('http://192.168.0.1', 'password')
+        client._logged = True
+        with patch.object(client, '_prepare_data', return_value={'sign': 's', 'data': 'e'}), \
+             patch.object(client._encryption, 'aes_decrypt', return_value=inner):
+            info = client.get_ipv4_reservations_info()
+        self.assertEqual(info.max_rules, 32)
+        self.assertEqual(info.used, 1)
 
     @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
     def test_reservations_accept_bare_list(self, mock_request: Mock) -> None:
