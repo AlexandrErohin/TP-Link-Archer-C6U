@@ -23,7 +23,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 from tplinkrouterc6u import (
     TplinkRouterProvider,
     TplinkRouterV1_11,
-    TplinkRouterSG, # For routers like Archer BE3600, Archer BE230
+    TplinkRouterSG, # For routers like Archer BE3600, BE230, BE600 (SG crypto)
     TplinkRouterAX72,
     TplinkRouter,
     TplinkC1200Router,
@@ -154,21 +154,22 @@ router = TplinkRouterProvider.get_client_safe(
     'http://192.168.0.1', 'local-password')
 ```
 
-The opt-in `get_client_safe` method selects a single SG, AX72, V1_11 or
-classic LuCI backend and attempts authentication at most once, returning an
-already-logged-in session. It does not call `supports()` or fall back to other
-logins if authentication fails. Unknown firmware raises `DetectionError`;
-select a known client explicitly rather than guessing. Key sizes are only a
-medium-confidence fingerprint, not proof of a signing scheme, and supported
-model coverage remains limited. Additional router families need their own
-verified read-only fingerprints before joining this API.
+The opt-in `get_client_safe` method selects a single SG, V1_11 or classic LuCI
+backend (when fingerprinting is unambiguous) and attempts authentication at
+most once, returning an already-logged-in session. It does not call
+`supports()` or fall back to other logins if authentication fails. Unknown or
+ambiguous firmware raises `DetectionError`; select a known client explicitly
+rather than guessing. Key sizes are only a medium-confidence fingerprint, not
+proof of a signing scheme, and supported model coverage remains limited.
 
-SG and AX72 both expose a 512-bit auth key; discovery only returns AX72 when
-`device_config` was read successfully and did not report an SG/CE_RED
-certification. Classic LuCI historically retries login once after a malformed
-or 403 response; `get_client_safe` disables that second try so a wrong password
-never burns two attempts — on a few firmwares a correct password that gets a
-transient first 403 may therefore need a manual retry.
+SG and AX72 both expose a 512-bit auth key, and some SG firmwares omit
+SG/CE_RED certification (e.g. Archer BE600 US). Discovery therefore leaves a
+512-bit auth key unresolved; use `get_client()`, or construct
+`TplinkRouterSG` / `TplinkRouterAX72` directly. Classic LuCI historically
+retries login once after a malformed or 403 response; `get_client_safe`
+disables that second try so a wrong password never burns two attempts — on a
+few firmwares a correct password that gets a transient first 403 may therefore
+need a manual retry.
 
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
@@ -885,6 +886,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer BE400 v1.0
 - Archer BE450 v1.0
 - Archer BE550 (v1.0, V2)
+- Archer BE600 v1.0
 - Archer BE800 v1.0
 - Archer BE805 (v1.0, v1.20)
 - Archer C1200 (v1.0, v2.0)
@@ -950,6 +952,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - RE330 v1
 - RE505X v1.0
 - RE700X
+- RE705X v1.0
 - RE813XE v1.6
 - TD-W9960 (v1, V1.20)
 - TL-7DR6430 1.0

@@ -102,6 +102,8 @@ class TplinkRouterProvider:
         """
         from tplinkrouterc6u.discovery import DetectionError
         result = TplinkRouterProvider.discover(host, verify_ssl, timeout)
+        # AX72 is omitted: a 512-bit auth key is ambiguous with cert-less SG
+        # (e.g. Archer BE600 US). Pick TplinkRouterAX72 explicitly or use get_client().
         clients = {
             'TplinkRouterSG': TplinkRouterSG,
             'TplinkRouterAX72': TplinkRouterAX72,

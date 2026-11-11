@@ -66,19 +66,21 @@ class TestPassiveDiscovery(TestCase):
         self.assertEqual(discover_router('router').client_name, 'TplinkRouter')
 
     @patch('tplinkrouterc6u.discovery.post')
-    def test_ax72_auth_key_is_not_misread_as_classic(self, post):
+    def test_512bit_auth_key_without_sg_cert_fails_closed(self, post):
+        """512-bit auth is shared by SG (incl. cert-less BE600) and AX72."""
         config, auth = Mock(), Mock()
-        config.json.return_value = {'data': {}}
+        config.json.return_value = {'data': {'certification': ['US FCC']}}
         auth.json.return_value = {'data': {'key': ['B' * 128, '010001']}}
         post.side_effect = [config, auth]
         result = discover_router('router')
-        self.assertEqual(result.client_name, 'TplinkRouterAX72')
-        self.assertEqual(result.confidence, 'medium')
+        self.assertIsNone(result.client_name)
+        self.assertEqual(result.confidence, 'unknown')
+        self.assertIn('ambiguous', result.evidence)
         self.assertEqual(post.call_count, 2)
 
     @patch('tplinkrouterc6u.discovery.post')
     def test_sg_sized_auth_key_without_config_fails_closed(self, post):
-        """SG also serves a 512-bit auth key; do not guess AX72 if config failed."""
+        """Do not guess AX72/SG when device_config could not be read."""
         auth = Mock()
         auth.json.return_value = {'data': {'key': ['B' * 128, '010001']}}
         post.side_effect = [RequestException('config unreachable'), auth]

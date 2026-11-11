@@ -29,15 +29,15 @@ def discover_router(host: str, verify_ssl: bool = True,
                     timeout: int = 30) -> DetectionResult:
     """Identify a known LuCI API family without a login attempt.
 
-    This deliberately covers only SG, AX72, V1_11 and classic LuCI. A UI skin
-    or an unsuccessful probe is not enough to guess another model's auth
-    mode. Key sizes are medium-confidence fingerprints, not proof of a
-    signing scheme; anything ambiguous is left unresolved.
+    This deliberately covers only SG, V1_11 and classic LuCI for confident
+    matches. A UI skin or an unsuccessful probe is not enough to guess another
+    model's auth mode. Key sizes are medium-confidence fingerprints, not proof
+    of a signing scheme; anything ambiguous is left unresolved.
 
-    SG and AX72 both serve a 512-bit auth key, so AX72 is selected only when
-    device_config was read successfully and did not report an SG/CE_RED
-    certification. A failed config probe plus a 512-bit auth key stays
-    unresolved rather than guessing.
+    SG and AX72 both serve a 512-bit auth key, and some SG firmwares omit
+    SG/CE_RED certification (e.g. Archer BE600 US). A 512-bit auth key alone
+    is therefore left unresolved — use get_client() or pick TplinkRouterSG /
+    TplinkRouterAX72 explicitly rather than guessing via get_client_safe().
     """
     if not host.startswith(('http://', 'https://')):
         host = 'http://' + host
@@ -52,7 +52,6 @@ def discover_router(host: str, verify_ssl: bool = True,
     # and Content-Type headers TplinkBaseRouter sets for login requests:
     # without them this firmware answers "no such callback" and an SG router
     # would fall through to the password-key classification below.
-    config_ok = False
     try:
         response = post(config_url, data='operation=read',
                         headers={'Referer': host + '/webpages/index.html',
@@ -60,15 +59,13 @@ def discover_router(host: str, verify_ssl: bool = True,
                         timeout=probe_timeout, verify=verify_ssl)
         data = response.json().get('data', {})
         certs = data.get('certification', []) if isinstance(data, dict) else []
-        config_ok = True
         if isinstance(certs, list) and any(c in SG_CERTIFICATIONS for c in certs):
             return DetectionResult('TplinkRouterSG', 'high', 'SG/CE_RED certification')
     except (RequestException, ValueError, AttributeError, TypeError):
         pass
 
-    # A 512-bit auth key is also served by SG (e.g. Archer AX12 / AX23). Only
-    # treat it as AX72 when device_config was readable and was not SG/CE_RED;
-    # otherwise leave unresolved so get_client_safe does not burn a wrong login.
+    # 512-bit auth keys are shared by SG (with or without cert labels) and
+    # AX72. Leave unresolved so get_client_safe does not burn a wrong login.
     try:
         response = post(auth_url, params={'operation': 'read'},
                         timeout=probe_timeout, verify=verify_ssl)
@@ -77,12 +74,9 @@ def discover_router(host: str, verify_ssl: bool = True,
         if (isinstance(key, list) and len(key) == 2
                 and isinstance(key[0], str) and len(key[0]) == 128
                 and all(c in '0123456789abcdefABCDEF' for c in key[0])):
-            if not config_ok:
-                return DetectionResult(
-                    None, 'unknown',
-                    '512-bit auth key without confirmed non-SG device_config')
-            return DetectionResult('TplinkRouterAX72', 'medium',
-                                   '512-bit LuCI auth key')
+            return DetectionResult(
+                None, 'unknown',
+                '512-bit auth key is ambiguous between SG and AX72')
     except (RequestException, ValueError, AttributeError, TypeError):
         pass
 
