@@ -6,6 +6,7 @@ from json import loads
 from urllib.parse import parse_qsl
 from tplinkrouterc6u import (
     TplinkRouter,
+    TplinkRouterV1_11,
     Connection,
     Status,
     Firmware,
@@ -1574,56 +1575,184 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(check_url, 'admin/wireless?form=iot_6g')
         self.assertEqual(check_data, 'operation=write&enable=on')
 
-    def test_add_ipv4_reservation(self) -> None:
-        check_url = ''
-        check_data = ''
-        router_class = self.router_class
+    def _reservation_router(self, rows: list, max_rules: int | None = 64, drop_writes: bool = False,
+                            envelope: str | None = None):
+        """Return (client, calls) backed by an in-memory reservation table.
 
-        class TPLinkRouterTest(router_class):
-            def request(self, path: str, data: str,
-                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
-                nonlocal check_url, check_data
-                check_url = path
-                check_data = data
-                return None
-
-        client = TPLinkRouterTest('', '')
-        result = client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116', 'auto')
-        self.assertIsNone(result)
-        self.assertEqual(check_url, 'admin/dhcps?form=reservation')
-        body = dict(parse_qsl(check_data))
-        self.assertEqual(body['operation'], 'insert')
-        self.assertEqual(
-            loads(body['new']),
-            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'})
-
-        # MAC is normalised to dash-uppercase and a disabled entry sends enable=off
-        client.add_ipv4_reservation('aa-bb-cc-dd-ee-ff', '10.0.0.50', enable=False)
-        body = dict(parse_qsl(check_data))
-        self.assertEqual(
-            loads(body['new']),
-            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'})
-
-    def test_delete_ipv4_reservation(self) -> None:
+        Mimics the LuCI form: load returns the rows (optionally wrapped in a
+        ``list`` envelope) plus ``others.max_rules``; insert/update/remove
+        mutate the table unless ``drop_writes`` simulates a router that answers
+        success without saving (Archer AX1800 with a full table).
+        """
         calls = []
+        table = [dict(r) for r in rows]
         router_class = self.router_class
 
         class TPLinkRouterTest(router_class):
             def request(self, path: str, data: str,
                         ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
                 calls.append((path, data))
-                if 'operation=load' in path or (data and 'operation=load' in data):
-                    return [
-                        {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
-                        # Router may store a non-dash form; remove key must echo that string.
-                        {'mac': 'aa:bb:cc:dd:ee:ff', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
-                    ]
+                body = dict(parse_qsl(data)) if data and '=' in data else {}
+                op = body.get('operation') or ('load' if 'operation=load' in path else None)
+                if op == 'load':
+                    self._last_response_others = {'max_rules': max_rules} if max_rules is not None else None
+                    items = [dict(r) for r in table]
+                    return {envelope: items} if envelope else items
+                if drop_writes:
+                    return None
+                if op == 'insert':
+                    table.append(loads(body['new']))
+                elif op == 'update':
+                    old = loads(body['old'])
+                    for i, item in enumerate(table):
+                        if item['mac'] == old['mac']:
+                            table[i] = loads(body['new'])
+                elif op == 'remove':
+                    del table[int(body['index'])]
                 return None
 
-        client = TPLinkRouterTest('', '')
+        return TPLinkRouterTest('', ''), calls
+
+    def test_get_ipv4_reservations_info(self) -> None:
+        client, _ = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto', 'enable': 'on'},
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+        ])
+        info = client.get_ipv4_reservations_info()
+        self.assertEqual(info.max_rules, 64)
+        self.assertEqual(info.used, 2)
+        self.assertEqual(info.free, 62)
+        self.assertFalse(info.is_full)
+        self.assertEqual(info.reservations[0].hostname, 'auto')
+        self.assertEqual(info.reservations[1].macaddr, 'AA-BB-CC-DD-EE-FF')
+        self.assertFalse(info.reservations[1].enabled)
+
+    def test_get_ipv4_reservations_info_without_max(self) -> None:
+        client, _ = self._reservation_router([], max_rules=None, envelope='list')
+        info = client.get_ipv4_reservations_info()
+        self.assertIsNone(info.max_rules)
+        self.assertIsNone(info.free)
+        self.assertFalse(info.is_full)
+
+    def test_add_ipv4_reservation(self) -> None:
+        client, calls = self._reservation_router([])
+        result = client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116', 'auto')
+        self.assertIsNone(result)
+        # load (pre-check) -> insert -> load (verify)
+        self.assertEqual(len(calls), 3)
+        check_url, check_data = calls[1]
+        self.assertEqual(check_url, 'admin/dhcps?form=reservation')
+        body = dict(parse_qsl(check_data))
+        self.assertEqual(body['operation'], 'insert')
+        self.assertEqual(
+            loads(body['new']),
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto',
+             'enable': 'on'})
+
+        # MAC is normalised to dash-uppercase and a disabled entry sends enable=off
+        client.add_ipv4_reservation('aa-bb-cc-dd-ee-ff', '10.0.0.50', enable=False)
+        body = dict(parse_qsl(calls[-2][1]))
+        self.assertEqual(
+            loads(body['new']),
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'hostname': '', 'enable': 'off'})
+
+    def test_add_ipv4_reservation_without_verify(self) -> None:
+        client, calls = self._reservation_router([])
+        client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116', 'auto', verify=False)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(dict(parse_qsl(calls[0][1]))['operation'], 'insert')
+
+    def test_add_ipv4_reservation_table_full(self) -> None:
+        rows = [{'mac': '02-00-00-00-00-{:02X}'.format(i), 'ip': '10.0.0.{}'.format(i), 'comment': '',
+                 'enable': 'on'} for i in range(2)]
+        client, calls = self._reservation_router(rows, max_rules=2)
+        with self.assertRaises(ClientException) as ctx:
+            client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116')
+        self.assertIn('full', str(ctx.exception))
+        self.assertEqual(len(calls), 1)  # nothing was sent
+
+    def test_add_ipv4_reservation_not_persisted(self) -> None:
+        client, _ = self._reservation_router([], drop_writes=True)
+        with self.assertRaises(ClientException) as ctx:
+            client.add_ipv4_reservation('02:00:00:00:00:16', '10.0.0.116')
+        self.assertIn('did not store', str(ctx.exception))
+
+    def test_add_ipv4_reservation_duplicates(self) -> None:
+        client, calls = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
+        ])
+        with self.assertRaises(ClientException):
+            client.add_ipv4_reservation('02-00-00-00-00-16', '10.0.0.117')
+        with self.assertRaises(ClientException):
+            client.add_ipv4_reservation('02-00-00-00-00-17', '10.0.0.116')
+        with self.assertRaises(ClientException):
+            client.add_ipv4_reservation('02-00-00-00-00-17', 'not-an-ip')
+        self.assertTrue(all('operation=load' in d or 'operation=load' in p for p, d in calls))
+
+    def test_update_ipv4_reservation(self) -> None:
+        client, calls = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto', 'enable': 'on'},
+            {'mac': '2E-6B-B3-EC-42-40', 'ip': '10.0.0.212', 'comment': 'phone', 'hostname': 'phone',
+             'enable': 'on'},
+        ])
+        result = client.update_ipv4_reservation('2e:6b:b3:ec:42:40', macaddr='aa:60:27:17:8d:45')
+
+        # load -> update -> load (verify)
+        self.assertEqual(len(calls), 3)
+        path, data = calls[1]
+        self.assertEqual(path, 'admin/dhcps?form=reservation')
+        body = dict(parse_qsl(data))
+        self.assertEqual(body['operation'], 'update')
+        self.assertEqual(body['key'], '2E-6B-B3-EC-42-40')
+        self.assertEqual(loads(body['old']), {'mac': '2E-6B-B3-EC-42-40', 'ip': '10.0.0.212', 'comment': 'phone',
+                                              'hostname': 'phone', 'enable': 'on'})
+        self.assertEqual(loads(body['new']), {'mac': 'AA-60-27-17-8D-45', 'ip': '10.0.0.212', 'comment': 'phone',
+                                              'hostname': 'phone', 'enable': 'on'})
+        self.assertEqual(result.macaddr, 'AA-60-27-17-8D-45')
+        self.assertEqual(result.ipaddr, '10.0.0.212')
+        self.assertEqual(result.hostname, 'phone')
+
+    def test_update_ipv4_reservation_ip_comment_enable(self) -> None:
+        client, calls = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'hostname': 'auto', 'enable': 'on'},
+        ])
+        result = client.update_ipv4_reservation('02-00-00-00-00-16', ipaddr='10.0.0.120', comment='renamed',
+                                                enable=False)
+        new = loads(dict(parse_qsl(calls[1][1]))['new'])
+        self.assertEqual(new, {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.120', 'comment': 'renamed',
+                               'hostname': 'renamed', 'enable': 'off'})
+        self.assertEqual(result.ipaddr, '10.0.0.120')
+        self.assertFalse(result.enabled)
+
+    def test_update_ipv4_reservation_errors(self) -> None:
+        rows = [
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'a', 'enable': 'on'},
+            {'mac': '02-00-00-00-00-17', 'ip': '10.0.0.117', 'comment': 'b', 'enable': 'on'},
+        ]
+        client, _ = self._reservation_router(rows)
+        with self.assertRaises(ClientException):
+            client.update_ipv4_reservation('00:11:22:33:44:55', ipaddr='10.0.0.1')
+        # MAC or IP already used by another row
+        with self.assertRaises(ClientException):
+            client.update_ipv4_reservation('02-00-00-00-00-16', macaddr='02-00-00-00-00-17')
+        with self.assertRaises(ClientException):
+            client.update_ipv4_reservation('02-00-00-00-00-16', ipaddr='10.0.0.117')
+
+        client, _ = self._reservation_router(rows, drop_writes=True)
+        with self.assertRaises(ClientException) as ctx:
+            client.update_ipv4_reservation('02-00-00-00-00-16', ipaddr='10.0.0.120')
+        self.assertIn('did not store', str(ctx.exception))
+
+    def test_delete_ipv4_reservation(self) -> None:
+        client, calls = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
+            # Router may store a non-dash form; remove key must echo that string.
+            {'mac': 'aa:bb:cc:dd:ee:ff', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+        ])
         client.delete_ipv4_reservation('AA-BB-CC-DD-EE-FF')
 
-        self.assertEqual(len(calls), 2)
+        # load -> remove -> load (verify)
+        self.assertEqual(len(calls), 3)
         load_path, load_data = calls[0]
         self.assertIn('form=reservation', load_path)
 
@@ -1636,30 +1765,29 @@ class TestTPLinkClient(TestCase):
 
     def test_delete_ipv4_reservation_list_envelope(self) -> None:
         """Some firmwares wrap the reservation load as {"list": [...]} (BE805)."""
-        calls = []
-        router_class = self.router_class
-
-        class TPLinkRouterTest(router_class):
-            def request(self, path: str, data: str,
-                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
-                calls.append((path, data))
-                if 'operation=load' in path or (data and 'operation=load' in data):
-                    return {
-                        'list': [
-                            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
-                            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
-                        ]
-                    }
-                return None
-
-        client = TPLinkRouterTest('', '')
+        client, calls = self._reservation_router([
+            {'mac': '02-00-00-00-00-16', 'ip': '10.0.0.116', 'comment': 'auto', 'enable': 'on'},
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+        ], envelope='list')
         client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff')
 
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3)
         body = dict(parse_qsl(calls[1][1]))
         self.assertEqual(body['operation'], 'remove')
         self.assertEqual(body['key'], 'AA-BB-CC-DD-EE-FF')
         self.assertEqual(body['index'], '1')
+
+    def test_delete_ipv4_reservation_not_persisted(self) -> None:
+        client, _ = self._reservation_router([
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+        ], drop_writes=True)
+        with self.assertRaises(ClientException):
+            client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff')
+        client, calls = self._reservation_router([
+            {'mac': 'AA-BB-CC-DD-EE-FF', 'ip': '10.0.0.50', 'comment': '', 'enable': 'off'},
+        ], drop_writes=True)
+        client.delete_ipv4_reservation('aa:bb:cc:dd:ee:ff', verify=False)
+        self.assertEqual(len(calls), 2)
 
     def test_delete_ipv4_reservation_not_found(self) -> None:
         router_class = self.router_class
@@ -2846,6 +2974,27 @@ class TestIPv4ListEnvelope(TestCase):
     array. Iterating the response directly walks dict KEYS on the former, so the
     first item['mac'] raises TypeError.
     """
+
+    @patch('tplinkrouterc6u.client.c6u.post')
+    def test_reservations_info_reads_others_from_real_request(self, mock_post: Mock) -> None:
+        """request() returns only "data"; max_rules lives in the sibling "others" block."""
+        response = Mock()
+        response.json.return_value = {
+            'success': True,
+            'data': [{'mac': '02-00-00-00-00-01', 'ip': '10.0.0.1', 'comment': 'a', 'enable': 'on'}],
+            'others': {'max_rules': 64},
+        }
+        mock_post.return_value = response
+        client = TplinkRouterV1_11('http://192.168.0.1', 'password')
+        client._logged = True
+        info = client.get_ipv4_reservations_info()
+        self.assertEqual(info.max_rules, 64)
+        self.assertEqual(info.used, 1)
+        self.assertEqual(info.free, 63)
+
+        # A later response without "others" must not leak the previous value.
+        response.json.return_value = {'success': True, 'data': []}
+        self.assertIsNone(client.get_ipv4_reservations_info().max_rules)
 
     @patch('tplinkrouterc6u.client.c6u.TplinkBaseRouter.request')
     def test_reservations_accept_bare_list(self, mock_request: Mock) -> None:

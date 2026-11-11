@@ -181,8 +181,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_mesh_nodes |   | Gets mesh nodes reported by the main router (EasyMesh on C6U/SG; Deco mesh units including the master). Returns an empty list on routers without mesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
-| add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
-| delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
+| get_ipv4_reservations_info |   | Gets IPv4 reserved addresses plus the table capacity (`max_rules`) reported by the router (Archer / LuCI clients) | [IPv4ReservationsInfo](#IPv4ReservationsInfo) |
+| add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True, verify: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients). With `verify` it refuses a duplicate MAC/IP or a full table and checks the row was stored, raising `ClientException` otherwise (some firmware answers success without saving) |   |
+| update_ipv4_reservation | old_macaddr: str, macaddr: str = None, ipaddr: str = None, comment: str = None, enable: bool = None, verify: bool = True | Edits a reservation in place with the router's own `update` operation (Archer / LuCI clients); unset fields keep their value. With `verify` it checks the change was stored | [IPv4Reservation](#IPv4Reservation) |
+| delete_ipv4_reservation | macaddr: str, verify: bool = True | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients). With `verify` it checks the row is gone |   |
 | get_ipv4_port_forwards |   | Gets IPv4 port forwarding (virtual server) rules (Archer / LuCI clients) | [[IPv4PortForward]](#IPv4PortForward) |
 | add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
 | update_ipv4_port_forward | name: str, new_name: str = None, external_port: str \| int = None, internal_port: str \| int = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
@@ -378,6 +380,15 @@ families. `internet_status`, hardware/firmware versions and `wired_ports` are De
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | enabled | enabled | bool |
+
+### <a id="IPv4ReservationsInfo">IPv4ReservationsInfo</a>
+| Field | Description | Type |
+| --- |---|---|
+| reservations | reservations in router order | [[IPv4Reservation]](#IPv4Reservation) |
+| max_rules | table capacity reported by the router (`others.max_rules`), None if not reported | int, None |
+| used | number of reservations | int |
+| free | free slots, None if `max_rules` is unknown | int, None |
+| is_full | whether the table is full | bool |
 
 ### <a id="IPv4DHCPLease">IPv4DHCPLease</a>
 | Field | Description | Type |

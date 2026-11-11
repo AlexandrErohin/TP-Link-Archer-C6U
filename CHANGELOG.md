@@ -5,6 +5,13 @@
 ### Added
 
 - **Provider:** opt-in passive-first discovery — `TplinkRouterProvider.discover()` fingerprints SG / AX72 / V1_11 / classic LuCI without credentials; `get_client_safe()` authorizes that one backend at most once and returns a logged-in session. Legacy `get_client()` unchanged ([#256](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/256)).
+- **C6U / V1_11 / SG (LuCI clients):** `get_ipv4_reservations_info()` returns the reservations together with the table capacity (`max_rules`, read from the `others` block of the load response) as `IPv4ReservationsInfo` (`used` / `free` / `is_full`). `request()` keeps the `others` block of the last valid response for this.
+- **C6U / V1_11 / SG (LuCI clients):** `update_ipv4_reservation(old_macaddr, macaddr=None, ipaddr=None, comment=None, enable=None)` edits a reservation in place with the router's own `update` operation (`key` / `new` / `old` rows, as the web UI sends), so no free slot is needed and the row keeps its position.
+
+### Changed
+
+- **C6U / V1_11 / SG:** `add_ipv4_reservation()` / `delete_ipv4_reservation()` take `verify=True`: the table is checked before an insert (full table, duplicate MAC or IP) and reloaded after insert/update/remove; `ClientException` is raised when the router answered success but did not store the change. Archer AX1800 v1.20 (fw 1.3.6) answers `success: true` to an insert into a full table (64 rules) without saving it. Pass `verify=False` for the previous single-request behavior.
+- **C6U / V1_11 / SG:** `add_ipv4_reservation()` / `update_ipv4_reservation()` send the name as both `comment` and `hostname`; Archer AX1800 v1.20 stores an empty name when only `comment` is sent (its web UI uses `hostname`).
 
 ## [5.39.0] - 2026-11-10
 
