@@ -102,6 +102,11 @@ class TplinkEncryption(TplinkRequest):
         self._pwdEE = ''
         self._encryption = EncryptionWrapper()
 
+    # Classic LuCI historically retries the login once after a malformed or
+    # 403 response. Passive detection (TplinkRouterProvider.get_client_safe)
+    # turns this off so a failed login never triggers a second try.
+    _retry_login_on_403 = True
+
     def supports(self) -> bool:
         if len(self.password) > 125:
             return False
@@ -130,9 +135,10 @@ class TplinkEncryption(TplinkRequest):
 
         if is_valid_json is False or response.status_code == 403:
             self._logged = False
-            self._request_pwd()
-            self._request_seq()
-            response = self._try_login()
+            if self._retry_login_on_403:
+                self._request_pwd()
+                self._request_seq()
+                response = self._try_login()
 
         data = response.text
         try:
