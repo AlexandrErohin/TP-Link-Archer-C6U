@@ -331,6 +331,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             decrypted = json.loads(decrypted_text)
 
             if self._is_valid_response(decrypted):
+                self._remember_envelope(decrypted)
                 return decrypted.get(self._data_block, decrypted)
             elif ignore_errors:
                 return decrypted

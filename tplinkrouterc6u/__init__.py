@@ -33,6 +33,7 @@ from tplinkrouterc6u.common.dataclass import (
     Device,
     MeshNode,
     IPv4Reservation,
+    IPv4ReservationsInfo,
     IPv4DHCPLease,
     IPv4PortForward,
     IPv4Status,
