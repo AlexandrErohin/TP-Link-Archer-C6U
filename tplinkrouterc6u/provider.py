@@ -28,12 +28,19 @@ from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
 from tplinkrouterc6u.client.vr1200v import TplinkVR1200vRouter
+from tplinkrouterc6u.discovery import DetectionResult
 
 
 class TplinkRouterProvider:
     @staticmethod
     def get_client(host: str, password: str, username: str = 'admin', logger: Logger = None,
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
+        """Auto-select a client by trying supports() in turn.
+
+        Note: the returned client is not yet authorized; call authorize()
+        before using it. See also get_client_safe() for a passive-first
+        alternative that returns a logged-in session.
+        """
         for client_name, client in TplinkRouterProvider.get_clients().items():
             if isinstance(client, TplinkC1200Router):
                 continue
@@ -74,6 +81,45 @@ class TplinkRouterProvider:
                 pass
 
         raise ClientException(message)
+
+    @staticmethod
+    def discover(host: str, verify_ssl: bool = True, timeout: int = 30) -> DetectionResult:
+        """Fingerprint known LuCI families without sending credentials."""
+        from tplinkrouterc6u.discovery import discover_router
+        return discover_router(host, verify_ssl=verify_ssl, timeout=timeout)
+
+    @staticmethod
+    def get_client_safe(host: str, password: str, username: str = 'admin',
+                        logger: Logger = None, verify_ssl: bool = True,
+                        timeout: int = 30) -> AbstractRouter:
+        """Select one client passively, then authorize at most once.
+
+        Unlike get_client(), this never tries multiple client implementations
+        or silently falls back to another authentication path. Unsupported
+        families must be selected explicitly or use legacy discovery.
+        Returns an already-authorized session; get_client() by contrast
+        returns a client on which authorize() still has to be called.
+        """
+        from tplinkrouterc6u.discovery import DetectionError
+        result = TplinkRouterProvider.discover(host, verify_ssl, timeout)
+        clients = {
+            'TplinkRouterSG': TplinkRouterSG,
+            'TplinkRouterAX72': TplinkRouterAX72,
+            'TplinkRouterV1_11': TplinkRouterV1_11,
+            'TplinkRouter': TplinkRouter,
+        }
+        cls = clients.get(result.client_name)
+        if cls is None:
+            raise DetectionError(
+                'Router protocol not identified by read-only fingerprint; '
+                'select a client explicitly instead of trying passwords.')
+        router = cls(host, password, username, logger, verify_ssl, timeout)
+        # Classic LuCI historically retries login on malformed/403 responses.
+        # For safe detection, a failed login must never trigger a second try.
+        if isinstance(router, TplinkRouter):
+            router._retry_login_on_403 = False
+        router.authorize()
+        return router
 
     @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
