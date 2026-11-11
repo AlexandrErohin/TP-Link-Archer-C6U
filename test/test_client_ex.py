@@ -1359,6 +1359,8 @@ class TestTPLinkEXClient(TestCase):
             self._token = True
 
             def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET' or not data_str:
+                    return 200, ''
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
                 elif 'DEV2_ADT_WAN' in data_str:
@@ -1379,6 +1381,8 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.clients_total, 1)
         self.assertIsNone(status.mem_usage)
         self.assertIsNone(status.cpu_usage)
+        self.assertFalse(client._ui_page_retry_status)
+        self.assertFalse(client._ui_page_access_quirk)
 
     def test_get_status_ex920_only_lan_wan(self) -> None:
         """EX920: WIFI / HOST / MEM / PROC return success with no data key (HA #393)."""
@@ -1393,6 +1397,8 @@ class TestTPLinkEXClient(TestCase):
             self._token = True
 
             def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET' or not data_str:
+                    return 200, ''
                 if 'DEV2_ADT_LAN' in data_str:
                     return 200, DEV2_ADT_LAN
                 elif 'DEV2_ADT_WAN' in data_str:
@@ -1413,16 +1419,145 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.clients_total, 0)
         self.assertIsNone(status.mem_usage)
         self.assertIsNone(status.cpu_usage)
+        self.assertFalse(client._ui_page_retry_status)
+        self.assertFalse(client._ui_page_retry_map)
+        self.assertFalse(client._ui_page_access_quirk)
 
     def test_get_ipv4_reservations_empty_oid(self) -> None:
         class TPLinkEXClientTest(TPLinkEXClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET' or not data_str:
+                    return 200, ''
                 if 'DEV2_DHCPV4_POOL_STATICADDR' in data_str:
                     return 200, '{"success":true,"errorcode":0}'
                 raise ClientException()
 
         client = TPLinkEXClientTest('', '')
         self.assertEqual(client.get_ipv4_reservations(), [])
+        self.assertFalse(client._ui_page_retry_dhcp)
+
+    def test_get_status_page_access_recovers_mem_and_hosts(self) -> None:
+        """XGB834v-style page ACL (#257): MEM/PROC only after status.htm,
+        Wi-Fi/hosts only after networkMap.htm.
+        """
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.1.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"203.0.113.10",'
+                        '"connIPv4Gateway":"203.0.113.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"}],'
+                                '"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"1","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.1.20","hostName":"phone","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+        DEV2_MEM_STATUS = ('{"data":{"total":"100","free":"40","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"25","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+            page = 'networkMap'
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET':
+                    if url.endswith('status.htm'):
+                        self.page = 'status'
+                    elif url.endswith('networkMap.htm'):
+                        self.page = 'networkMap'
+                    self.pages.append(url)
+                    return 200, ''
+                if not data_str:
+                    raise ClientException()
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                if 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON if self.page == 'networkMap' else EMPTY_OID
+                if 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY if self.page == 'networkMap' else EMPTY_OID
+                if 'DEV2_MEM_STATUS' in data_str:
+                    return 200, DEV2_MEM_STATUS if self.page == 'status' else EMPTY_OID
+                if 'DEV2_PROC_STATUS' in data_str:
+                    return 200, DEV2_PROC_STATUS if self.page == 'status' else EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.pages = []
+        status = client.get_status()
+
+        self.assertTrue(client._ui_page_access_quirk)
+        self.assertTrue(any(u.endswith('status.htm') for u in client.pages))
+        self.assertTrue(any(u.endswith('networkMap.htm') for u in client.pages))
+        self.assertEqual(client.pages[-1].split('/')[-1], 'networkMap.htm')
+        self.assertAlmostEqual(status.mem_usage, 0.6)
+        self.assertEqual(status.cpu_usage, 0.25)
+        self.assertTrue(status.wifi_2g_enable)
+        self.assertEqual(status.wifi_clients_total, 1)
+        self.assertEqual(status.clients_total, 1)
+
+    def test_get_ipv4_reservations_page_access_retry(self) -> None:
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+        RES = ('{"data":[{"enable":"1","chaddr":"bf:75:44:4c:dc:9e","yiaddr":"192.168.1.50",'
+               '"stack":"1,1,0,0,0,0"}],"operation":"gl","oid":"DEV2_DHCPV4_POOL_STATICADDR","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+            allow_dhcp = False
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET':
+                    if url.endswith('dhcp.htm'):
+                        self.allow_dhcp = True
+                    self.pages.append(url)
+                    return 200, ''
+                if not data_str:
+                    raise ClientException()
+                if 'DEV2_DHCPV4_POOL_STATICADDR' in data_str:
+                    return 200, RES if self.allow_dhcp else EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.pages = []
+        result = client.get_ipv4_reservations()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].ipaddr, '192.168.1.50')
+        self.assertTrue(client._ui_page_access_quirk)
+        self.assertTrue(any(u.endswith('dhcp.htm') for u in client.pages))
+
+    def test_get_ipv4_dhcp_leases_page_access_retry(self) -> None:
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+        HOST = ('{"data":[{"IPAddress":"192.168.1.20","physAddress":"66-e2-02-bd-b5-1b","hostName":"phone",'
+                '"leaseTimeRemaining":"3600","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                '"oid":"DEV2_HOST_ENTRY","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+            allow_hosts = False
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET':
+                    if url.endswith('networkMap.htm'):
+                        self.allow_hosts = True
+                    self.pages.append(url)
+                    return 200, ''
+                if not data_str:
+                    raise ClientException()
+                if 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, HOST if self.allow_hosts else EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.pages = []
+        result = client.get_ipv4_dhcp_leases()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].hostname, 'phone')
+        self.assertTrue(client._ui_page_access_quirk)
+        self.assertTrue(any(u.endswith('networkMap.htm') for u in client.pages))
 
     def test_get_vpn_status_empty_oids(self) -> None:
         class TPLinkEXClientTest(TPLinkEXClient):
