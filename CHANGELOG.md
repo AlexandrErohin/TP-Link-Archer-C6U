@@ -8,6 +8,7 @@
 - **C6U / V1_11 / SG (LuCI clients):** `get_ipv4_reservations_info()` returns the reservations together with the table capacity (`max_rules`, read from the `others` block of the load response) as `IPv4ReservationsInfo` (`used` / `free` / `is_full`). `request()` keeps the `others` block of the last valid response for this ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
 - **C6U / V1_11 / SG (LuCI clients):** `update_ipv4_reservation(old_macaddr, macaddr=None, ipaddr=None, comment=None, enable=None)` edits a reservation in place with the router's own `update` operation (`key` / `new` / `old` rows, as the web UI sends), so no free slot is needed and the row keeps its position ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
 - Added TP-LINK RE705X v1.0 to supported router list
+- Added TP-LINK TL-WDR7660 3.0.10 to supported router list
 
 ### Changed
 
