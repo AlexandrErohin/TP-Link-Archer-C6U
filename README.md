@@ -51,6 +51,7 @@ from tplinkrouterc6u import (
     TPLinkC50Client,
     TPLinkWR841NClient,
     TplinkRE330Router,
+    TplinkRE365Router,
     TplinkRE813XERouter,
     TplinkC3200Router,
     Connection
@@ -901,6 +902,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
+- RE365 v1.0 (firmware 1.0.4 Build 20200923 Rel. 36382)
 - RE505X v1.0
 - RE700X
 - RE813XE v1.6
