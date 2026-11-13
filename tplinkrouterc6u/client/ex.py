@@ -89,6 +89,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
         self._url_rsa_key = 'cgi/getGDPRParm'
         # Like MR _ipv6_support: ask for serviceType / connStatusV4 / X_TP_Uptime once; latch off on failure
         self._wan_detail_support = True
+        # TIM XGB834v (and similar): DEV2 objects only answer after the matching web UI
+        # page was GETed. Retry via that page when an act returns no data; latch off only
+        # when the page request succeeded and data is still missing (firmware lacks the
+        # object). Transient errors keep the flags so the next poll can recover. See #257.
+        self._ui_page_retry_status = True
+        self._ui_page_retry_map = True
+        self._ui_page_retry_dhcp = True
+        self._ui_page_retry_leases = True
+        self._ui_page_access_quirk = False
         # EasyMesh association tables (VX231v); latch off when the OIDs are missing (e.g. EX920)
         self._easymesh_assoc_support = True
 
@@ -169,6 +178,26 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self._wan_detail_support = False
         return None
 
+    @staticmethod
+    def _act_data_missing(value) -> bool:
+        """True when an act replied with success but no usable data block (page ACL / unsupported)."""
+        return value is None
+
+    def _request_ui_page(self, page: str) -> None:
+        """GET a web UI HTML page to switch DEV2 page-access context (#257)."""
+        url = '{}/{}'.format(self.host.rstrip('/'), page.lstrip('/'))
+        status_code, _ = self._request(url, method='GET')
+        # 5xx after _request's own retries is transient — raise so callers keep
+        # retry flags (same path as a timeout). 4xx (e.g. 404) means the page
+        # is absent; callers latch off when data is still missing.
+        if status_code >= 500:
+            raise ClientException(
+                'TplinkRouter - EX - UI page {} returned HTTP {}'.format(page, status_code))
+
+    def _refetch_acts(self, acts: list) -> list:
+        _, values = self.req_act(acts)
+        return values if values else []
+
     def _get_easymesh_controller(self) -> dict | None:
         # LAN MAC/IP of the router itself from its EasyMesh AP device entry (stack 1,0,0,0,0,0).
         # The MAC matches the one DEV2_ADT_LAN reports, so the router keeps its identity.
@@ -241,12 +270,68 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
 
         _, values = self.req_act(acts)
+        if not values:
+            values = []
+        while len(values) < 6:
+            values.append(None)
 
-        if values and not values[0]:
+        # status.htm exposes MEM/PROC; networkMap.htm exposes LAN/WAN/Wi-Fi/hosts.
+        # Request status first, then map last so the session ends on the home page.
+        used_status_page = False
+        if self._ui_page_retry_status and (
+                self._act_data_missing(values[4]) or self._act_data_missing(values[5])):
+            try:
+                self._request_ui_page('main/status.htm')
+                used_status_page = True
+                mem_proc = self._refetch_acts([acts[4], acts[5]])
+                if len(mem_proc) > 0 and not self._act_data_missing(mem_proc[0]):
+                    values[4] = mem_proc[0]
+                    self._ui_page_access_quirk = True
+                if len(mem_proc) > 1 and not self._act_data_missing(mem_proc[1]):
+                    values[5] = mem_proc[1]
+                    self._ui_page_access_quirk = True
+                if self._act_data_missing(values[4]) and self._act_data_missing(values[5]):
+                    self._ui_page_retry_status = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (status.htm) failed: %s', e)
+
+        map_needed = (
+                self._act_data_missing(values[0])
+                or self._act_data_missing(values[2])
+                or self._act_data_missing(values[3]))
+        if self._ui_page_retry_map and map_needed:
+            try:
+                self._request_ui_page('main/networkMap.htm')
+                used_status_page = False
+                map_vals = self._refetch_acts(acts[0:4])
+                recovered = False
+                for i in range(min(4, len(map_vals))):
+                    if not self._act_data_missing(map_vals[i]):
+                        if self._act_data_missing(values[i]):
+                            recovered = True
+                        values[i] = map_vals[i]
+                if recovered:
+                    self._ui_page_access_quirk = True
+                if self._act_data_missing(values[2]) and self._act_data_missing(values[3]):
+                    # Still no Wi-Fi/hosts after the map page → firmware lacks them
+                    self._ui_page_retry_map = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (networkMap.htm) failed: %s', e)
+        elif used_status_page and self._ui_page_access_quirk:
+            # MEM/PROC came from status.htm while map data was already in hand; restore
+            # the usual home-page session context without another act round-trip.
+            try:
+                self._request_ui_page('main/networkMap.htm')
+            except Exception:
+                pass
+
+        if values and self._act_data_missing(values[0]):
             # Same EasyMesh controller firmwares may also answer DEV2_ADT_LAN without data
             values[0] = self._get_easymesh_controller()
 
-        if not values or not values[0]:
+        if not values or self._act_data_missing(values[0]):
             raise ClientError('TplinkRouter - EX - DEV2_ADT_LAN returned no data')
 
         if values[0].__class__ == list:
@@ -378,9 +463,25 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_DHCPV4_POOL_STATICADDR', attrs=['enable', 'chaddr', 'yiaddr']),
         ]
         _, values = self.req_act(acts)
+        data = values[0] if values else None
+
+        # Only dhcp.htm (and a few siblings) expose DEV2_DHCPV4_POOL_STATICADDR on
+        # page-ACL firmwares; retry once then latch off when still empty.
+        if self._act_data_missing(data) and self._ui_page_retry_dhcp:
+            try:
+                self._request_ui_page('main/dhcp.htm')
+                values = self._refetch_acts(acts)
+                data = values[0] if values else None
+                if not self._act_data_missing(data):
+                    self._ui_page_access_quirk = True
+                else:
+                    self._ui_page_retry_dhcp = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (dhcp.htm) failed: %s', e)
 
         ipv4_reservations = []
-        for item in self._to_list(values[0] if values else None):
+        for item in self._to_list(data):
             ipv4_reservations.append(
                 IPv4Reservation(
                     get_mac(item['chaddr']),
@@ -397,9 +498,23 @@ class TPLinkEXClient(TPLinkMRClientBase):
                          attrs=['IPAddress', 'physAddress', 'hostName', 'leaseTimeRemaining']),
         ]
         _, values = self.req_act(acts)
+        data = values[0] if values else None
+
+        if self._act_data_missing(data) and self._ui_page_retry_leases:
+            try:
+                self._request_ui_page('main/networkMap.htm')
+                values = self._refetch_acts(acts)
+                data = values[0] if values else None
+                if not self._act_data_missing(data):
+                    self._ui_page_access_quirk = True
+                else:
+                    self._ui_page_retry_leases = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (networkMap.htm/leases) failed: %s', e)
 
         dhcp_leases = []
-        for item in self._to_list(values[0] if values else None):
+        for item in self._to_list(data):
             lease_time = item['leaseTimeRemaining']
             dhcp_leases.append(
                 IPv4DHCPLease(
