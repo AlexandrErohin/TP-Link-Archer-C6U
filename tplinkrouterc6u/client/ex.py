@@ -186,7 +186,13 @@ class TPLinkEXClient(TPLinkMRClientBase):
     def _request_ui_page(self, page: str) -> None:
         """GET a web UI HTML page to switch DEV2 page-access context (#257)."""
         url = '{}/{}'.format(self.host.rstrip('/'), page.lstrip('/'))
-        self._request(url, method='GET')
+        status_code, _ = self._request(url, method='GET')
+        # 5xx after _request's own retries is transient — raise so callers keep
+        # retry flags (same path as a timeout). 4xx (e.g. 404) means the page
+        # is absent; callers latch off when data is still missing.
+        if status_code >= 500:
+            raise ClientException(
+                'TplinkRouter - EX - UI page {} returned HTTP {}'.format(page, status_code))
 
     def _refetch_acts(self, acts: list) -> list:
         _, values = self.req_act(acts)
