@@ -973,6 +973,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - TL-WR844N v1.0
 - TL-WR3002X v1.0
 - TL-WDR3600 V1
+- TL-WDR7660 3.0.10
 - TL-XDR3010 V2
 - TL-XDR5410 1.0
 - TL-XDR6010

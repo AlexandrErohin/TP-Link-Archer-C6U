@@ -211,6 +211,192 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(status.devices[1].packets_sent, None)  # TODO
         self.assertEqual(status.devices[1].packets_received, None)  # TODO
 
+    def test_get_status_easymesh_fallback_VX231v(self) -> None:
+        # VX231v 231.0.25 as EasyMesh controller: DEV2_ADT_LAN and DEV2_HOST_ENTRY answer success without
+        # data, the router and its clients are only listed in the EasyMesh tables
+        DEV2_WIFI_APDEV = ('{"data":[{"X_TP_IPAddress":"192.168.1.1","MACAddress":"7C:F1:7E:55:3A:DD",'
+                           '"X_TP_HostName":"VX231v_3ADD","stack":"1,0,0,0,0,0"}],'
+                           '"operation":"gl","oid":"DEV2_WIFI_APDEV","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","stack":"1,0,0,0,0,0"},'
+                                '{"primaryEnable":"1","stack":"2,0,0,0,0,0"}],"operation":"gl",'
+                                '"oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        EMPTY = '{"success":true, "errorcode":0}'
+        DEV2_WIFI_APDEV_ASSOCDEV = (
+            '{"data":[{"X_TP_HostName":"plug","X_TP_IPAddress":"192.168.1.102","MACAddress":"28:37:2F:2E:F8:FC",'
+            '"operatingStandard":"n","active":"1","stack":"1,1,1,2,0,0"},'
+            '{"X_TP_HostName":"phone","X_TP_IPAddress":"192.168.1.100","MACAddress":"B6:3A:3A:1D:57:9C",'
+            '"operatingStandard":"ax","active":"1","stack":"1,2,1,1,0,0"},'
+            '{"X_TP_HostName":"Mac","MACAddress":"02:11:47:BE:EE:7E",'
+            '"operatingStandard":"ax","active":"0","stack":"1,2,1,3,0,0"}],'
+            '"operation":"gl","oid":"DEV2_WIFI_APDEV_ASSOCDEV","success":true}')
+        DEV2_WIFI_APDEV_ETHASSOCDEV = (
+            '{"data":[{"X_TP_HostName":"Unknown","IPAddress":"192.168.1.135","MACAddress":"00:1E:06:49:04:61",'
+            '"active":"1","interfaceType":"Ethernet","stack":"1,1,0,0,0,0"}],'
+            '"operation":"gl","oid":"DEV2_WIFI_APDEV_ETHASSOCDEV","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if '"DEV2_WIFI_APDEV"' in data_str:
+                    return 200, DEV2_WIFI_APDEV
+                elif 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                elif 'DEV2_WIFI_APDEV_ASSOCDEV' in data_str:
+                    return 200, DEV2_WIFI_APDEV_ASSOCDEV
+                elif 'DEV2_WIFI_APDEV_ETHASSOCDEV' in data_str:
+                    return 200, DEV2_WIFI_APDEV_ETHASSOCDEV
+                return 200, EMPTY
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.lan_macaddr, '7C-F1-7E-55-3A-DD')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.1.1')
+        self.assertEqual(len(status.devices), 3)
+        self.assertEqual(status.devices[0].type, Connection.HOST_2G)
+        self.assertEqual(status.devices[0].macaddr, '28-37-2F-2E-F8-FC')
+        self.assertEqual(status.devices[0].ipaddr, '192.168.1.102')
+        self.assertEqual(status.devices[0].hostname, 'plug')
+        self.assertEqual(status.devices[1].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[1].macaddr, 'B6-3A-3A-1D-57-9C')
+        self.assertEqual(status.devices[1].hostname, 'phone')
+        self.assertEqual(status.devices[2].type, Connection.WIRED)
+        self.assertEqual(status.devices[2].macaddr, '00-1E-06-49-04-61')
+        self.assertEqual(status.devices[2].ipaddr, '192.168.1.135')
+        self.assertEqual(status.wired_total, 1)
+        self.assertEqual(status.wifi_clients_total, 2)
+        self.assertEqual(status.clients_total, 3)
+        self.assertTrue(client._easymesh_assoc_support)
+
+    def test_get_status_host_entry_skips_easymesh(self) -> None:
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"0","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.30.10","hostName":"host1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+        requested = []
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            self._token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                requested.append(data_str)
+                if method == 'GET' or not data_str:
+                    # page-ACL may GET status.htm when MEM/PROC are empty; that is unrelated to EasyMesh
+                    return 200, ''
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                elif 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                return 200, '{"success":true, "errorcode":0}'
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(len(status.devices), 1)
+        self.assertFalse(any(r and 'DEV2_WIFI_APDEV' in r for r in requested))
+
+    def test_get_status_easymesh_lan_ok_empty_host(self) -> None:
+        # Intermittent VX231v case: DEV2_ADT_LAN still populated while DEV2_HOST_ENTRY is empty
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_HOST_ENTRY = '{"data":[],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                                '"oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_WIFI_APDEV_ASSOCDEV = (
+            '{"data":[{"X_TP_HostName":"phone","X_TP_IPAddress":"192.168.1.100","MACAddress":"B6:3A:3A:1D:57:9C",'
+            '"active":"1","stack":"1,2,1,1,0,0"}],"operation":"gl","oid":"DEV2_WIFI_APDEV_ASSOCDEV","success":true}')
+        DEV2_WIFI_APDEV_ETHASSOCDEV = '{"data":[],"operation":"gl","oid":"DEV2_WIFI_APDEV_ETHASSOCDEV","success":true}'
+        requested = []
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                requested.append(data_str)
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY
+                if 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON
+                if 'DEV2_WIFI_APDEV_ASSOCDEV' in data_str:
+                    return 200, DEV2_WIFI_APDEV_ASSOCDEV
+                if 'DEV2_WIFI_APDEV_ETHASSOCDEV' in data_str:
+                    return 200, DEV2_WIFI_APDEV_ETHASSOCDEV
+                if '"DEV2_WIFI_APDEV"' in data_str:
+                    raise AssertionError('controller OID must not be queried when LAN is present')
+                return 200, '{"success":true, "errorcode":0}'
+
+        client = TPLinkEXClientTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(status.lan_macaddr, 'A0-28-84-DE-DD-5C')
+        self.assertEqual(status.lan_ipv4_addr, '192.168.4.1')
+        self.assertEqual(len(status.devices), 1)
+        self.assertEqual(status.devices[0].type, Connection.HOST_5G)
+        self.assertEqual(status.devices[0].macaddr, 'B6-3A-3A-1D-57-9C')
+        self.assertEqual(status.wifi_clients_total, 1)
+        self.assertTrue(client._easymesh_assoc_support)
+        self.assertFalse(any('"oid":"DEV2_WIFI_APDEV"' in (r or '') for r in requested))
+
+    def test_get_status_easymesh_assoc_latches_off(self) -> None:
+        # EX920-style: empty HOST_ENTRY every poll; missing EasyMesh OIDs must be probed once then skipped
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        EMPTY = '{"success":true, "errorcode":0}'
+        mesh_hits = []
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_WIFI_APDEV_ASSOCDEV' in data_str or 'DEV2_WIFI_APDEV_ETHASSOCDEV' in data_str:
+                    mesh_hits.append(data_str)
+                    return 200, EMPTY
+                return 200, EMPTY
+
+        client = TPLinkEXClientTest('', '')
+        self.assertTrue(client._easymesh_assoc_support)
+        first = client.get_status()
+        self.assertEqual(first.clients_total, 0)
+        self.assertFalse(client._easymesh_assoc_support)
+        self.assertEqual(len(mesh_hits), 2)
+
+        mesh_hits.clear()
+        second = client.get_status()
+        self.assertEqual(second.clients_total, 0)
+        self.assertEqual(len(mesh_hits), 0)
+
+    def test_get_status_easymesh_assoc_latches_off_on_error(self) -> None:
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        EMPTY = '{"success":true, "errorcode":0}'
+        mesh_hits = []
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_WIFI_APDEV_ASSOCDEV' in data_str or 'DEV2_WIFI_APDEV_ETHASSOCDEV' in data_str:
+                    mesh_hits.append(data_str)
+                    raise ClientException('unsupported oid')
+                return 200, EMPTY
+
+        client = TPLinkEXClientTest('', '')
+        client.get_status()
+        self.assertFalse(client._easymesh_assoc_support)
+        self.assertEqual(len(mesh_hits), 1)  # req_act stops on first failing act
+
+        mesh_hits.clear()
+        client.get_status()
+        self.assertEqual(len(mesh_hits), 0)
+
     def test_get_status_NE200(self) -> None:
         DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.4.1","stack":"1,0,0,0,0,0"}],'
                         '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
@@ -593,6 +779,62 @@ class TestTPLinkEXClient(TestCase):
         self.assertEqual(result.lan_ipv4_netmask, '0.0.0.0')
         self.assertEqual(result.lan_ipv4_dhcp_enable, False)
         self.assertEqual(result.remote, None)
+
+    def test_get_ipv4_status_easymesh_lan_fallback(self) -> None:
+        DEV2_ADT_LAN = '{"success":true, "errorcode":0}'
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"a0:28:84:de:dd:5c","connIPv4Address":"10.10.11.5",'
+                        '"connIPv4Gateway":"11.11.11.11","name":"ipoe_0_0_d","connIPv4SubnetMask":"1.1.1.1",'
+                        '"connIPv4DnsServer":"8.8.8.8,8.8.4.4","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_WIFI_APDEV = ('{"data":[{"X_TP_IPAddress":"192.168.1.1","MACAddress":"7C:F1:7E:55:3A:DD",'
+                           '"stack":"1,0,0,0,0,0"}],"operation":"gl","oid":"DEV2_WIFI_APDEV","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                if '"DEV2_WIFI_APDEV"' in data_str:
+                    return 200, DEV2_WIFI_APDEV
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        result = client.get_ipv4_status()
+
+        self.assertEqual(result.lan_macaddr, '7C-F1-7E-55-3A-DD')
+        self.assertEqual(result.lan_ipv4_ipaddr, '192.168.1.1')
+        self.assertEqual(result.wan_ipv4_ipaddr, '10.10.11.5')
+
+    def test_get_ipv4_dhcp_leases_easymesh_fallback(self) -> None:
+        EMPTY_HOST = '{"data":[],"operation":"gl","oid":"DEV2_HOST_ENTRY","success":true}'
+        ASSOC = (
+            '{"data":[{"X_TP_HostName":"phone","X_TP_IPAddress":"192.168.1.100","MACAddress":"B6:3A:3A:1D:57:9C",'
+            '"active":"1","stack":"1,2,1,1,0,0"}],"operation":"gl","oid":"DEV2_WIFI_APDEV_ASSOCDEV","success":true}')
+        ETH = '{"data":[],"operation":"gl","oid":"DEV2_WIFI_APDEV_ETHASSOCDEV","success":true}'
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, EMPTY_HOST
+                if 'DEV2_WIFI_APDEV_ASSOCDEV' in data_str:
+                    return 200, ASSOC
+                if 'DEV2_WIFI_APDEV_ETHASSOCDEV' in data_str:
+                    return 200, ETH
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        result = client.get_ipv4_dhcp_leases()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].macaddr, 'B6-3A-3A-1D-57-9C')
+        self.assertEqual(result[0].ipaddr, '192.168.1.100')
+        self.assertEqual(result[0].hostname, 'phone')
+        self.assertEqual(result[0].lease_time, 'Permanent')
 
     def test_get_ipv4_status_one_wlan(self) -> None:
 
