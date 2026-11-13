@@ -28,6 +28,7 @@ from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.sg108e import TPLinkSG108EClient
 from tplinkrouterc6u.client.vr1200v import TplinkVR1200vRouter
+from tplinkrouterc6u.client.re365 import TplinkRE365Router
 from tplinkrouterc6u.discovery import DetectionResult
 
 
@@ -126,6 +127,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
         return {
+            TplinkRE365Router.__name__: TplinkRE365Router,
             TplinkRE813XERouter.__name__: TplinkRE813XERouter,
             TplinkC5400XRouter.__name__: TplinkC5400XRouter,
             TPLinkVRClient.__name__: TPLinkVRClient,
