@@ -127,7 +127,6 @@ class TplinkRouterProvider:
     @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
         return {
-            TplinkRE365Router.__name__: TplinkRE365Router,
             TplinkRE813XERouter.__name__: TplinkRE813XERouter,
             TplinkC5400XRouter.__name__: TplinkC5400XRouter,
             TPLinkVRClient.__name__: TPLinkVRClient,
@@ -153,6 +152,7 @@ class TplinkRouterProvider:
             TplinkC80Router.__name__: TplinkC80Router,
             TplinkWDRRouter.__name__: TplinkWDRRouter,
             TplinkRE330Router.__name__: TplinkRE330Router,
+            TplinkRE365Router.__name__: TplinkRE365Router,
             TplinkDecoE4RRouter.__name__: TplinkDecoE4RRouter,
             TplinkC3200Router.__name__: TplinkC3200Router,
             TPLinkEAP115Client.__name__: TPLinkEAP115Client,

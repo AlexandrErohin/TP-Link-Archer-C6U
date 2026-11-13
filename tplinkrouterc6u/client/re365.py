@@ -30,49 +30,75 @@ def _login_hash(password: str, nonce: str) -> str:
     return _md5_upper(f"{_md5_upper(password)}:{nonce}")
 
 
-def devices_from_wireless_grid(grid: list[dict]) -> list[Device]:
+def _connection_from_item(item: dict) -> Connection:
+    """Map optional band/type fields from the wireless grid; default UNKNOWN."""
+    raw = str(
+        item.get("type")
+        or item.get("band")
+        or item.get("conn_type")
+        or item.get("connType")
+        or ""
+    ).lower()
+    if not raw:
+        return Connection.UNKNOWN
+    if "2.4" in raw or raw in ("2g", "2", "host_2g", "wifi_2g"):
+        return Connection.HOST_2G
+    if raw.startswith("5") or "5g" in raw or raw in ("host_5g", "wifi_5g"):
+        return Connection.HOST_5G
+    if "6g" in raw or raw in ("6", "host_6g", "wifi_6g"):
+        return Connection.HOST_6G
+    if "wired" in raw or raw == "ethernet":
+        return Connection.WIRED
+    return Connection.UNKNOWN
+
+
+def _device_from_wireless_item(item: dict) -> Device | None:
+    """Build a Device from one grid row, or None when the row is unusable."""
+    if not isinstance(item, dict):
+        return None
+
+    mac = str(item.get("mac") or "").strip()
+    if not mac:
+        return None
+
+    # get_mac() never raises; invalid input becomes the null MAC.
+    addr = get_mac(mac)
+    if addr == get_mac("00:00:00:00:00:00"):
+        return None
+
+    name = str(item.get("name") or "").strip()
+    normalized = str(addr)
+    if not name or name.upper() == "UNKNOWN":
+        name = normalized
+
+    return Device(
+        type=_connection_from_item(item),
+        _macaddr=addr,
+        _ipaddr=get_ip(item.get("ip") or item.get("ipaddr") or ""),
+        hostname=name,
+    )
+
+
+def devices_from_wireless_grid(grid: list, logger: Logger | None = None) -> list[Device]:
     """Convert the active Wi-Fi client list into Device objects.
 
-    Reject malformed entries rather than silently dropping clients: an
-    incomplete list could be mistaken for devices leaving the network.
-    Duplicate MAC addresses are collapsed into a single device.
+    Malformed rows are skipped (optional debug log) so one bad MAC does not
+    empty the whole presence list. Duplicate MAC addresses collapse to one
+    device. Callers that see wirelessCount > 0 with an empty result should
+    treat that as an API error.
     """
     result: list[Device] = []
     seen: set[str] = set()
     for item in grid:
-        if not isinstance(item, dict):
-            raise ClientException("RE365: invalid client entry")
-
-        mac = str(item.get("mac") or "").strip()
-
-        if not mac:
-            raise ClientException("RE365: client MAC missing")
-
-        try:
-            addr = get_mac(mac)
-        except Exception as exc:
-            raise ClientException(
-                f"RE365: invalid client MAC: {mac}"
-            ) from exc
-
-        if addr == get_mac("00:00:00:00:00:00"):
-            raise ClientException("RE365: null client MAC")
-
-        normalized = str(addr)
-        # A MAC address is the stable identity used by presence tracking.
-        if normalized in seen:
+        device = _device_from_wireless_item(item)
+        if device is None:
+            if logger is not None:
+                logger.debug("RE365: skipping malformed wirelessGrid entry: %r", item)
             continue
-        seen.add(normalized)
-        name = str(item.get("name") or "").strip()
-        if not name or name.upper() == "UNKNOWN":
-            name = normalized
-
-        result.append(Device(
-            type=Connection.UNKNOWN,
-            _macaddr=addr,
-            _ipaddr=get_ip(item.get("ip") or item.get("ipaddr") or ""),
-            hostname=name,
-        ))
+        if device.macaddr in seen:
+            continue
+        seen.add(device.macaddr)
+        result.append(device)
     return result
 
 
@@ -80,7 +106,10 @@ class TplinkRE365Router(AbstractRouter):
     """Access the RE365 web API for device tracking and basic device identity.
 
     The client supports authentication, status polling, firmware information,
-    and logout. Router management operations are not implemented.
+    and logout. Router management operations are not implemented
+    (``get_ipv4_status`` / ``reboot`` / ``set_wifi`` raise ``NotImplementedError``).
+    Use the local web password (plaintext); there is no separate username prompt
+    on the tested firmware.
     """
 
     def __init__(self, host: str, password: str, username: str = "admin",
@@ -201,29 +230,18 @@ class TplinkRE365Router(AbstractRouter):
             raise
 
     def supports(self) -> bool:
-        """Identify the model without claiming other TP-Link devices."""
-        supported = False
+        """True when the RE365 cookie/nonce login succeeds.
+
+        Model strings are not checked: a successful login against
+        ``/webpages/data/login.json`` is the protocol fingerprint.
+        """
         try:
             self.authorize()
-            firmware = self.get_firmware()
-            supported = firmware.model.strip().upper() == "RE365"
-            return supported
-
+            return True
         except Exception as exc:
             if self._logger:
                 self._logger.debug("RE365 detection failed: %s", exc)
             return False
-
-        finally:
-            # Keep the session for the selected client; release it otherwise.
-            if not supported:
-                try:
-                    self.logout()
-                except Exception as exc:
-                    if self._logger:
-                        self._logger.debug(
-                            "RE365 logout after detection failed: %s", exc
-                        )
 
     def get_status(self) -> Status:
         """Return active Wi-Fi associations and the RE365's LAN identity."""
@@ -238,8 +256,12 @@ class TplinkRE365Router(AbstractRouter):
                 "RE365: wirelessCount indicates connected clients "
                 "but wirelessGrid is empty"
             )
-        # Malformed client data must fail the poll instead of reporting departures.
-        devices = devices_from_wireless_grid(grid)
+        devices = devices_from_wireless_grid(grid, self._logger)
+        if isinstance(count, int) and count > 0 and not devices:
+            raise ClientException(
+                "RE365: wirelessCount indicates connected clients "
+                "but no usable wirelessGrid entries"
+            )
         status = Status()
         status.devices = devices
         status.wifi_clients_total = len(devices)
@@ -248,8 +270,10 @@ class TplinkRE365Router(AbstractRouter):
         status.wifi_5g_enable = data.get("wireless_5g_enable") == "on"
         # LAN MAC is retrieved separately; the status endpoint does not include it.
         lan_data = self._read_data("status_lan_ipv4.json")
-
-        status._lan_macaddr = get_mac(lan_data["lan_macaddr"])
+        lan_mac = lan_data.get("lan_macaddr")
+        if not lan_mac:
+            raise ClientException("RE365: lan_macaddr missing from status_lan_ipv4")
+        status._lan_macaddr = get_mac(lan_mac)
 
         return status
 
@@ -258,11 +282,19 @@ class TplinkRE365Router(AbstractRouter):
         self.authorize()
 
         data = self._read_data("firmware.set.json")
+        try:
+            hardware_version = data["hardware_version"]
+            model = data["model"]
+            firmware_version = data["firmware_version"]
+        except KeyError as exc:
+            raise ClientException(
+                f"RE365 firmware.set.json: missing field {exc.args[0]!r}"
+            ) from exc
 
         return Firmware(
-            hardware_version=data["hardware_version"],
-            model=data["model"],
-            firmware_version=data["firmware_version"]
+            hardware_version=hardware_version,
+            model=model,
+            firmware_version=firmware_version,
         )
 
     def logout(self) -> None:

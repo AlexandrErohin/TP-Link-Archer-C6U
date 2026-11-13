@@ -6,16 +6,14 @@ Run from the repository root with:
 """
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 from requests.exceptions import HTTPError
 
-from tplinkrouterc6u.client.re365 import (
-    TplinkRE365Router,
-    devices_from_wireless_grid,
-)
+from tplinkrouterc6u import Connection, TplinkRE365Router
+from tplinkrouterc6u.client.re365 import devices_from_wireless_grid
 from tplinkrouterc6u.common.exception import AuthorizeError, ClientException
+from tplinkrouterc6u.provider import TplinkRouterProvider
 
 
 class TestRE365Client(unittest.TestCase):
@@ -133,8 +131,8 @@ class TestRE365Client(unittest.TestCase):
         ):
             self.router.get_status()
 
-    def test_get_status_rejects_invalid_macs(self):
-        with self.assertRaises(ClientException):
+    def test_get_status_rejects_all_invalid_macs(self):
+        with self.assertRaisesRegex(ClientException, "no usable wirelessGrid"):
             self.read_status({
                 "wirelessCount": 1,
                 "wirelessGrid": [
@@ -142,13 +140,14 @@ class TestRE365Client(unittest.TestCase):
                 ],
             })
 
-    def test_get_status_partial_invalid_grid(self):
+    def test_get_status_skips_partial_invalid_grid(self):
         wifi_data = {
             "wirelessCount": 3,
             "wirelessGrid": [
                 {"mac": "AA:BB:CC:00:00:01", "name": "Pixel", "ip": "192.168.0.10"},
                 {"mac": "INVALID", "name": "iPhone", "ip": "192.168.0.11"},
-                {"mac": "AA:BB:CC:00:00:03", "name": "PC", "ip": "192.168.0.12"},
+                {"mac": "AA:BB:CC:00:00:03", "name": "PC", "ip": "192.168.0.12",
+                 "type": "5G"},
             ],
         }
         with (
@@ -157,7 +156,25 @@ class TestRE365Client(unittest.TestCase):
                 self.router, "_read_data",
                 side_effect=[wifi_data, {"lan_macaddr": "AA:BB:CC:DD:EE:FF"}]
             ),
-            self.assertRaises(ClientException),
+        ):
+            status = self.router.get_status()
+        self.assertEqual(status.clients_total, 2)
+        by_mac = {d.macaddr.lower(): d for d in status.devices}
+        self.assertEqual(by_mac["aa-bb-cc-00-00-01"].type, Connection.UNKNOWN)
+        self.assertEqual(by_mac["aa-bb-cc-00-00-03"].type, Connection.HOST_5G)
+
+    def test_get_status_missing_lan_mac(self):
+        wifi_data = {
+            "wirelessCount": 0,
+            "wirelessGrid": [],
+        }
+        with (
+            patch.object(self.router, "authorize"),
+            patch.object(
+                self.router, "_read_data",
+                side_effect=[wifi_data, {"ip": "192.168.0.1"}]
+            ),
+            self.assertRaisesRegex(ClientException, "lan_macaddr"),
         ):
             self.router.get_status()
 
@@ -208,35 +225,17 @@ class TestRE365Client(unittest.TestCase):
         self.assertIs(self.router._authorized, False)
         self.assertFalse(self.router._session.cookies)
 
-    def _assert_supports(self, model, expected):
-        with (
-            patch.object(self.router, "authorize") as authorize,
-            patch.object(self.router, "get_firmware",
-                         return_value=SimpleNamespace(model=model)),
-            patch.object(self.router, "logout") as logout,
-        ):
-            self.assertIs(self.router.supports(), expected)
+    def test_supports_authorize_ok(self):
+        with patch.object(self.router, "authorize") as authorize:
+            self.assertIs(self.router.supports(), True)
         authorize.assert_called_once_with()
-        if expected:
-            logout.assert_not_called()
-        else:
-            logout.assert_called_once_with()
 
-    def test_supports_re365(self):
-        self._assert_supports("RE365", True)
-
-    def test_supports_other_model(self):
-        self._assert_supports("RE305", False)
-
-    def test_supports_firmware_error(self):
-        with (
-            patch.object(self.router, "authorize"),
-            patch.object(self.router, "get_firmware",
-                         side_effect=ClientException("Firmware error")),
-            patch.object(self.router, "logout") as logout,
+    def test_supports_authorize_fails(self):
+        with patch.object(
+            self.router, "authorize",
+            side_effect=ClientException("COOKIE missing"),
         ):
             self.assertIs(self.router.supports(), False)
-        logout.assert_called_once_with()
 
     def test_get_firmware(self):
         with (
@@ -251,6 +250,32 @@ class TestRE365Client(unittest.TestCase):
         self.assertEqual(firmware.model, "RE365")
         self.assertEqual(firmware.hardware_version, "RE365 v1.0")
         self.assertEqual(firmware.firmware_version, "1.0.4")
+
+    def test_get_firmware_missing_field(self):
+        with (
+            patch.object(self.router, "authorize"),
+            patch.object(self.router, "_read_data", return_value={
+                "model": "RE365",
+                "hardware_version": "RE365 v1.0",
+            }),
+            self.assertRaisesRegex(ClientException, "missing field"),
+        ):
+            self.router.get_firmware()
+
+    def test_provider_registers_after_cheap_clients(self):
+        clients = list(TplinkRouterProvider.get_clients())
+        self.assertLess(
+            clients.index("TplinkC5400XRouter"),
+            clients.index(TplinkRE365Router.__name__),
+        )
+        self.assertLess(
+            clients.index("TplinkRE330Router"),
+            clients.index(TplinkRE365Router.__name__),
+        )
+        self.assertLess(
+            clients.index("TplinkRE813XERouter"),
+            clients.index(TplinkRE365Router.__name__),
+        )
 
     def test_logout_clears_session_on_http_error(self):
         self.router._authorized = True
@@ -284,21 +309,12 @@ class TestRE365Client(unittest.TestCase):
     def test_post_api_error(self):
         self._assert_post_error({"success": False, "errorcode": 123}, "API error")
 
-    def _assert_invalid_wireless_entry(self, entry):
-        with self.assertRaises(ClientException):
-            devices_from_wireless_grid([entry])
-
-    def test_wireless_grid_none_entry(self):
-        self._assert_invalid_wireless_entry(None)
-
-    def test_wireless_grid_missing_mac(self):
-        self._assert_invalid_wireless_entry({})
-
-    def test_wireless_grid_invalid_mac(self):
-        self._assert_invalid_wireless_entry({"mac": "INVALID"})
-
-    def test_wireless_grid_zero_mac(self):
-        self._assert_invalid_wireless_entry({"mac": "00:00:00:00:00:00"})
+    def test_wireless_grid_skips_malformed_entries(self):
+        self.assertEqual(devices_from_wireless_grid([None]), [])
+        self.assertEqual(devices_from_wireless_grid([{}]), [])
+        self.assertEqual(devices_from_wireless_grid([{"mac": "INVALID"}]), [])
+        self.assertEqual(
+            devices_from_wireless_grid([{"mac": "00:00:00:00:00:00"}]), [])
 
     def test_wireless_grid_duplicate_mac(self):
         grid = [
@@ -314,6 +330,14 @@ class TestRE365Client(unittest.TestCase):
             "ip": "192.168.0.10",
         }])
         self.assertEqual(devices[0].hostname, devices[0].macaddr)
+
+    def test_wireless_grid_band_mapping(self):
+        devices = devices_from_wireless_grid([
+            {"mac": "AA:BB:CC:00:00:01", "type": "2.4GHz", "ip": "192.168.0.10"},
+            {"mac": "AA:BB:CC:00:00:02", "band": "5G", "ip": "192.168.0.11"},
+        ])
+        self.assertEqual(devices[0].type, Connection.HOST_2G)
+        self.assertEqual(devices[1].type, Connection.HOST_5G)
 
 
 if __name__ == "__main__":

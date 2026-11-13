@@ -71,6 +71,8 @@ logger = Logger('test')
 # router = TplinkC5400XRouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 # RE813XE / RE700X / similar: use web encrypted password
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
+# RE365: local web password (plaintext); reboot / set_wifi / get_ipv4_status are NotImplementedError
+# router = TplinkRE365Router('http://192.168.0.1', 'password', logger=logger)
 
 try:
     # Or: with router:  # authorize on enter, logout on exit
@@ -951,7 +953,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
-- RE365 v1.0 (firmware 1.0.4 Build 20200923 Rel. 36382)
+- RE365 v1.0 (firmware 1.0.4 Build 20200923 Rel. 36382; Wi-Fi clients / firmware / LAN MAC via `TplinkRE365Router`, plaintext local password)
 - RE505X v1.0
 - RE700X
 - RE705X v1.0

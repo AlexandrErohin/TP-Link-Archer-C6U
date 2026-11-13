@@ -2,6 +2,10 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- **RE365:** `TplinkRE365Router` for TP-Link RE365 v1 (cookie/nonce MD5 login, Wi-Fi client presence, firmware, LAN MAC). `reboot` / `set_wifi` / `get_ipv4_status` raise `NotImplementedError`. ([#266](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/266)).
+
 ### Fixed
 
 - **EX:** on EasyMesh controller firmwares such as VX231v 231.0.25, `get_status()` falls back to `DEV2_WIFI_APDEV_ASSOCDEV` / `DEV2_WIFI_APDEV_ETHASSOCDEV` when `DEV2_HOST_ENTRY` is empty, and takes LAN MAC/IP from `DEV2_WIFI_APDEV` when `DEV2_ADT_LAN` has no data; `get_ipv4_status()` / `get_ipv4_dhcp_leases()` use the same fallbacks. Association probes latch off via `_easymesh_assoc_support` after an error or success-without-data so firmwares like EX920 do not re-hit missing OIDs on every empty host-table poll ([#265](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/265), [#264](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/264)).
