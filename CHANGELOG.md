@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).
 - **RE365:** `TplinkRE365Router` for TP-Link RE365 v1 (cookie/nonce MD5 login, Wi-Fi client presence, firmware, LAN MAC). `reboot` / `set_wifi` / `get_ipv4_status` raise `NotImplementedError`. ([#266](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/266)).
 
 ### Fixed
