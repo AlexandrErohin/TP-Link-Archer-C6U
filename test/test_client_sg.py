@@ -32,6 +32,17 @@ class TestTplinkRouterSGUnit(TestCase):
         client = TplinkRouterSG('http://192.168.0.1', long_password)
         self.assertFalse(client.supports())
 
+    def test_supports_without_sg_certification(self) -> None:
+        """Cert labels are optional; US BE600-style units still use SG crypto (#262)."""
+        client = TplinkRouterSG('http://192.168.0.1', 'testpassword')
+        with patch.object(client, '_check_sg_certification', return_value=False) as check, \
+             patch.object(client, 'authorize') as auth, \
+             patch.object(client, 'logout') as logout:
+            self.assertTrue(client.supports())
+            check.assert_not_called()
+            auth.assert_called_once()
+            logout.assert_called_once()
+
     def test_build_login_signature_real_key_size(self) -> None:
         """Regression test for #171/#185.
 
@@ -197,6 +208,46 @@ class TestTplinkRouterSGUnit(TestCase):
                 client.authorize()
 
         self.assertIn('Login failed', str(context.exception))
+        self.assertIn('invalid password', str(context.exception))
+        self.assertFalse(client._logged)
+
+    @patch('tplinkrouterc6u.client.sg.post')
+    def test_authorize_failure_top_level_errorcode(self, mock_post: Mock) -> None:
+        """BE600-style lockout puts errorcode at the top level (#262)."""
+        pwd_keys_response = Mock()
+        pwd_keys_response.json.return_value = {
+            'data': {'password': ['mock_pwd_nn', '010001']}
+        }
+        auth_keys_response = Mock()
+        auth_keys_response.json.return_value = {
+            'data': {'seq': 100, 'key': ['mock_auth_nn', '010001']}
+        }
+        login_response = Mock()
+        login_response.json.return_value = {'data': 'encrypted_login_blob'}
+        login_response.headers = {}
+        login_response.text = 'mock error response'
+        mock_post.side_effect = [
+            pwd_keys_response, auth_keys_response, login_response,
+        ]
+
+        client = TplinkRouterSG('http://192.168.0.1', 'wrongpassword')
+        login_result = json.dumps({
+            'errorcode': 'exceeded max attempts',
+            'success': False,
+            'data': {'failureCount': 10, 'attemptsAllowed': 0},
+        })
+        with patch.object(client, '_rsa_v15_encrypt', return_value='encrypted_pwd_hex'), \
+             patch.object(client, '_aes_encrypt', return_value='encrypted_data_b64'), \
+             patch.object(client, '_build_login_signature', return_value='mock_sign'), \
+             patch.object(client, '_aes_decrypt', return_value=login_result):
+            with self.assertRaises(ClientException) as context:
+                client.authorize()
+
+        message = str(context.exception)
+        self.assertIn('exceeded max attempts', message)
+        self.assertIn('failureCount=10', message)
+        self.assertIn('attemptsAllowed=0', message)
+        self.assertNotIn('unknown', message)
         self.assertFalse(client._logged)
 
     def test_authorize_uses_username(self) -> None:

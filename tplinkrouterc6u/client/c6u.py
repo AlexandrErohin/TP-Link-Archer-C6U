@@ -15,6 +15,7 @@ from tplinkrouterc6u.common.dataclass import (
     Device,
     MeshNode,
     IPv4Reservation,
+    IPv4ReservationsInfo,
     IPv4DHCPLease,
     IPv4PortForward,
     IPv4Status,
@@ -57,6 +58,7 @@ class TplinkRequest:
             data = self._decrypt_response(data)
 
             if self._is_valid_response(data):
+                self._remember_envelope(data)
                 return data.get(self._data_block)
             elif ignore_errors:
                 return data
@@ -77,6 +79,17 @@ class TplinkRequest:
 
     def _is_valid_response(self, data: dict) -> bool:
         return 'success' in data and data['success'] and self._data_block in data
+
+    def _remember_envelope(self, data: dict) -> None:
+        """Keep the ``others`` block of the last valid response.
+
+        ``request()`` returns only the ``data`` block, but some forms put table
+        metadata next to it (e.g. ``{"others": {"max_rules": 64}}`` on the DHCP
+        reservation load). Methods that need it read ``_last_response_others``
+        right after their request.
+        """
+        others = data.get('others') if isinstance(data, dict) else None
+        self._last_response_others = others if isinstance(others, dict) else None
 
     def _prepare_data(self, data: str):
         return data
@@ -101,6 +114,11 @@ class TplinkEncryption(TplinkRequest):
         self._pwdNN = ''
         self._pwdEE = ''
         self._encryption = EncryptionWrapper()
+
+    # Classic LuCI historically retries the login once after a malformed or
+    # 403 response. Passive detection (TplinkRouterProvider.get_client_safe)
+    # turns this off so a failed login never triggers a second try.
+    _retry_login_on_403 = True
 
     def supports(self) -> bool:
         if len(self.password) > 125:
@@ -130,9 +148,10 @@ class TplinkEncryption(TplinkRequest):
 
         if is_valid_json is False or response.status_code == 403:
             self._logged = False
-            self._request_pwd()
-            self._request_seq()
-            response = self._try_login()
+            if self._retry_login_on_403:
+                self._request_pwd()
+                self._request_seq()
+                response = self._try_login()
 
         data = response.text
         try:
@@ -249,6 +268,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._logged = False
         self._sysauth = None
         self._data_block = 'data'
+        # Sibling metadata from the last valid request() envelope (e.g. others.max_rules).
+        # Only meaningful immediately after that request; loaders clear it first.
+        self._last_response_others = None
         self._smart_network = True
         self._wan_ipv4_dynamic = True
         self._easymesh = True
@@ -673,33 +695,177 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         raise ClientError('{} response is neither a list nor an object; got {}'
                           .format(what, type(data).__name__))
 
-    def get_ipv4_reservations(self) -> [IPv4Reservation]:
-        ipv4_reservations = []
+    def _load_ipv4_reservation_rows(self) -> tuple[list, int | None]:
+        """Load the raw reservation rows and the table capacity (if reported)."""
+        self._last_response_others = None
         data = self.request(self._url_ipv4_reservations, 'operation=load')
+        rows = self._as_list(data, 'list', 'IPv4 reservation')
+        others = self._last_response_others or {}
+        max_rules = None
+        try:
+            if others.get('max_rules') not in (None, ''):
+                max_rules = int(others['max_rules'])
+        except (TypeError, ValueError):
+            max_rules = None
+        return rows, max_rules
 
-        for item in self._as_list(data, 'list', 'IPv4 reservation'):
-            ipv4_reservations.append(
-                IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), item['comment'],
-                                self._str2bool(item['enable'])))
+    @staticmethod
+    def _reservation_name(item: dict) -> str:
+        # Empty comment must not hide a filled hostname (AX UI stores the name in hostname).
+        return item.get('comment') or item.get('hostname') or ''
 
-        return ipv4_reservations
+    def _reservation_from_row(self, item: dict) -> IPv4Reservation:
+        return IPv4Reservation(get_mac(item['mac']), get_ip(item['ip']), self._reservation_name(item),
+                               self._str2bool(item['enable']))
 
-    def add_ipv4_reservation(self, macaddr: str, ipaddr: str, comment: str = '', enable: bool = True) -> None:
+    def get_ipv4_reservations(self) -> list[IPv4Reservation]:
+        rows, _ = self._load_ipv4_reservation_rows()
+        return [self._reservation_from_row(item) for item in rows]
+
+    def get_ipv4_reservations_info(self) -> IPv4ReservationsInfo:
+        """Get the reservations together with the table capacity.
+
+        ``max_rules`` is read from the ``others`` block of the load response
+        (64 on Archer AX1800 v1.20 fw 1.3.6) and is None when not reported.
+        """
+        rows, max_rules = self._load_ipv4_reservation_rows()
+        return IPv4ReservationsInfo([self._reservation_from_row(item) for item in rows], max_rules)
+
+    @staticmethod
+    def _find_reservation_row(rows: list, macaddr: str) -> tuple[int | None, dict | None]:
+        normalized_mac = str(get_mac(macaddr))
+        for i, item in enumerate(rows):
+            mac = item.get('mac')
+            if mac and str(get_mac(mac)) == normalized_mac:
+                return i, item
+        return None, None
+
+    @staticmethod
+    def _parse_reservation_ip(ipaddr: str) -> str:
+        ip_text = str(ipaddr).strip()
+        parsed_ip = get_ip(ip_text)
+        # get_ip soft-falls back to 0.0.0.0 on garbage input.
+        if str(parsed_ip) == '0.0.0.0':
+            raise ClientException('Invalid IP address: {}'.format(ipaddr))
+        return str(parsed_ip)
+
+    def _check_reservation_conflicts(self, rows: list, mac: str, ip: str, ignore_mac: str | None = None) -> None:
+        for item in rows:
+            row_mac = str(get_mac(item.get('mac', ''))) if item.get('mac') else ''
+            if ignore_mac is not None and row_mac == ignore_mac:
+                continue
+            if row_mac == mac:
+                raise ClientException('A reservation for MAC {} already exists'.format(mac))
+            row_ip = str(item.get('ip', '')).strip()
+            if row_ip and str(get_ip(row_ip)) == ip:
+                raise ClientException('IP {} is already reserved for {}'.format(ip, item.get('mac')))
+
+    def add_ipv4_reservation(self, macaddr: str, ipaddr: str, comment: str = '', enable: bool = True,
+                             verify: bool = True) -> None:
         """Add an IPv4 DHCP address reservation.
 
         macaddr may be given in any common format (colon/dash, upper/lower);
         it is normalised to the dash-uppercase form the router stores.
+
+        With ``verify`` (default) the table is loaded first to refuse a
+        duplicate MAC/IP or a full table, and reloaded afterwards to make sure
+        the row was stored: Archer AX1800 v1.20 answers ``success: true`` to an
+        insert into a full table (64 rules) without saving anything.
+        Raises ClientException in those cases.
         """
+        mac = str(get_mac(macaddr))
+        ip = self._parse_reservation_ip(ipaddr) if verify else ipaddr
+        if verify:
+            rows, max_rules = self._load_ipv4_reservation_rows()
+            if max_rules is not None and len(rows) >= max_rules:
+                raise ClientException('IPv4 reservation table is full ({}/{})'.format(len(rows), max_rules))
+            self._check_reservation_conflicts(rows, mac, ip)
+
         path = self._url_ipv4_reservations.split('&operation=')[0]
+        # The Archer AX web UI sends the name as ``hostname`` and the router
+        # derives ``comment`` from it (AX1800 v1.20 stores an empty name when
+        # only ``comment`` is sent); other firmware reads ``comment``.
         new = dumps({
-            'mac': str(get_mac(macaddr)),
-            'ip': ipaddr,
+            'mac': mac,
+            'ip': ip,
             'comment': comment,
+            'hostname': comment,
             'enable': 'on' if enable else 'off',
         })
         self.request(path, urlencode({'operation': 'insert', 'new': new}))
 
-    def delete_ipv4_reservation(self, macaddr: str) -> None:
+        if verify:
+            rows, _ = self._load_ipv4_reservation_rows()
+            _, row = self._find_reservation_row(rows, mac)
+            if row is None or str(get_ip(str(row.get('ip', '')).strip())) != ip:
+                raise ClientException(
+                    'Router accepted the reservation {} -> {} but did not store it'.format(mac, ip))
+
+    def update_ipv4_reservation(self, old_macaddr: str, macaddr: str | None = None, ipaddr: str | None = None,
+                                comment: str | None = None, enable: bool | None = None,
+                                verify: bool = True) -> IPv4Reservation:
+        """Update an IPv4 DHCP address reservation identified by its current MAC.
+
+        Uses the router's own edit operation (``operation=update`` with
+        ``key``/``new``/``old`` JSON rows, the same wire format the web UI
+        sends), so the row keeps its place in the table and no free slot is
+        needed. Fields left as None keep their current value; extra firmware
+        fields on the loaded row (e.g. ``hostname``) are preserved.
+
+        With ``verify`` (default) a MAC/IP already used by another row is
+        refused and the table is reloaded afterwards; ClientException is
+        raised when MAC, IP, enable or comment/hostname did not persist. A new
+        ``comment`` is sent as both ``comment`` and ``hostname`` (Archer AX1800
+        v1.20 ignores a rename that only changes ``comment``); the returned
+        reservation is the row the router actually stored.
+        """
+        rows, _ = self._load_ipv4_reservation_rows()
+        _, target = self._find_reservation_row(rows, old_macaddr)
+        if target is None:
+            raise ClientException('Reservation not found for MAC: {}'.format(old_macaddr))
+
+        current_mac = str(get_mac(target['mac']))
+        new_mac = str(get_mac(macaddr)) if macaddr is not None else current_mac
+        if ipaddr is not None:
+            new_ip = self._parse_reservation_ip(ipaddr)
+        else:
+            new_ip = str(get_ip(str(target.get('ip', '')).strip()))
+        if verify:
+            self._check_reservation_conflicts(rows, new_mac, new_ip, ignore_mac=current_mac)
+
+        old = dict(target)
+        new = dict(target)
+        new['mac'] = new_mac if macaddr is not None else target['mac']
+        new['ip'] = new_ip
+        if comment is not None:
+            new['comment'] = comment
+            new['hostname'] = comment
+        if enable is not None:
+            new['enable'] = 'on' if enable else 'off'
+
+        path = self._url_ipv4_reservations.split('&operation=')[0]
+        self.request(path, urlencode({
+            'operation': 'update',
+            'key': target['mac'],
+            'new': dumps(new),
+            'old': dumps(old),
+        }))
+
+        if not verify:
+            return self._reservation_from_row(new)
+
+        rows, _ = self._load_ipv4_reservation_rows()
+        _, row = self._find_reservation_row(rows, new_mac)
+        if row is None or str(get_ip(str(row.get('ip', '')).strip())) != new_ip or (
+                enable is not None and self._str2bool(row.get('enable')) != enable) or (
+                comment is not None and self._reservation_name(row) != comment):
+            raise ClientException('Router accepted the update of reservation {} but did not store it'
+                                  .format(old_macaddr))
+        if new_mac != current_mac and self._find_reservation_row(rows, current_mac)[1] is not None:
+            raise ClientException('Router kept the old reservation {} after the update'.format(current_mac))
+        return self._reservation_from_row(row)
+
+    def delete_ipv4_reservation(self, macaddr: str, verify: bool = True) -> None:
         """Delete an IPv4 DHCP address reservation.
 
         macaddr may be given in any common format (colon/dash, upper/lower);
@@ -709,29 +875,25 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         The list is loaded then removed in two requests; if the reservation
         table changes between them, the wrong row could be targeted.
+        With ``verify`` (default) the table is reloaded and ClientException is
+        raised if the reservation is still there.
         """
-        raw = self.request(self._url_ipv4_reservations, 'operation=load')
-        items = self._as_list(raw, 'list', 'IPv4 reservation')
-        normalized_mac = str(get_mac(macaddr))
-        target_idx = None
-        target_mac = None
-        for i, item in enumerate(items):
-            mac = item.get('mac')
-            if not mac:
-                continue
-            if str(get_mac(mac)) == normalized_mac:
-                target_idx = i
-                target_mac = mac
-                break
-        if target_idx is None:
+        items, _ = self._load_ipv4_reservation_rows()
+        target_idx, target = self._find_reservation_row(items, macaddr)
+        if target is None:
             raise ClientException('Reservation not found for MAC: {}'.format(macaddr))
 
         path = self._url_ipv4_reservations.split('&operation=')[0]
         self.request(path, urlencode({
             'operation': 'remove',
-            'key': target_mac,
+            'key': target['mac'],
             'index': target_idx,
         }))
+
+        if verify:
+            items, _ = self._load_ipv4_reservation_rows()
+            if self._find_reservation_row(items, macaddr)[1] is not None:
+                raise ClientException('Router accepted the removal of reservation {} but kept it'.format(macaddr))
 
     @classmethod
     def _as_port_forward_list(cls, data) -> list:

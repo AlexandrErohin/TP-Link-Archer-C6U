@@ -23,7 +23,7 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
 from tplinkrouterc6u import (
     TplinkRouterProvider,
     TplinkRouterV1_11,
-    TplinkRouterSG, # For routers like Archer BE3600, Archer BE230
+    TplinkRouterSG, # For routers like Archer BE3600, BE230, BE600 (SG crypto)
     TplinkRouterAX72,
     TplinkRouter,
     TplinkC1200Router,
@@ -135,6 +135,43 @@ or you use `TplinkC5400XRouter` / `TplinkRE813XERouter` (RE813XE, RE700X, …) d
 5. Type `document.getElementById("login-password").value;`
 6. Copy the returned value as password and use it.
 
+
+## Safe, passive-first router discovery (opt-in)
+
+The legacy `TplinkRouterProvider.get_client(...)` auto-selection is retained
+for backward compatibility. It can try several authentication mechanisms and
+is **not** appropriate for routers with strict login-lockout behavior, and the
+client it returns is not authorized yet — call `authorize()` before use.
+
+For a cautious first attempt, use `TplinkRouterProvider.discover(host)` to
+fingerprint known LuCI variants without credentials or login attempts:
+
+```python
+from tplinkrouterc6u import TplinkRouterProvider
+result = TplinkRouterProvider.discover('http://192.168.0.1')
+print(result.client_name, result.confidence, result.evidence)
+# Optionally authenticate just the one detected backend:
+router = TplinkRouterProvider.get_client_safe(
+    'http://192.168.0.1', 'local-password')
+```
+
+The opt-in `get_client_safe` method selects a single SG, V1_11 or classic LuCI
+backend (when fingerprinting is unambiguous) and attempts authentication at
+most once, returning an already-logged-in session. It does not call
+`supports()` or fall back to other logins if authentication fails. Unknown or
+ambiguous firmware raises `DetectionError`; select a known client explicitly
+rather than guessing. Key sizes are only a medium-confidence fingerprint, not
+proof of a signing scheme, and supported model coverage remains limited.
+
+SG and AX72 both expose a 512-bit auth key, and some SG firmwares omit
+SG/CE_RED certification (e.g. Archer BE600 US). Discovery therefore leaves a
+512-bit auth key unresolved; use `get_client()`, or construct
+`TplinkRouterSG` / `TplinkRouterAX72` directly. Classic LuCI historically
+retries login once after a malformed or 403 response; `get_client_safe`
+disables that second try so a wrong password never burns two attempts — on a
+few firmwares a correct password that gets a transient first 403 may therefore
+need a manual retry.
+
 ## Functions
 Not every method is available on every client. Methods below `get_ipv6_status` that are model-specific (reservations, VPN client, SMS/LTE, …) raise `AttributeError` / `NotImplementedError` or are simply missing on unsupported routers.
 
@@ -146,8 +183,10 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_mesh_nodes |   | Gets mesh nodes reported by the main router (EasyMesh on C6U/SG; Deco mesh units including the master). Returns an empty list on routers without mesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
-| add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
-| delete_ipv4_reservation | macaddr: str | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients) |   |
+| get_ipv4_reservations_info |   | Gets IPv4 reserved addresses plus the table capacity (`max_rules`) reported by the router (Archer / LuCI clients) | [IPv4ReservationsInfo](#IPv4ReservationsInfo) |
+| add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True, verify: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients). With `verify` it refuses a duplicate MAC/IP or a full table and checks the row was stored, raising `ClientException` otherwise (some firmware answers success without saving) |   |
+| update_ipv4_reservation | old_macaddr: str, macaddr: str = None, ipaddr: str = None, comment: str = None, enable: bool = None, verify: bool = True | Edits a reservation in place with the router's own `update` operation (Archer / LuCI clients); unset fields keep their value. With `verify` it checks the change was stored | [IPv4Reservation](#IPv4Reservation) |
+| delete_ipv4_reservation | macaddr: str, verify: bool = True | Deletes an IPv4 DHCP address reservation (Archer / LuCI clients). With `verify` it checks the row is gone |   |
 | get_ipv4_port_forwards |   | Gets IPv4 port forwarding (virtual server) rules (Archer / LuCI clients) | [[IPv4PortForward]](#IPv4PortForward) |
 | add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
 | update_ipv4_port_forward | name: str, new_name: str = None, external_port: str \| int = None, internal_port: str \| int = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
@@ -343,6 +382,15 @@ families. `internet_status`, hardware/firmware versions and `wired_ports` are De
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | enabled | enabled | bool |
+
+### <a id="IPv4ReservationsInfo">IPv4ReservationsInfo</a>
+| Field | Description | Type |
+| --- |---|---|
+| reservations | reservations in router order | [[IPv4Reservation]](#IPv4Reservation) |
+| max_rules | table capacity reported by the router (`others.max_rules`), None if not reported | int, None |
+| used | number of reservations | int |
+| free | free slots, None if `max_rules` is unknown | int, None |
+| is_full | whether the table is full (`False` when `max_rules` is unknown — not proof that slots remain) | bool |
 
 ### <a id="IPv4DHCPLease">IPv4DHCPLease</a>
 | Field | Description | Type |
@@ -814,7 +862,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer AX11000 V1
 - Archer AX12 v1.0
 - Archer AX17 v1.0
-- Archer AX1800
+- Archer AX1800 v1.20
 - Archer AX20 (v1.0, v3.0)
 - Archer AX21 (v1.20, v3.0, v4.6)
 - Archer AX23 (v1.0, v1.2)
@@ -839,6 +887,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer BE400 v1.0
 - Archer BE450 v1.0
 - Archer BE550 (v1.0, V2)
+- Archer BE600 v1.0
 - Archer BE800 v1.0
 - Archer BE805 (v1.0, v1.20)
 - Archer C1200 (v1.0, v2.0)
@@ -905,6 +954,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - RE365 v1.0 (firmware 1.0.4 Build 20200923 Rel. 36382)
 - RE505X v1.0
 - RE700X
+- RE705X v1.0
 - RE813XE v1.6
 - TD-W9960 (v1, V1.20)
 - TL-7DR6430 1.0
@@ -925,6 +975,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - TL-WR844N v1.0
 - TL-WR3002X v1.0
 - TL-WDR3600 V1
+- TL-WDR7660 3.0.10
 - TL-XDR3010 V2
 - TL-XDR5410 1.0
 - TL-XDR6010

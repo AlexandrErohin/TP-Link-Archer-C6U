@@ -1,8 +1,12 @@
 """
-TP-Link router client for SG_L1_S2 / CE_RED certified devices.
+TP-Link router client for the SG encryption scheme (SHA256 + OAEP + HMAC).
 
-Routers with these certifications (e.g., Archer BE3600, Wi-Fi 7 models)
-use an enhanced encryption scheme:
+Many of these firmwares advertise SG_L1_S2 / CE_RED in device_config
+(e.g. Archer BE3600), but some regional builds use the same crypto without
+those labels (e.g. Archer BE600 US). supports() therefore tries a real login
+rather than requiring a certification string.
+
+Scheme details:
   1. SHA256 hash instead of MD5 for authentication
   2. PKCS1-OAEP RSA padding for login signature encryption
   3. HMAC-SHA256 for non-login request signatures
@@ -59,12 +63,16 @@ class TplinkRouterSG(TplinkBaseRouter):
         self._data_block = 'data'
 
     def supports(self) -> bool:
-        """Check if this router uses SG/CE_RED encryption."""
+        """Check if this router uses the SG encryption scheme.
+
+        Certification strings (SG CLS L1 STAGE2 / EU CE RED) are a strong
+        positive hint for passive discovery, but some firmwares use the same
+        crypto without those labels (e.g. Archer BE600 US). Always try a real
+        authorize/logout; a wrong scheme fails and the provider moves on.
+        """
         if len(self.password) > 125:
             return False
         try:
-            if not self._check_sg_certification():
-                return False
             self.authorize()
             self.logout()
             return True
@@ -74,7 +82,11 @@ class TplinkRouterSG(TplinkBaseRouter):
         return False
 
     def _check_sg_certification(self) -> bool:
-        """Check if the router has SG_L1_S2 or CE_RED certification."""
+        """Check if the router has SG_L1_S2 or CE_RED certification.
+
+        Used by passive discovery as a high-confidence fingerprint. Not a
+        hard requirement for supports() — see authorize()-based detection.
+        """
         url = '{}/cgi-bin/luci/;stok=/device_config?form=config'.format(self.host)
         response = post(
             url, data='operation=read',
@@ -225,10 +237,21 @@ class TplinkRouterSG(TplinkBaseRouter):
             decrypted = json.loads(self._aes_decrypt(resp['data']))
 
             if not decrypted.get('success'):
-                error_data = decrypted.get('data', {})
+                error_data = decrypted.get('data') or {}
+                if not isinstance(error_data, dict):
+                    error_data = {}
+                # Some firmwares put errorcode at the top level and counters in data
+                # (e.g. {"errorcode":"exceeded max attempts","data":{"failureCount":10,...}}).
+                errorcode = (decrypted.get('errorcode')
+                             or error_data.get('errorcode')
+                             or 'unknown')
+                detail = ''
+                if 'failureCount' in error_data or 'attemptsAllowed' in error_data:
+                    detail = ' (failureCount={}, attemptsAllowed={})'.format(
+                        error_data.get('failureCount'),
+                        error_data.get('attemptsAllowed'))
                 raise ClientException(
-                    'TplinkRouterSG - Login failed: {}'.format(
-                        error_data.get('errorcode', 'unknown')))
+                    'TplinkRouterSG - Login failed: {}{}'.format(errorcode, detail))
 
             self._stok = decrypted['data']['stok']
             if 'set-cookie' in response.headers:
@@ -331,6 +354,7 @@ class TplinkRouterSG(TplinkBaseRouter):
             decrypted = json.loads(decrypted_text)
 
             if self._is_valid_response(decrypted):
+                self._remember_envelope(decrypted)
                 return decrypted.get(self._data_block, decrypted)
             elif ignore_errors:
                 return decrypted

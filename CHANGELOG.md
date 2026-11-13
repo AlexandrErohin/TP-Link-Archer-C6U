@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.40.0] - 2026-11-11
+
+### Added
+
+- **Provider:** opt-in passive-first discovery — `TplinkRouterProvider.discover()` fingerprints SG / AX72 / V1_11 / classic LuCI without credentials; `get_client_safe()` authorizes that one backend at most once and returns a logged-in session. Legacy `get_client()` unchanged ([#256](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/256)).
+- **C6U / V1_11 / SG (LuCI clients):** `get_ipv4_reservations_info()` returns the reservations together with the table capacity (`max_rules`, read from the `others` block of the load response) as `IPv4ReservationsInfo` (`used` / `free` / `is_full`). `request()` keeps the `others` block of the last valid response for this ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
+- **C6U / V1_11 / SG (LuCI clients):** `update_ipv4_reservation(old_macaddr, macaddr=None, ipaddr=None, comment=None, enable=None)` edits a reservation in place with the router's own `update` operation (`key` / `new` / `old` rows, as the web UI sends), so no free slot is needed and the row keeps its position ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
+- Added TP-LINK RE705X v1.0 to supported router list
+- Added TP-LINK TL-WDR7660 3.0.10 to supported router list
+
+### Changed
+
+- **C6U / V1_11 / SG:** `add_ipv4_reservation()` / `delete_ipv4_reservation()` take `verify=True`: the table is checked before an insert (full table, duplicate MAC or IP) and reloaded after insert/update/remove; `ClientException` is raised when the router answered success but did not store the change. Archer AX1800 v1.20 (fw 1.3.6) answers `success: true` to an insert into a full table (64 rules) without saving it. Pass `verify=False` for the previous single-request behavior ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
+- **C6U / V1_11 / SG:** `add_ipv4_reservation()` / `update_ipv4_reservation()` send the name as both `comment` and `hostname`; Archer AX1800 v1.20 stores an empty name when only `comment` is sent (its web UI uses `hostname`) ([#261](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/261)).
+
+### Fixed
+
+- **SG:** `TplinkRouterSG.supports()` no longer requires `SG CLS L1 STAGE2` / `EU CE RED` in `device_config` — those labels are still used for passive discovery, but US firmwares such as Archer BE600 use the SG scheme without them, so `get_client()` previously skipped SG and burned failed logins on other clients ([#262](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/262)).
+- **SG:** login failure reads top-level `errorcode` (and reports `failureCount` / `attemptsAllowed` when present), so lockouts like `exceeded max attempts` are no longer shown as `unknown` ([#262](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/262)).
+- **Discovery:** a 512-bit auth key without an SG/CE_RED certification is left unresolved (ambiguous SG vs AX72) instead of selecting `TplinkRouterAX72`, so `get_client_safe` does not mis-login cert-less SG routers ([#262](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/262)).
+
 ## [5.39.0] - 2026-11-10
 
 ### Added

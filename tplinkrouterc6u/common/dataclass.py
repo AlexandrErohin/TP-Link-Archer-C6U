@@ -237,6 +237,33 @@ class IPv4Reservation:
 
 
 @dataclass
+class IPv4ReservationsInfo:
+    """IPv4 reservation table plus the capacity the router reports for it.
+
+    ``max_rules`` comes from the ``others.max_rules`` field of the
+    reservation load response (e.g. 64 on Archer AX1800 v1.20); it is None
+    when the firmware does not report a limit.
+    """
+    reservations: list[IPv4Reservation] = field(default_factory=list)
+    max_rules: int | None = None
+
+    @property
+    def used(self) -> int:
+        return len(self.reservations)
+
+    @property
+    def free(self) -> int | None:
+        if self.max_rules is None:
+            return None
+        return max(0, self.max_rules - self.used)
+
+    @property
+    def is_full(self) -> bool:
+        # False when max_rules is unknown — not proof that the table has free slots.
+        return self.max_rules is not None and self.used >= self.max_rules
+
+
+@dataclass
 class IPv4DHCPLease:
     _macaddr: EUI48
     _ipaddr: IPv4Address
