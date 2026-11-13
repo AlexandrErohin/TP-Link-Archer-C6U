@@ -83,8 +83,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
         # Like MR _ipv6_support: ask for serviceType / connStatusV4 / X_TP_Uptime once; latch off on failure
         self._wan_detail_support = True
         # TIM XGB834v (and similar): DEV2 objects only answer after the matching web UI
-        # page was GETed. Retry once via that page when an act returns no data; latch
-        # off when still empty (firmware simply lacks the object). See #257.
+        # page was GETed. Retry via that page when an act returns no data; latch off only
+        # when the page request succeeded and data is still missing (firmware lacks the
+        # object). Transient errors keep the flags so the next poll can recover. See #257.
         self._ui_page_retry_status = True
         self._ui_page_retry_map = True
         self._ui_page_retry_dhcp = True
@@ -218,8 +219,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     self._ui_page_access_quirk = True
                 if self._act_data_missing(values[4]) and self._act_data_missing(values[5]):
                     self._ui_page_retry_status = False
-            except Exception:
-                self._ui_page_retry_status = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (status.htm) failed: %s', e)
 
         map_needed = (
                 self._act_data_missing(values[0])
@@ -241,8 +243,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 if self._act_data_missing(values[2]) and self._act_data_missing(values[3]):
                     # Still no Wi-Fi/hosts after the map page → firmware lacks them
                     self._ui_page_retry_map = False
-            except Exception:
-                self._ui_page_retry_map = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (networkMap.htm) failed: %s', e)
         elif used_status_page and self._ui_page_access_quirk:
             # MEM/PROC came from status.htm while map data was already in hand; restore
             # the usual home-page session context without another act round-trip.
@@ -388,8 +391,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     self._ui_page_access_quirk = True
                 else:
                     self._ui_page_retry_dhcp = False
-            except Exception:
-                self._ui_page_retry_dhcp = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (dhcp.htm) failed: %s', e)
 
         ipv4_reservations = []
         for item in self._to_list(data):
@@ -420,8 +424,9 @@ class TPLinkEXClient(TPLinkMRClientBase):
                     self._ui_page_access_quirk = True
                 else:
                     self._ui_page_retry_leases = False
-            except Exception:
-                self._ui_page_retry_leases = False
+            except Exception as e:
+                if self._logger:
+                    self._logger.debug('TplinkRouter - EX - UI page retry (networkMap.htm/leases) failed: %s', e)
 
         dhcp_leases = []
         for item in self._to_list(data):

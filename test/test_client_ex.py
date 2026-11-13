@@ -1559,6 +1559,110 @@ class TestTPLinkEXClient(TestCase):
         self.assertTrue(client._ui_page_access_quirk)
         self.assertTrue(any(u.endswith('networkMap.htm') for u in client.pages))
 
+    def test_get_status_page_retry_survives_transient_error(self) -> None:
+        """A timeout on status.htm / networkMap.htm must not permanently disable retries (#257)."""
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+        DEV2_ADT_LAN = ('{"data":[{"MACAddress":"a0:28:84:de:dd:5c","IPAddress":"192.168.1.1","stack":"1,0,0,0,0,0"}],'
+                        '"operation":"gl","oid":"DEV2_ADT_LAN","success":true}')
+        DEV2_ADT_WAN = ('{"data":[{"enable":"1","MACAddr":"BF-75-44-4C-DC-9E","connIPv4Address":"203.0.113.10",'
+                        '"connIPv4Gateway":"203.0.113.1","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                        '"oid":"DEV2_ADT_WAN","success":true}')
+        DEV2_ADT_WIFI_COMMON = ('{"data":[{"primaryEnable":"1","guestEnable":"0","stack":"1,0,0,0,0,0"}],'
+                                '"operation":"gl","oid":"DEV2_ADT_WIFI_COMMON","success":true}')
+        DEV2_HOST_ENTRY = ('{"data":[{"active":"1","X_TP_LanConnType":"1","physAddress":"66-E2-02-BD-B5-1B",'
+                           '"IPAddress":"192.168.1.20","hostName":"phone","stack":"1,0,0,0,0,0"}],"operation":"gl",'
+                           '"oid":"DEV2_HOST_ENTRY","success":true}')
+        DEV2_MEM_STATUS = ('{"data":{"total":"100","free":"40","stack":"0,0,0,0,0,0"},"operation":"go",'
+                           '"oid":"DEV2_MEM_STATUS","success":true}')
+        DEV2_PROC_STATUS = ('{"data":{"CPUUsage":"25","stack":"0,0,0,0,0,0"},"operation":"go",'
+                            '"oid":"DEV2_PROC_STATUS","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+            page = 'portForward'
+            fail_status_once = True
+            fail_map_once = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET':
+                    if url.endswith('status.htm'):
+                        if self.fail_status_once:
+                            self.fail_status_once = False
+                            raise ClientException('timeout')
+                        self.page = 'status'
+                    elif url.endswith('networkMap.htm'):
+                        if self.fail_map_once:
+                            self.fail_map_once = False
+                            raise ClientException('timeout')
+                        self.page = 'networkMap'
+                    self.pages.append(url)
+                    return 200, ''
+                if not data_str:
+                    raise ClientException()
+                if 'DEV2_ADT_LAN' in data_str:
+                    return 200, DEV2_ADT_LAN
+                if 'DEV2_ADT_WAN' in data_str:
+                    return 200, DEV2_ADT_WAN
+                if 'DEV2_ADT_WIFI_COMMON' in data_str:
+                    return 200, DEV2_ADT_WIFI_COMMON if self.page == 'networkMap' else EMPTY_OID
+                if 'DEV2_HOST_ENTRY' in data_str:
+                    return 200, DEV2_HOST_ENTRY if self.page == 'networkMap' else EMPTY_OID
+                if 'DEV2_MEM_STATUS' in data_str:
+                    return 200, DEV2_MEM_STATUS if self.page == 'status' else EMPTY_OID
+                if 'DEV2_PROC_STATUS' in data_str:
+                    return 200, DEV2_PROC_STATUS if self.page == 'status' else EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        client.pages = []
+
+        first = client.get_status()
+        self.assertTrue(client._ui_page_retry_status)
+        self.assertTrue(client._ui_page_retry_map)
+        self.assertIsNone(first.mem_usage)
+        self.assertIsNone(first.cpu_usage)
+        self.assertEqual(first.clients_total, 0)
+
+        second = client.get_status()
+        self.assertTrue(client._ui_page_access_quirk)
+        self.assertAlmostEqual(second.mem_usage, 0.6)
+        self.assertEqual(second.cpu_usage, 0.25)
+        self.assertEqual(second.clients_total, 1)
+        self.assertTrue(second.wifi_2g_enable)
+
+    def test_get_ipv4_reservations_page_retry_survives_transient_error(self) -> None:
+        EMPTY_OID = '{"success":true,"errorcode":0}'
+        RES = ('{"data":[{"enable":"1","chaddr":"bf:75:44:4c:dc:9e","yiaddr":"192.168.1.50",'
+               '"stack":"1,1,0,0,0,0"}],"operation":"gl","oid":"DEV2_DHCPV4_POOL_STATICADDR","success":true}')
+
+        class TPLinkEXClientTest(TPLinkEXClient):
+            _token = True
+            allow_dhcp = False
+            fail_once = True
+
+            def _request(self, url, method='POST', data_str=None, encrypt=False):
+                if method == 'GET':
+                    if url.endswith('dhcp.htm'):
+                        if self.fail_once:
+                            self.fail_once = False
+                            raise ClientException('timeout')
+                        self.allow_dhcp = True
+                    return 200, ''
+                if not data_str:
+                    raise ClientException()
+                if 'DEV2_DHCPV4_POOL_STATICADDR' in data_str:
+                    return 200, RES if self.allow_dhcp else EMPTY_OID
+                raise ClientException()
+
+        client = TPLinkEXClientTest('', '')
+        self.assertEqual(client.get_ipv4_reservations(), [])
+        self.assertTrue(client._ui_page_retry_dhcp)
+
+        result = client.get_ipv4_reservations()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].ipaddr, '192.168.1.50')
+        self.assertTrue(client._ui_page_access_quirk)
+
     def test_get_vpn_status_empty_oids(self) -> None:
         class TPLinkEXClientTest(TPLinkEXClient):
             def _request(self, url, method='POST', data_str=None, encrypt=False):
