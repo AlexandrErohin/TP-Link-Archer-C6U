@@ -52,6 +52,13 @@ class TPLinkEXClient(TPLinkMRClientBase):
         Connection.IOT_6G: '3,0,0,0,0,0',
     }
 
+    # EasyMesh radio index (2nd stack field of DEV2_WIFI_APDEV_ASSOCDEV) -> band; matches WIFI_SET stacks
+    EASYMESH_RADIO_TYPES = {
+        '1': Connection.HOST_2G,
+        '2': Connection.HOST_5G,
+        '3': Connection.HOST_6G,
+    }
+
     class ActItem:
         GET = 'go'
         GO = 'go'
@@ -82,6 +89,8 @@ class TPLinkEXClient(TPLinkMRClientBase):
         self._url_rsa_key = 'cgi/getGDPRParm'
         # Like MR _ipv6_support: ask for serviceType / connStatusV4 / X_TP_Uptime once; latch off on failure
         self._wan_detail_support = True
+        # EasyMesh association tables (VX231v); latch off when the OIDs are missing (e.g. EX920)
+        self._easymesh_assoc_support = True
 
     def supports(self) -> bool:
         try:
@@ -160,13 +169,6 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self._wan_detail_support = False
         return None
 
-    # EasyMesh radio index (2nd stack field of DEV2_WIFI_APDEV_ASSOCDEV) -> band; matches WIFI_SET stacks
-    EASYMESH_RADIO_TYPES = {
-        '1': Connection.HOST_2G,
-        '2': Connection.HOST_5G,
-        '3': Connection.HOST_6G,
-    }
-
     def _get_easymesh_controller(self) -> dict | None:
         # LAN MAC/IP of the router itself from its EasyMesh AP device entry (stack 1,0,0,0,0,0).
         # The MAC matches the one DEV2_ADT_LAN reports, so the router keeps its identity.
@@ -181,21 +183,32 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
     def _get_easymesh_devices(self) -> dict:
         # Clients as listed by the EasyMesh controller's Network Map: Wi-Fi stations and wired hosts.
-        # Errors are swallowed so firmwares without these OIDs keep the empty host-table result.
+        # Probe once; latch off on error or success-without-data so EX920-style firmwares do not
+        # re-hit missing OIDs on every empty host-table poll. Empty lists [] stay supported.
+        if not self._easymesh_assoc_support:
+            return {}
         try:
             _, values = self.req_act([
                 self.ActItem(self.ActItem.GL, 'DEV2_WIFI_APDEV_ASSOCDEV'),
                 self.ActItem(self.ActItem.GL, 'DEV2_WIFI_APDEV_ETHASSOCDEV'),
             ])
         except Exception:
+            self._easymesh_assoc_support = False
+            return {}
+
+        assoc = values[0] if values else None
+        eth = values[1] if values and len(values) > 1 else None
+        if assoc is None and eth is None:
+            self._easymesh_assoc_support = False
             return {}
 
         devices = {}
-        for val in self._to_list(values[0] if values else None):
+        for val in self._to_list(assoc):
             if int(val.get('active', '0') or '0') == 0 or not val.get('MACAddress'):
                 continue
             stack = val.get('stack', '').split(',')
-            # 3rd stack field is the BSS; only the first (primary SSID) is known to be the host network
+            # 3rd stack field is the BSS; only the first (primary SSID) is known to be the host network.
+            # Other BSS indexes (guest/IoT) stay UNKNOWN — mapping is unverified on these firmwares.
             if len(stack) > 2 and stack[2] == '1':
                 conn = self.EASYMESH_RADIO_TYPES.get(stack[1], Connection.UNKNOWN)
             else:
@@ -204,7 +217,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
                                                 get_mac(val['MACAddress']),
                                                 get_ip(val.get('X_TP_IPAddress') or '0.0.0.0'),
                                                 val.get('X_TP_HostName', ''))
-        for val in self._to_list(values[1] if values and len(values) > 1 else None):
+        for val in self._to_list(eth):
             if int(val.get('active', '0') or '0') == 0 or not val.get('MACAddress'):
                 continue
             devices[val['MACAddress']] = Device(Connection.WIRED,
@@ -397,6 +410,13 @@ class TPLinkEXClient(TPLinkMRClientBase):
                                                                 and int(lease_time)) > 0 else 'Permanent',
                 ))
 
+        # EasyMesh controllers may leave DEV2_HOST_ENTRY empty; association tables have no lease
+        # remaining, so report Permanent (same as a static/zero leaseTimeRemaining row).
+        if not dhcp_leases:
+            for device in self._get_easymesh_devices().values():
+                dhcp_leases.append(
+                    IPv4DHCPLease(device.macaddress, device.ipaddress, device.hostname, 'Permanent'))
+
         return dhcp_leases
 
     def get_ipv4_status(self) -> IPv4Status:
@@ -408,6 +428,10 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN', attrs=wan_attrs),
         ]
         _, values = self.req_act(acts)
+
+        if values and not values[0]:
+            # Same EasyMesh controller path as get_status() when DEV2_ADT_LAN has no data
+            values[0] = self._get_easymesh_controller()
 
         if values and values[0] and values[0].__class__ == list and len(values[0]) > 0:
             values[0] = values[0][0]
