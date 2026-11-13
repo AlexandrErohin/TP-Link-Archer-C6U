@@ -160,6 +160,60 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self._wan_detail_support = False
         return None
 
+    # EasyMesh radio index (2nd stack field of DEV2_WIFI_APDEV_ASSOCDEV) -> band; matches WIFI_SET stacks
+    EASYMESH_RADIO_TYPES = {
+        '1': Connection.HOST_2G,
+        '2': Connection.HOST_5G,
+        '3': Connection.HOST_6G,
+    }
+
+    def _get_easymesh_controller(self) -> dict | None:
+        # LAN MAC/IP of the router itself from its EasyMesh AP device entry (stack 1,0,0,0,0,0).
+        # The MAC matches the one DEV2_ADT_LAN reports, so the router keeps its identity.
+        try:
+            _, values = self.req_act([self.ActItem(self.ActItem.GL, 'DEV2_WIFI_APDEV')])
+        except Exception:
+            return None
+        for val in self._to_list(values[0] if values else None):
+            if val.get('stack') == '1,0,0,0,0,0' and val.get('MACAddress') and val.get('X_TP_IPAddress'):
+                return {'MACAddress': val['MACAddress'], 'IPAddress': val['X_TP_IPAddress']}
+        return None
+
+    def _get_easymesh_devices(self) -> dict:
+        # Clients as listed by the EasyMesh controller's Network Map: Wi-Fi stations and wired hosts.
+        # Errors are swallowed so firmwares without these OIDs keep the empty host-table result.
+        try:
+            _, values = self.req_act([
+                self.ActItem(self.ActItem.GL, 'DEV2_WIFI_APDEV_ASSOCDEV'),
+                self.ActItem(self.ActItem.GL, 'DEV2_WIFI_APDEV_ETHASSOCDEV'),
+            ])
+        except Exception:
+            return {}
+
+        devices = {}
+        for val in self._to_list(values[0] if values else None):
+            if int(val.get('active', '0') or '0') == 0 or not val.get('MACAddress'):
+                continue
+            stack = val.get('stack', '').split(',')
+            # 3rd stack field is the BSS; only the first (primary SSID) is known to be the host network
+            if len(stack) > 2 and stack[2] == '1':
+                conn = self.EASYMESH_RADIO_TYPES.get(stack[1], Connection.UNKNOWN)
+            else:
+                conn = Connection.UNKNOWN
+            devices[val['MACAddress']] = Device(conn,
+                                                get_mac(val['MACAddress']),
+                                                get_ip(val.get('X_TP_IPAddress') or '0.0.0.0'),
+                                                val.get('X_TP_HostName', ''))
+        for val in self._to_list(values[1] if values and len(values) > 1 else None):
+            if int(val.get('active', '0') or '0') == 0 or not val.get('MACAddress'):
+                continue
+            devices[val['MACAddress']] = Device(Connection.WIRED,
+                                                get_mac(val['MACAddress']),
+                                                get_ip(val.get('IPAddress') or '0.0.0.0'),
+                                                val.get('X_TP_HostName', ''))
+
+        return devices
+
     def get_status(self) -> Status:
         status = Status()
         wan_attrs = ['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']
@@ -174,6 +228,10 @@ class TPLinkEXClient(TPLinkMRClientBase):
         ]
 
         _, values = self.req_act(acts)
+
+        if values and not values[0]:
+            # Same EasyMesh controller firmwares may also answer DEV2_ADT_LAN without data
+            values[0] = self._get_easymesh_controller()
 
         if not values or not values[0]:
             raise ClientError('TplinkRouter - EX - DEV2_ADT_LAN returned no data')
@@ -255,6 +313,19 @@ class TPLinkEXClient(TPLinkMRClientBase):
             if int(val['active']) == 0:
                 continue
             conn = self.CLIENT_TYPES.get(int(val['X_TP_LanConnType']), Connection.UNKNOWN)
+            devices[val['physAddress']] = Device(conn,
+                                                 get_mac(val['physAddress']),
+                                                 get_ip(val['IPAddress']),
+                                                 val['hostName'])
+
+        # Some EasyMesh controller firmwares (e.g. VX231v 231.0.25) stop filling DEV2_HOST_ENTRY while
+        # the web UI keeps listing clients from the EasyMesh association tables. Only consulted when
+        # the host table is empty, so routers with a populated host table are unaffected.
+        if not devices:
+            devices = self._get_easymesh_devices()
+
+        for device in devices.values():
+            conn = device.type
             if conn == Connection.WIRED:
                 status.wired_total += 1
             elif conn.is_guest_wifi():
@@ -268,11 +339,6 @@ class TPLinkEXClient(TPLinkMRClientBase):
             else:
                 # Unknown / unmapped X_TP_LanConnType — still count toward totals
                 status.wifi_clients_total += 1
-
-            devices[val['physAddress']] = Device(conn,
-                                                 get_mac(val['physAddress']),
-                                                 get_ip(val['IPAddress']),
-                                                 val['hostName'])
 
         # Some firmwares (e.g. EX920) leave DEV2_MEM_STATUS / DEV2_PROC_STATUS
         # empty (success with no data); slots stay None so indexes do not shift.
