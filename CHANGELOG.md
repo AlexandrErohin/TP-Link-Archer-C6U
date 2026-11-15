@@ -4,6 +4,7 @@
 
 ### Added
 
+- **C80 / C24:** `get_blocked_devices()`, `block_device(mac, name='')` and `unblock_device(mac)` manage the Access Control blacklist with the web UI's `advanced bm` instructions; blocking turns Access Control on and switches it to blacklist mode when needed.
 - Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).
 - **RE365:** `TplinkRE365Router` for TP-Link RE365 v1 (cookie/nonce MD5 login, Wi-Fi client presence, firmware, LAN MAC). `reboot` / `set_wifi` / `get_ipv4_status` raise `NotImplementedError`. ([#266](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/266)).
 
