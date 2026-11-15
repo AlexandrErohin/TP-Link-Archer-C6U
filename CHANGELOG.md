@@ -5,6 +5,7 @@
 ### Added
 
 - Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).
+- **PGW2440:** `TplinkPGW2440Router` for the TP-Link PGW2440 v1.0 powerline Wi-Fi extender (firmware 1.0.4): Wi-Fi clients, 2.4 / 5 GHz state, firmware, LAN IP / netmask / MAC and `reboot`. The LuCI-style forms are served from the web root (no `/cgi-bin/luci/;stok=`), the session needs no `stok` or cookie, and the classic `sign` / `data` encryption signs with raw RSA (no padding, 64-character blocks, `EncryptionWrapperNoPadding`) and hashes the password alone. `supports()` reads only the unauthenticated `login?form=keys` and `admin/firmware?form=get_firmware_info`, so the provider tries it first without opening a session. `set_wifi` raises `NotImplementedError`.
 - **RE365:** `TplinkRE365Router` for TP-Link RE365 v1 (cookie/nonce MD5 login, Wi-Fi client presence, firmware, LAN MAC). `reboot` / `set_wifi` / `get_ipv4_status` raise `NotImplementedError`. ([#266](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/266)).
 
 ### Fixed
