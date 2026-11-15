@@ -53,6 +53,7 @@ from tplinkrouterc6u import (
     TplinkRE330Router,
     TplinkRE365Router,
     TplinkRE813XERouter,
+    TplinkRE235BERouter,
     TplinkC3200Router,
     Connection
 )
@@ -73,6 +74,8 @@ logger = Logger('test')
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 # RE365: local web password (plaintext); reboot / set_wifi / get_ipv4_status are NotImplementedError
 # router = TplinkRE365Router('http://192.168.0.1', 'password', logger=logger)
+# RE235BE: local web password (plaintext); same API as RE813XE over the classic LuCI encryption
+# router = TplinkRE235BERouter('http://192.168.0.1', 'password', logger=logger)
 
 try:
     # Or: with router:  # authorize on enter, logout on exit
@@ -950,6 +953,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - NE211-Outdoor v1.0
 - NX510v v1.0
 - NX600 v2.0
+- RE235BE v1.0 (firmware 1.0.16, access point mode, via `TplinkRE235BERouter`)
 - RE305 4.0
 - RE315 1.0
 - RE330 v1
