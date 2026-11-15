@@ -628,8 +628,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return mesh_nodes
 
     def get_mesh_clients(self) -> list:
-        # Each list item will contain the AP's name, mac, and list of its clients with their details
-        mesh_client_details = []
+        # Each list item will contain the AP's name, mac addresses, and list of its clients with details
+        mesh_sclient_data = []
         try:
             easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
         except Exception:
@@ -646,13 +646,16 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             if not sclient_detail:
                 continue
                 
-            mesh_client_details.append({
+            mesh_sclient_data.append({
               "ap_mac": ap.get('mac'),
+              "ap_mac_24g": sclient_detail.get('mac_24g', ''),
+              "ap_mac_5g": sclient_detail.get('mac_5g', ''),
+              "ap_mac_6g": sclient_detail.get('mac_6g', ''),
               "ap_name": ap.get('name'),
               "nclient_list": sclient_detail.get('mesh_nclient_list')
             })
         
-        return mesh_client_details
+        return mesh_sclient_data
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
