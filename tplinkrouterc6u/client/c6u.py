@@ -647,12 +647,12 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 continue
                 
             mesh_sclient_data.append({
-              "ap_mac": ap.get('mac'),
-              "ap_mac_24g": sclient_detail.get('mac_24g', ''),
-              "ap_mac_5g": sclient_detail.get('mac_5g', ''),
-              "ap_mac_6g": sclient_detail.get('mac_6g', ''),
-              "ap_name": ap.get('name'),
-              "nclient_list": sclient_detail.get('mesh_nclient_list')
+                "ap_name": ap.get('name'),
+                "ap_mac": ap.get('mac'),
+                "ap_mac_24g": sclient_detail.get('mac_24g', ''),
+                "ap_mac_5g": sclient_detail.get('mac_5g', ''),
+                "ap_mac_6g": sclient_detail.get('mac_6g', ''),
+                "nclient_list": sclient_detail.get('mesh_nclient_list')
             })
         
         return mesh_sclient_data
