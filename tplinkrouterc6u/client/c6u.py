@@ -627,6 +627,33 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return mesh_nodes
 
+    def get_mesh_clients(self) -> list:
+        # Each list item will contain the AP's name, mac, and list of its clients with their details
+        mesh_client_details = []
+        try:
+            easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
+        except Exception:
+            return []
+        if not easymesh_device_list:
+            return []
+        for ap in easymesh_device_list:
+            try:
+                # 'sclient' is mesh main or satellite, 'nclient' is a network device
+                form_data = f'operation=read&mac={ap.get('mac')}'
+                sclient_detail = self.request(f'admin/easymesh_network?form=mesh_sclient_detail&{form_data}', form_data)
+            except Exception:
+                continue
+            if not sclient_detail:
+                continue
+                
+            mesh_client_details.append({
+              "ap_mac": ap.get('mac'),
+              "ap_name": ap.get('name'),
+              "nclient_list": sclient_detail.get('mesh_nclient_list')
+            })
+        
+        return mesh_client_details
+
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
         data = self.request('admin/network?form=status_ipv4&operation=read', 'operation=read')
