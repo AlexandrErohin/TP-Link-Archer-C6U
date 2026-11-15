@@ -896,6 +896,72 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(down_plain, 'wan -linkDown')
 
 
+ACCESS_CONTROL_RESPONSE = ('00000\r\nid 58|1,0,0\r\nctrlEnable {enable}\r\nisWhiteList {white}\r\n'
+                           'id 73|1,0,0\r\ndevName 0 My%20Phone\r\nreserved 0 \r\nmac 0 AA-BB-CC-DD-EE-01\r\n'
+                           'devType 0 0\r\ndevName 1 \r\nreserved 1 \r\nmac 1 00-00-00-00-00-00\r\ndevType 1 0')
+
+
+class TestTplinkC80AccessControl(TestCase):
+
+    def _client(self, read_response: str, instr_response: str = '00000'):
+        sent = []
+
+        class CaptureClient(TplinkC80RouterTest):
+            def request(self, code: int, asyn: int, use_token: bool = False, data: str = None):
+                if code == 0 and asyn == 0 and use_token:
+                    sent.append(self._decrypt_data(data.split('data=', 1)[1]))
+                    return ResponseMock(self._encrypt_body(instr_response).split('data=')[1]
+                                        if instr_response != '00000' else '00000')
+                return super().request(code, asyn, use_token, data)
+
+        client = CaptureClient('', '')
+        client.authorize()
+        client.set_encrypted_response(read_response)
+        return client, sent
+
+    def test_get_blocked_devices(self) -> None:
+        client, _ = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=0))
+        devices = client.get_blocked_devices()
+        self.assertEqual(len(devices), 1)
+        self.assertEqual(devices[0].macaddr, 'AA-BB-CC-DD-EE-01')
+        self.assertEqual(devices[0].hostname, 'My Phone')
+
+    def test_block_device_enables_access_control_and_blacklist(self) -> None:
+        client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=0, white=1))
+        client.block_device('aa:bb:cc:dd:ee:02', 'Kid Tablet')
+        self.assertEqual(sent, [
+            'advanced bm -enable',
+            'advanced bm -list black',
+            'advanced bm -add list:black name:Kid%20Tablet mac:AA-BB-CC-DD-EE-02',
+        ])
+
+    def test_block_device_already_blocked_sends_nothing(self) -> None:
+        client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=0))
+        client.block_device('aa-bb-cc-dd-ee-01')
+        self.assertEqual(sent, [])
+
+    def test_block_device_without_name_uses_mac(self) -> None:
+        client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=0))
+        client.block_device('AABBCCDDEE03')
+        self.assertEqual(sent, ['advanced bm -add list:black name:AA-BB-CC-DD-EE-03 mac:AA-BB-CC-DD-EE-03'])
+
+    def test_unblock_device(self) -> None:
+        client, sent = self._client('')
+        client.unblock_device('aa:bb:cc:dd:ee:01')
+        self.assertEqual(sent, ['advanced bm rule -del list:black mac:AA-BB-CC-DD-EE-01'])
+
+    def test_invalid_mac_raises(self) -> None:
+        client, sent = self._client('')
+        with self.assertRaises(ClientException):
+            client.unblock_device('not-a-mac')
+        self.assertEqual(sent, [])
+
+    def test_router_error_raises(self) -> None:
+        client, _ = self._client('', instr_response='00003')
+        with self.assertRaises(ClientException):
+            client.unblock_device('aa:bb:cc:dd:ee:01')
+
+
 class TestTplinkC80RouterSslContext(TestCase):
 
     def test_ssl_context_enables_legacy_renegotiation(self) -> None:
