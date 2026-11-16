@@ -5,6 +5,7 @@
 ### Added
 
 - Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).
+- **RE235BE:** `TplinkRE235BERouter` for TP-Link RE235BE v1.0 in access point mode. Same status / Wi-Fi / repeater methods as `TplinkRE813XERouter`, over the classic LuCI RSA + AES transport of `TplinkRouter` with the plaintext password. The firmware rejects requests without a `Referer` header (`400 Bad Request`, including `login?form=keys`), and `admin/status?form=all` fails, so no existing client matched it. LAN MAC / IP come from `admin/network?form=status_ipv4` when `lan_ipv4` lacks them. Tried after `TplinkRouter` by the provider.
 - **RE365:** `TplinkRE365Router` for TP-Link RE365 v1 (cookie/nonce MD5 login, Wi-Fi client presence, firmware, LAN MAC). `reboot` / `set_wifi` / `get_ipv4_status` raise `NotImplementedError`. ([#266](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/266)).
 
 ### Fixed
