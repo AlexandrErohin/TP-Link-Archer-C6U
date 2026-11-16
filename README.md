@@ -77,7 +77,7 @@ logger = Logger('test')
 # router = TplinkRE365Router('http://192.168.0.1', 'password', logger=logger)
 # RE235BE: local web password (plaintext); same API as RE813XE over the classic LuCI encryption
 # router = TplinkRE235BERouter('http://192.168.0.1', 'password', logger=logger)
-# PGW2440 (powerline Wi-Fi extender): local web password (plaintext); set_wifi is NotImplementedError
+# PGW2440 (powerline Wi-Fi extender): local web password (plaintext); set_wifi is NotImplementedError.
 # router = TplinkPGW2440Router('http://192.168.0.1', 'password', logger=logger)
 
 try:
@@ -170,7 +170,7 @@ most once, returning an already-logged-in session. It does not call
 ambiguous firmware raises `DetectionError`; select a known client explicitly
 rather than guessing. Key sizes are only a medium-confidence fingerprint, not
 proof of a signing scheme, and supported model coverage remains limited
-(families such as RE235BE / RE813XE / MR / EX are not selected by
+(families such as PGW2440 / RE235BE / RE813XE / MR / EX are not selected by
 `get_client_safe` — use `get_client()` or construct the client class directly).
 
 SG and AX72 both expose a 512-bit auth key, and some SG firmwares omit

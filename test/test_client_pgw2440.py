@@ -4,8 +4,10 @@ from unittest.mock import Mock, patch
 
 from Crypto.PublicKey import RSA
 
+from macaddress import EUI48
+
 from tplinkrouterc6u import TplinkPGW2440Router, TplinkRouterProvider, Connection, Status, IPv4Status
-from tplinkrouterc6u.client.pgw2440 import EncryptionWrapperNoPadding
+from tplinkrouterc6u.common.encryption import EncryptionWrapperNoPadding
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 HOST = 'http://192.168.0.250'
@@ -98,6 +100,15 @@ class TestTplinkPGW2440Router(TestCase):
 
     @patch('tplinkrouterc6u.client.pgw2440.post', return_value=response(text='<h1>Not Found</h1>', status_code=404))
     def test_supports_false_on_other_devices(self, _mock_post: Mock) -> None:
+        self.assertFalse(TplinkPGW2440Router(HOST, 'password').supports())
+
+    @patch('tplinkrouterc6u.client.pgw2440.post')
+    def test_supports_false_when_model_is_not_pgw(self, mock_post: Mock) -> None:
+        mock_post.side_effect = [
+            response({'success': True, 'timeout': False, 'data': {'password': ['AB12', '010001']}}),
+            response({'success': True, 'timeout': False,
+                      'data': {'model': 'Archer C6U', 'hardware_version': 'v1', 'firmware_version': '1.0'}}),
+        ]
         self.assertFalse(TplinkPGW2440Router(HOST, 'password').supports())
 
     def test_supports_false_for_long_password(self) -> None:
@@ -228,11 +239,17 @@ class TestTplinkPGW2440Router(TestCase):
         self.assertEqual(status.devices, [])
 
     def test_get_ipv4_status(self) -> None:
-        client, _calls = self._status_client({'admin/network?form=status_ipv4': STATUS_IPV4})
+        client, calls = self._status_client({
+            'admin/network?form=status_ipv4': STATUS_IPV4,
+            'admin/wlan_status': WLAN_STATUS,
+        })
         status = client.get_ipv4_status()
         self.assertIsInstance(status, IPv4Status)
         self.assertEqual(status.lan_ipv4_ipaddr, '192.168.0.250')
         self.assertEqual(status.lan_ipv4_netmask, '255.255.255.0')
+        self.assertEqual(status.lan_macaddr, '02-00-00-00-00-01')
+        self.assertEqual(status.lan_macaddress, EUI48('02-00-00-00-00-01'))
+        self.assertIn(('admin/wlan_status', 'operation=read'), calls)
 
     def test_reboot_and_logout(self) -> None:
         client = self._client()

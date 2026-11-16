@@ -95,6 +95,30 @@ class EncryptionWrapper:
         return encrypted_hex
 
 
+class EncryptionWrapperNoPadding(EncryptionWrapper):
+    """Classic LuCI signature, RSA-encrypted without padding.
+
+    The web UI splits the signature string into 64-character blocks and
+    encrypts each block with raw RSA ("nopadding"): the block is filled with
+    zero bytes up to the key length. ``EncryptionWrapper`` uses PKCS#1 v1.5
+    and 53-character blocks instead.
+    """
+
+    @staticmethod
+    def rsa_encrypt_no_padding(data: str, nn: str, ee: str) -> str:
+        n = int(nn, 16)
+        size = (n.bit_length() + 7) // 8
+        block = int.from_bytes(data.encode().ljust(size, b'\0'), 'big')
+        return format(pow(block, int(ee, 16), n), 'x').zfill(size * 2)
+
+    def get_signature(self, seq: int, is_login: bool, hash: str, nn: str, ee: str) -> str:
+        if is_login:
+            s = '{}&h={}&s={}'.format(self._get_aes_string(), hash, seq)
+        else:
+            s = 'h={}&s={}'.format(hash, seq)
+        return ''.join(self.rsa_encrypt_no_padding(s[pos:pos + 64], nn, ee) for pos in range(0, len(s), 64))
+
+
 class EncryptionWrapperMR:
     RSA_USE_PKCS_V1_5 = False
     AES_KEY_LEN = 128 // 8

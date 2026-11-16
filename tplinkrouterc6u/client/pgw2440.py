@@ -7,34 +7,10 @@ from requests import post, Response
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.common.dataclass import Device, Firmware, IPv4Status, Status
-from tplinkrouterc6u.common.encryption import EncryptionWrapper
+from tplinkrouterc6u.common.encryption import EncryptionWrapperNoPadding
 from tplinkrouterc6u.common.exception import ClientError, ClientException
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 from tplinkrouterc6u.common.package_enum import Connection
-
-
-class EncryptionWrapperNoPadding(EncryptionWrapper):
-    """Classic LuCI signature, RSA-encrypted without padding.
-
-    The web UI splits the signature string into 64-character blocks and
-    encrypts each block with raw RSA ("nopadding"): the block is filled with
-    zero bytes up to the key length. ``EncryptionWrapper`` uses PKCS#1 v1.5
-    and 53-character blocks instead.
-    """
-
-    @staticmethod
-    def rsa_encrypt_no_padding(data: str, nn: str, ee: str) -> str:
-        n = int(nn, 16)
-        size = (n.bit_length() + 7) // 8
-        block = int.from_bytes(data.encode().ljust(size, b'\0'), 'big')
-        return format(pow(block, int(ee, 16), n), 'x').zfill(size * 2)
-
-    def get_signature(self, seq: int, is_login: bool, hash: str, nn: str, ee: str) -> str:
-        if is_login:
-            s = '{}&h={}&s={}'.format(self._get_aes_string(), hash, seq)
-        else:
-            s = 'h={}&s={}'.format(hash, seq)
-        return ''.join(self.rsa_encrypt_no_padding(s[pos:pos + 64], nn, ee) for pos in range(0, len(s), 64))
 
 
 class TplinkPGW2440Router(TplinkEncryption, AbstractRouter):
@@ -97,7 +73,8 @@ class TplinkPGW2440Router(TplinkEncryption, AbstractRouter):
             if not keys.get('password'):
                 return False
             firmware = self._read_plain('admin/firmware?form=get_firmware_info')
-            return bool(firmware.get('model'))
+            model = str(firmware.get('model') or '')
+            return model.startswith('PGW')
         except Exception:
             return False
 
@@ -233,6 +210,12 @@ class TplinkPGW2440Router(TplinkEncryption, AbstractRouter):
         except ClientError:
             return None
 
+    @staticmethod
+    def _lan_mac_from_forms(lan: dict, wlan: dict):
+        # status_ipv4 has no MAC on this firmware; the 2.4 GHz radio uses the unit's LAN MAC.
+        mac = lan.get('lan_macaddr') or wlan.get('wireless_2g_macaddr') or wlan.get('wireless_5g_macaddr')
+        return get_mac(mac) if mac else None
+
     def get_status(self) -> Status:
         lan = self._read('admin/network?form=status_ipv4') or {}
         wlan = self._read('admin/wlan_status') or {}
@@ -241,10 +224,7 @@ class TplinkPGW2440Router(TplinkEncryption, AbstractRouter):
         status = Status()
         if lan.get('lan_ipv4_ipaddr'):
             status._lan_ipv4_addr = get_ip(lan['lan_ipv4_ipaddr'])
-        # status_ipv4 has no MAC; the 2.4 GHz radio uses the unit's LAN MAC.
-        mac = lan.get('lan_macaddr') or wlan.get('wireless_2g_macaddr') or wlan.get('wireless_5g_macaddr')
-        if mac:
-            status._lan_macaddr = get_mac(mac)
+        status._lan_macaddr = self._lan_mac_from_forms(lan, wlan)
         status.wifi_2g_enable = self._str2bool(wlan.get('wireless_2g_enable'))
         status.wifi_5g_enable = self._str2bool(wlan.get('wireless_5g_enable'))
 
@@ -264,11 +244,13 @@ class TplinkPGW2440Router(TplinkEncryption, AbstractRouter):
 
     def get_ipv4_status(self) -> IPv4Status:
         lan = self._read('admin/network?form=status_ipv4') or {}
+        wlan = self._read('admin/wlan_status') or {}
         status = IPv4Status()
         if lan.get('lan_ipv4_ipaddr'):
             status._lan_ipv4_ipaddr = get_ip(lan['lan_ipv4_ipaddr'])
         if lan.get('lan_ipv4_netmask'):
             status._lan_ipv4_netmask = get_ip(lan['lan_ipv4_netmask'])
+        status._lan_macaddr = self._lan_mac_from_forms(lan, wlan)
         return status
 
     def reboot(self) -> None:
