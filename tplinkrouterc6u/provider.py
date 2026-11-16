@@ -16,6 +16,7 @@ from tplinkrouterc6u.client.ex import TPLinkEXClient, TPLinkEXClientGCM, TPLinkE
 from tplinkrouterc6u.client.c5400x import TplinkC5400XRouter
 from tplinkrouterc6u.client.re813xe import TplinkRE813XERouter
 from tplinkrouterc6u.client.re235be import TplinkRE235BERouter
+from tplinkrouterc6u.client.pgw2440 import TplinkPGW2440Router
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
 from tplinkrouterc6u.client.c80 import TplinkC80Router
@@ -128,6 +129,7 @@ class TplinkRouterProvider:
     @staticmethod
     def get_clients() -> dict[str, type[AbstractRouter]]:
         return {
+            TplinkPGW2440Router.__name__: TplinkPGW2440Router,
             TplinkRE813XERouter.__name__: TplinkRE813XERouter,
             TplinkC5400XRouter.__name__: TplinkC5400XRouter,
             TPLinkVRClient.__name__: TPLinkVRClient,
