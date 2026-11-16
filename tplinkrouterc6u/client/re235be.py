@@ -2,7 +2,7 @@ from requests import post
 
 from tplinkrouterc6u.client.c6u import TplinkEncryption
 from tplinkrouterc6u.client.re813xe import TplinkRE813XERouter
-from tplinkrouterc6u.common.dataclass import Status
+from tplinkrouterc6u.common.dataclass import Status, IPv4Status
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.common.helper import get_ip, get_mac
 
@@ -29,15 +29,26 @@ class TplinkRE235BERouter(TplinkEncryption, TplinkRE813XERouter):
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         # TplinkEncryption.__init__ runs after TplinkRE813XERouter.__init__ and
         # clears the headers, so set them again.
-        referer = '{}/webpages/index.html'.format(self.host)
-        self._headers_request = {'Referer': referer, 'Origin': self.host}
-        self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
+        self._headers_request = {
+            'Referer': '{}/webpages/index.html'.format(self.host),
+            'Origin': self.host,
+        }
+        self._headers_login = {
+            'Referer': '{}/webpages/login.html'.format(self.host),
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
 
     def supports(self) -> bool:
-        """Detect the firmware by capability, as ``TplinkRE813XERouter`` does.
+        """Detect this firmware without changing classic ``TplinkRouter``.
 
-        The unauthenticated ``login?form=keys`` read is tried first, so a device
-        without this login never gets a login attempt from this client.
+        1. Unauthenticated ``login?form=keys`` with ``Referer`` — devices without
+           this login never get a login attempt from this client.
+           ``TplinkRouter.supports()`` only probes keys *without* Referer, so it
+           already fails on this firmware; this client is reached next.
+        2. ``TplinkRE813XERouter.supports()`` — authorize, require
+           ``admin/status?form=ap_status``, and require ``form=all`` to fail.
+           That keeps full routers (where ``form=all`` works) for
+           ``TplinkRouter`` / other clients.
         """
         if len(self.password) > 125:
             return False
@@ -88,17 +99,31 @@ class TplinkRE235BERouter(TplinkEncryption, TplinkRE813XERouter):
             self._logger.debug(error)
         return ClientException(error)
 
+    def _read_status_ipv4(self) -> dict:
+        try:
+            return self.request('admin/network?form=status_ipv4', 'operation=read') or {}
+        except ClientError:
+            return {}
+
     def get_status(self) -> Status:
         status = TplinkRE813XERouter.get_status(self)
-        # admin/network?form=lan_ipv4 has no lan_macaddr / lan_ip here;
-        # admin/network?form=status_ipv4 has both.
+        # lan_ipv4 uses macaddr / ipaddr here, not lan_macaddr / lan_ip that
+        # TplinkRE813XERouter reads. status_device.wired_ip often fills the IP
+        # already; status_ipv4 supplies lan_macaddr (and lan_ipv4_ipaddr if needed).
         if status._lan_macaddr is None or status._lan_ipv4_addr is None:
-            try:
-                lan = self.request('admin/network?form=status_ipv4', 'operation=read') or {}
-            except ClientError:
-                lan = {}
+            lan = self._read_status_ipv4()
             if status._lan_macaddr is None and lan.get('lan_macaddr'):
                 status._lan_macaddr = get_mac(lan['lan_macaddr'])
             if status._lan_ipv4_addr is None and lan.get('lan_ipv4_ipaddr'):
                 status._lan_ipv4_addr = get_ip(lan['lan_ipv4_ipaddr'])
         return status
+
+    def get_ipv4_status(self) -> IPv4Status:
+        ipv4_status = TplinkRE813XERouter.get_ipv4_status(self)
+        if ipv4_status._lan_macaddr is None or ipv4_status._lan_ipv4_ipaddr is None:
+            lan = self._read_status_ipv4()
+            if ipv4_status._lan_macaddr is None and lan.get('lan_macaddr'):
+                ipv4_status._lan_macaddr = get_mac(lan['lan_macaddr'])
+            if ipv4_status._lan_ipv4_ipaddr is None and lan.get('lan_ipv4_ipaddr'):
+                ipv4_status._lan_ipv4_ipaddr = get_ip(lan['lan_ipv4_ipaddr'])
+        return ipv4_status

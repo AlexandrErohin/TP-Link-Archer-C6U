@@ -4,11 +4,14 @@ from unittest.mock import Mock, patch
 
 from macaddress import EUI48
 
-from tplinkrouterc6u import TplinkRE235BERouter, TplinkRouter, TplinkRouterProvider, Connection, Status
+from tplinkrouterc6u import (
+    TplinkRE235BERouter, TplinkRouter, TplinkRouterProvider, Connection, Status, IPv4Status,
+)
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 HOST = 'http://192.168.0.254'
 REFERER = HOST + '/webpages/index.html'
+LOGIN_REFERER = HOST + '/webpages/login.html'
 
 # Shapes as returned by an RE235BE v1.0 (firmware 1.0.16) in access point mode.
 # All MAC addresses, IP addresses and names are made up.
@@ -64,7 +67,7 @@ class TestTplinkRE235BERouter(TestCase):
     def test_headers_have_referer(self) -> None:
         client = TplinkRE235BERouter(HOST, 'password')
         self.assertEqual(client._headers_request['Referer'], REFERER)
-        self.assertEqual(client._headers_login['Referer'], REFERER)
+        self.assertEqual(client._headers_login['Referer'], LOGIN_REFERER)
         self.assertFalse(client._logged)
         self.assertEqual(client._stok, '')
 
@@ -86,7 +89,7 @@ class TestTplinkRE235BERouter(TestCase):
             HOST + '/cgi-bin/luci/;stok=/login?form=auth',
         ])
         for call in mock_post.call_args_list:
-            self.assertEqual(call.kwargs['headers']['Referer'], REFERER)
+            self.assertEqual(call.kwargs['headers']['Referer'], LOGIN_REFERER)
             self.assertEqual(call.kwargs['params'], {'operation': 'read'})
 
     @patch('tplinkrouterc6u.client.re235be.post', return_value=response(text='<h1>Bad Request</h1>', status_code=400))
@@ -235,6 +238,43 @@ class TestTplinkRE235BERouter(TestCase):
 
         self.assertIsNone(status.lan_macaddr)
         self.assertEqual(len(status.devices), 2)
+
+    def test_get_ipv4_status(self) -> None:
+        client = self._client()
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            if path == 'admin/network?form=lan_ipv4':
+                return LAN_IPV4
+            if path == 'admin/status?form=status_device':
+                return STATUS_DEVICE
+            if path == 'admin/network?form=status_ipv4':
+                return STATUS_IPV4
+            raise AssertionError(path)
+
+        client.request = request  # type: ignore[method-assign]
+        ipv4 = client.get_ipv4_status()
+
+        self.assertIsInstance(ipv4, IPv4Status)
+        self.assertEqual(ipv4.lan_macaddr, '02-00-00-00-00-AA')
+        self.assertEqual(ipv4.lan_macaddress, EUI48('02-00-00-00-00-AA'))
+        self.assertEqual(ipv4.lan_ipv4_ipaddr, '192.168.0.254')
+
+    def test_get_ipv4_status_skips_status_ipv4_when_lan_ipv4_is_complete(self) -> None:
+        client = self._client()
+        calls = []
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            calls.append(path)
+            if path == 'admin/network?form=lan_ipv4':
+                return {'lan_macaddr': '02-00-00-00-00-BB', 'lan_ip': '192.168.0.253'}
+            raise ClientError('missing')
+
+        client.request = request  # type: ignore[method-assign]
+        ipv4 = client.get_ipv4_status()
+
+        self.assertEqual(ipv4.lan_macaddr, '02-00-00-00-00-BB')
+        self.assertEqual(ipv4.lan_ipv4_ipaddr, '192.168.0.253')
+        self.assertNotIn('admin/network?form=status_ipv4', calls)
 
     def test_provider_tries_after_classic_luci(self) -> None:
         names = list(TplinkRouterProvider.get_clients())

@@ -74,7 +74,6 @@ logger = Logger('test')
 # router = TplinkRE813XERouter('http://192.168.0.1', 'WebEncryptedPassword', logger=logger)
 # RE365: local web password (plaintext); reboot / set_wifi / get_ipv4_status are NotImplementedError
 # router = TplinkRE365Router('http://192.168.0.1', 'password', logger=logger)
-# RE235BE: local web password (plaintext); same API as RE813XE over the classic LuCI encryption
 # router = TplinkRE235BERouter('http://192.168.0.1', 'password', logger=logger)
 
 try:
@@ -166,7 +165,9 @@ most once, returning an already-logged-in session. It does not call
 `supports()` or fall back to other logins if authentication fails. Unknown or
 ambiguous firmware raises `DetectionError`; select a known client explicitly
 rather than guessing. Key sizes are only a medium-confidence fingerprint, not
-proof of a signing scheme, and supported model coverage remains limited.
+proof of a signing scheme, and supported model coverage remains limited
+(families such as RE235BE / RE813XE / MR / EX are not selected by
+`get_client_safe` — use `get_client()` or construct the client class directly).
 
 SG and AX72 both expose a 512-bit auth key, and some SG firmwares omit
 SG/CE_RED certification (e.g. Archer BE600 US). Discovery therefore leaves a
