@@ -14,6 +14,8 @@ from tplinkrouterc6u import (
     IPv6Status,
     Device,
     MeshNode,
+    MeshApClients,
+    MeshClient,
     ClientException,
     VPN,
     WifiStatus,
@@ -1457,6 +1459,101 @@ class TestTPLinkClient(TestCase):
 
         self.assertEqual(client.get_mesh_nodes(), [])
         self.assertTrue(client._easymesh)
+
+    def test_get_mesh_clients(self) -> None:
+        response_easymesh_list = '''
+{
+    "success": true,
+    "data": [
+        {"mac": "24-00-00-00-00-18", "role": "main_router", "name": "AX55 main"},
+        {"mac": "60-00-00-00-00-F5", "role": "satellite_router", "name": "Archer AX23"},
+        {"name": "no-mac-skipped"}
+    ]
+}
+'''
+        response_sclient_main = '''
+{
+    "success": true,
+    "data": {
+        "mac": "24-00-00-00-00-18",
+        "mac_24g": "24-00-00-00-00-19",
+        "mac_5g": "24-00-00-00-00-1A",
+        "mesh_nclient_list": [
+            {"mac": "34-00-00-00-00-A8", "name": "Aircon_Bedroom", "is_wired": false,
+             "ip": "10.1.1.27"},
+            {"name": "missing-mac-skipped"}
+        ],
+        "name": "AX55 main"
+    }
+}
+'''
+        response_sclient_ax23 = '''
+{
+    "success": true,
+    "data": {
+        "mac": "60-00-00-00-00-F5",
+        "mesh_nclient_list": [
+            {"mac": "E8-00-00-00-00-BE", "signal_strength": -47, "connection_type": "2.4G",
+             "ip": "10.1.1.2", "guest": "NON_GUEST", "name": "Solarman", "rxrate": 72,
+             "is_wired": false, "txrate": 14}
+        ]
+    }
+}
+'''
+        sclient_by_mac = {
+            '24-00-00-00-00-18': response_sclient_main,
+            '60-00-00-00-00-F5': response_sclient_ax23,
+        }
+        router_class = self.router_class
+        easymesh_device_list_path = self.easymesh_device_list_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == easymesh_device_list_path:
+                    return loads(response_easymesh_list)['data']
+                if path.startswith('admin/easymesh_network?form=mesh_sclient_detail'):
+                    mac = path.rsplit('mac=', 1)[-1]
+                    return loads(sclient_by_mac[mac])['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        result = client.get_mesh_clients()
+
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], MeshApClients)
+        self.assertEqual(result[0].name, 'AX55 main')
+        self.assertEqual(result[0].macaddr, '24-00-00-00-00-18')
+        self.assertEqual(result[0].macaddr_24g, '24-00-00-00-00-19')
+        self.assertEqual(result[0].macaddr_5g, '24-00-00-00-00-1A')
+        self.assertIsNone(result[0].macaddr_6g)
+        self.assertEqual(len(result[0].clients), 1)
+        self.assertIsInstance(result[0].clients[0], MeshClient)
+        self.assertEqual(result[0].clients[0].macaddr, '34-00-00-00-00-A8')
+        self.assertEqual(result[0].clients[0].hostname, 'Aircon_Bedroom')
+        self.assertEqual(result[0].clients[0].ipaddr, '10.1.1.27')
+        self.assertFalse(result[0].clients[0].is_wired)
+
+        self.assertEqual(result[1].name, 'Archer AX23')
+        self.assertEqual(len(result[1].clients), 1)
+        self.assertEqual(result[1].clients[0].macaddr, 'E8-00-00-00-00-BE')
+        self.assertEqual(result[1].clients[0].signal, -47)
+        self.assertEqual(result[1].clients[0].connection_type, '2.4G')
+        self.assertEqual(result[1].clients[0].rx_rate, 72)
+        self.assertEqual(result[1].clients[0].tx_rate, 14)
+
+    def test_get_mesh_clients_returns_empty_when_unsupported(self) -> None:
+        router_class = self.router_class
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        self.assertEqual(client.get_mesh_clients(), [])
+        self.assertFalse(client._easymesh)
+        self.assertEqual(client.get_mesh_clients(), [])
 
     def test_get_status_with_perf_request(self) -> None:
         response_status = '''

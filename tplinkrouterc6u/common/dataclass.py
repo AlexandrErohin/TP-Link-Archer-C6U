@@ -213,6 +213,79 @@ class MeshNode:
 
 
 @dataclass
+class MeshClient:
+    """A client associated with one EasyMesh access point (``mesh_nclient_list``)."""
+    _macaddr: EUI48 | None = None
+    _ipaddr: IPv4Address | None = None
+    hostname: str | None = None
+    connection_type: str | None = None
+    guest: str | None = None
+    signal: int | None = None
+    rx_rate: int | None = None
+    tx_rate: int | None = None
+    is_wired: bool | None = None
+
+    @property
+    def macaddr(self) -> str | None:
+        return str(self._macaddr) if self._macaddr is not None else None
+
+    @property
+    def macaddress(self) -> EUI48 | None:
+        return self._macaddr
+
+    @property
+    def ipaddr(self) -> str | None:
+        return str(self._ipaddr) if self._ipaddr is not None else None
+
+    @property
+    def ipaddress(self) -> IPv4Address | None:
+        return self._ipaddr
+
+
+@dataclass
+class MeshApClients:
+    """One EasyMesh AP with the clients reported under ``mesh_sclient_detail``."""
+    name: str | None = None
+    _macaddr: EUI48 | None = None
+    _macaddr_24g: EUI48 | None = None
+    _macaddr_5g: EUI48 | None = None
+    _macaddr_6g: EUI48 | None = None
+    clients: list[MeshClient] = field(default_factory=list)
+
+    @property
+    def macaddr(self) -> str | None:
+        return str(self._macaddr) if self._macaddr is not None else None
+
+    @property
+    def macaddress(self) -> EUI48 | None:
+        return self._macaddr
+
+    @property
+    def macaddr_24g(self) -> str | None:
+        return str(self._macaddr_24g) if self._macaddr_24g is not None else None
+
+    @property
+    def macaddress_24g(self) -> EUI48 | None:
+        return self._macaddr_24g
+
+    @property
+    def macaddr_5g(self) -> str | None:
+        return str(self._macaddr_5g) if self._macaddr_5g is not None else None
+
+    @property
+    def macaddress_5g(self) -> EUI48 | None:
+        return self._macaddr_5g
+
+    @property
+    def macaddr_6g(self) -> str | None:
+        return str(self._macaddr_6g) if self._macaddr_6g is not None else None
+
+    @property
+    def macaddress_6g(self) -> EUI48 | None:
+        return self._macaddr_6g
+
+
+@dataclass
 class IPv4Reservation:
     _macaddr: EUI48 | None = None
     _ipaddr: IPv4Address | None = None

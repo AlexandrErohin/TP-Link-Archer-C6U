@@ -14,6 +14,8 @@ from tplinkrouterc6u.common.dataclass import (
     Status,
     Device,
     MeshNode,
+    MeshApClients,
+    MeshClient,
     IPv4Reservation,
     IPv4ReservationsInfo,
     IPv4DHCPLease,
@@ -627,34 +629,74 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         return mesh_nodes
 
-    def get_mesh_clients(self) -> list:
-        # Each list item will contain the AP's name, mac addresses, and list of its clients with details
-        mesh_sclient_data = []
+    def get_mesh_clients(self) -> list[MeshApClients]:
+        """Return EasyMesh APs with the clients each reports under mesh_sclient_detail.
+
+        Returns an empty list on routers without EasyMesh (same latch as
+        ``get_mesh_nodes`` / ``get_status``). Intended for pollers that need
+        per-AP client lists without enriching ``get_status()`` devices.
+        """
+        if not self._easymesh:
+            return []
+
         try:
             easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
         except Exception:
+            self._easymesh = False
             return []
         if not easymesh_device_list:
             return []
+
+        mesh_sclient_data: list[MeshApClients] = []
         for ap in easymesh_device_list:
+            ap_mac = ap.get('mac')
+            if not ap_mac:
+                continue
             try:
                 # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                form_data = f'operation=read&mac={ap.get('mac')}'
-                sclient_detail = self.request(f'admin/easymesh_network?form=mesh_sclient_detail&{form_data}', form_data)
+                form_data = 'operation=read&mac=' + ap_mac
+                sclient_detail = self.request(
+                    'admin/easymesh_network?form=mesh_sclient_detail&' + form_data,
+                    form_data,
+                )
             except Exception:
                 continue
             if not sclient_detail:
                 continue
-                
-            mesh_sclient_data.append({
-                "ap_name": ap.get('name'),
-                "ap_mac": ap.get('mac'),
-                "ap_mac_24g": sclient_detail.get('mac_24g', ''),
-                "ap_mac_5g": sclient_detail.get('mac_5g', ''),
-                "ap_mac_6g": sclient_detail.get('mac_6g', ''),
-                "nclient_list": sclient_detail.get('mesh_nclient_list')
-            })
-        
+
+            clients: list[MeshClient] = []
+            for nclient in sclient_detail.get('mesh_nclient_list') or []:
+                if not isinstance(nclient, dict) or not nclient.get('mac'):
+                    continue
+                client = MeshClient()
+                client._macaddr = get_mac(nclient['mac'])
+                if nclient.get('ip'):
+                    client._ipaddr = get_ip(nclient['ip'])
+                client.hostname = nclient.get('name')
+                client.connection_type = nclient.get('connection_type')
+                client.guest = nclient.get('guest')
+                if nclient.get('signal_strength') is not None:
+                    client.signal = int(nclient['signal_strength'])
+                if nclient.get('rxrate') is not None:
+                    client.rx_rate = int(nclient['rxrate'])
+                if nclient.get('txrate') is not None:
+                    client.tx_rate = int(nclient['txrate'])
+                if nclient.get('is_wired') is not None:
+                    client.is_wired = bool(nclient['is_wired'])
+                clients.append(client)
+
+            ap_entry = MeshApClients()
+            ap_entry.name = ap.get('name')
+            ap_entry._macaddr = get_mac(ap_mac)
+            if sclient_detail.get('mac_24g'):
+                ap_entry._macaddr_24g = get_mac(sclient_detail['mac_24g'])
+            if sclient_detail.get('mac_5g'):
+                ap_entry._macaddr_5g = get_mac(sclient_detail['mac_5g'])
+            if sclient_detail.get('mac_6g'):
+                ap_entry._macaddr_6g = get_mac(sclient_detail['mac_6g'])
+            ap_entry.clients = clients
+            mesh_sclient_data.append(ap_entry)
+
         return mesh_sclient_data
 
     def get_ipv4_status(self) -> IPv4Status:

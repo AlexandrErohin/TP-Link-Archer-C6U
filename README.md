@@ -192,6 +192,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_ipv4_status |   | Gets WAN and LAN IPv4 status info, gateway, DNS, netmask | [IPv4Status](#IPv4Status) |
 | get_ipv6_status |   | Gets WAN IPv6 status info, gateway, DNS, site prefix (c6u/SG, MR/EX/VR, C80-style; others raise `NotImplementedError`) | [IPv6Status](#IPv6Status) |
 | get_mesh_nodes |   | Gets mesh nodes reported by the main router (EasyMesh on C6U/SG; Deco mesh units including the master). Returns an empty list on routers without mesh; clients that do not implement it raise `NotImplementedError` | [[MeshNode]](#MeshNode) |
+| get_mesh_clients |   | Gets EasyMesh clients grouped by access point (C6U/SG). Returns an empty list without EasyMesh; clients that do not implement it raise `NotImplementedError` | [[MeshApClients]](#MeshApClients) |
 | get_ipv4_reservations |   | Gets IPv4 reserved addresses (static) | [[IPv4Reservation]](#IPv4Reservation) |
 | get_ipv4_reservations_info |   | Gets IPv4 reserved addresses plus the table capacity (`max_rules`) reported by the router (Archer / LuCI clients) | [IPv4ReservationsInfo](#IPv4ReservationsInfo) |
 | add_ipv4_reservation | macaddr: str, ipaddr: str, comment: str = '', enable: bool = True, verify: bool = True | Adds an IPv4 DHCP address reservation (Archer / LuCI clients). With `verify` it refuses a duplicate MAC/IP or a full table and checks the row was stored, raising `ClientException` otherwise (some firmware answers success without saving) |   |
@@ -382,6 +383,35 @@ families. `internet_status`, hardware/firmware versions and `wired_ports` are De
 | rx_rate_2g / rx_rate_5g | Deco backhaul RX rate | int, None |
 | tx_rate_2g / tx_rate_5g | Deco backhaul TX rate | int, None |
 | wired_ports | Deco wired port count | int, None |
+
+### <a id="MeshApClients">MeshApClients</a>
+One EasyMesh access point with the clients it reports under `mesh_sclient_detail`
+(C6U / SG via `get_mesh_clients()`).
+
+| Field | Description | Type |
+|---|---|---|
+| name | AP name | str, None |
+| macaddr | AP mac address | str, None |
+| macaddress | AP mac address | macaddress.EUI48, None |
+| macaddr_24g / macaddr_5g / macaddr_6g | AP radio mac addresses when the firmware reports them | str, None |
+| macaddress_24g / macaddress_5g / macaddress_6g | AP radio mac addresses | macaddress.EUI48, None |
+| clients | clients associated with this AP | [[MeshClient]](#MeshClient) |
+
+### <a id="MeshClient">MeshClient</a>
+A client under one EasyMesh AP (`mesh_nclient_list` entry).
+
+| Field | Description | Type |
+|---|---|---|
+| macaddr | client mac address | str, None |
+| macaddress | client mac address | macaddress.EUI48, None |
+| ipaddr | client ip address | str, None |
+| ipaddress | client ip address | ipaddress.IPv4Address, None |
+| hostname | client name | str, None |
+| connection_type | connection type, like - `2.4G` | str, None |
+| guest | guest flag from the firmware, like - `NON_GUEST` | str, None |
+| signal | signal strength | int, None |
+| rx_rate / tx_rate | PHY rates (Mbps) when present | int, None |
+| is_wired | whether the client is wired | bool, None |
 
 ### <a id="IPv4Reservation">IPv4Reservation</a>
 | Field | Description | Type |

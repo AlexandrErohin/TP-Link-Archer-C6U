@@ -36,6 +36,8 @@ from tplinkrouterc6u.common.dataclass import (
     Status,
     Device,
     MeshNode,
+    MeshApClients,
+    MeshClient,
     IPv4Reservation,
     IPv4ReservationsInfo,
     IPv4DHCPLease,
