@@ -1,6 +1,6 @@
 from unittest import main
 from unittest.mock import patch, Mock
-from test_client_c6u import TestTPLinkClient
+from .test_client_c6u import TestTPLinkClient
 from tplinkrouterc6u import TplinkRouterV1_11, ClientException
 
 

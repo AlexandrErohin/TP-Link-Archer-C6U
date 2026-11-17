@@ -10,7 +10,7 @@ from tplinkrouterc6u import (
     VpnClientServer,
     VpnClientServerProtocol,
 )
-from test_client_c6u import TestTPLinkClient
+from .test_client_c6u import TestTPLinkClient
 
 
 class TestTPLinkClientSG(TestTPLinkClient):
