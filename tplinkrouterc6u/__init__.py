@@ -72,6 +72,7 @@ from tplinkrouterc6u.common.dataclass import (
     QoSSettings,
     SecuritySettings,
     HomeCareStatus,
+    BlockedDevice,
     BlockedThreats,
     IpMacBinding,
     FirmwareUpdate,

@@ -202,6 +202,9 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
 | update_ipv4_port_forward | name: str, new_name: str = None, external_port: str \| int = None, internal_port: str \| int = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
 | delete_ipv4_port_forward | name: str | Deletes an IPv4 port forwarding rule by name (Archer / LuCI clients) |   |
+| get_blocked_devices |   | Devices on the Access Control blacklist (Archer C80 / C24) | [[BlockedDevice]](#blocked_device) |
+| block_device | mac: str, name: str = '' | Block a device: adds it to the Access Control blacklist, turning Access Control on and switching it to blacklist mode first when needed, like the web UI Block button (Archer C80 / C24). Already blocked MACs are left as they are |   |
+| unblock_device | mac: str | Remove a device from the Access Control blacklist; Access Control stays on (Archer C80 / C24) |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |
@@ -441,6 +444,13 @@ A client under one EasyMesh AP (`mesh_nclient_list` entry).
 | ipaddress | client ip address | ipaddress |
 | hostname | client hostname | str |
 | lease_time | ip address lease time | str |
+
+### <a id="blocked_device">BlockedDevice</a>
+| Field | Description | Type |
+| --- |---|---|
+| macaddr | device mac address | str |
+| macaddress | device mac address | macaddress |
+| hostname | name stored with the blacklist entry | str |
 
 ### <a id="IPv4PortForward">IPv4PortForward</a>
 | Field | Description | Type |
@@ -1055,7 +1065,9 @@ Guidelines [CONTRIBUTING.md](https://github.com/AlexandrErohin/TP-Link-Archer-C6
 The sanity check test.py illustrates a few tests and runs through a list of queries in queries.txt creating logs of the results of each query in the logs folder. This can be used to capture the dictionary output of all cgi-bin form submissions.
 
 ### Run tests
-- Run `python -m unittest discover ./test`
+- Run `uv sync` (installs the package in editable mode plus the `dev` group: pytest, flake8)
+- Run `uv run pytest` and `uv run flake8` (or `python -m unittest discover ./test`)
+- Live tests against a real router are marked `live` and skipped unless `TPLINK_HOST` / `TPLINK_PASSWORD` are set; see `test/test_live_c80_access_control.py` (Archer C80 / C24 block/unblock)
 
 ## Thanks To
  - [EncryptionWrapper for TP-Link Archer C6U](https://github.com/ericpignet/home-assistant-tplink_router/pull/42/files) by [@Singleton-95](https://github.com/Singleton-95)
