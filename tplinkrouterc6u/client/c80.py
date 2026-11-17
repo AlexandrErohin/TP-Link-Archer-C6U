@@ -10,7 +10,8 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, IPv4Reservation
-from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus
+from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus, BlockedDevice
+from macaddress import EUI48
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
 
@@ -26,6 +27,10 @@ class RouterConstants:
     IOT_WIFI_5G_REQUEST = '33|2,9,0'
     IPV6_WAN_REQUEST = '45|1,0,0'
     IPV6_SITE_REQUEST = '48|1,0,0'
+    # Access Control (web UI: Advanced > Security > Access Control and the network map Block button).
+    # 58: ctrlEnable / isWhiteList; 73: blackList entries (devName, reserved, mac, devType).
+    ACCESS_CONTROL_SWITCH_REQUEST = '58|1,0,0'
+    ACCESS_CONTROL_BLACKLIST_REQUEST = '73|1,0,0'
 
     CONNECTION_REQUESTS_MAP = {
             Connection.HOST_2G: HOST_WIFI_2G_REQUEST,
@@ -308,6 +313,61 @@ class TplinkC80Router(AbstractRouter):
         # C80/C24 web UI: wan -linkUp / wan -linkDown (captured in #227).
         text = 'wan -linkUp' if enable else 'wan -linkDown'
         self._post_data(text, code=0, asyn=0)
+
+    def get_blocked_devices(self) -> list[BlockedDevice]:
+        """Devices on the Access Control blacklist (kept even while Access Control is off or in whitelist mode)."""
+        request = RouterConstants.ACCESS_CONTROL_BLACKLIST_REQUEST
+        entries = self._parse_response_to_dict(self._return_data_block(request).get(request, []))
+
+        devices: list[BlockedDevice] = []
+        for entry in entries:
+            mac = entry.get('mac', '')
+            if not mac or mac == '00-00-00-00-00-00':
+                continue
+            devices.append(BlockedDevice(get_mac(mac), parse.unquote(entry.get('devName', ''))))
+        return devices
+
+    def block_device(self, mac: str, name: str = '') -> None:
+        """Block a device by adding it to the Access Control blacklist.
+
+        Same steps as the web UI's network map Block button: turns Access Control on
+        and switches it to blacklist mode when needed (a whitelist stops applying),
+        then adds the MAC unless it is already on the blacklist.
+        """
+        mac = self._format_mac(mac)
+        switch_request = RouterConstants.ACCESS_CONTROL_SWITCH_REQUEST
+        blacklist_request = RouterConstants.ACCESS_CONTROL_BLACKLIST_REQUEST
+        data_blocks = self._return_data_block(f'{switch_request}#{blacklist_request}')
+
+        switch = self._parse_last_values_from_block(data_blocks.get(switch_request, []))
+        if switch.get('ctrlEnable') != '1':
+            self._send_instruction('advanced bm -enable')
+        if switch.get('isWhiteList') != '0':
+            self._send_instruction('advanced bm -list black')
+
+        blocked = {entry.get('mac', '').upper()
+                   for entry in self._parse_response_to_dict(data_blocks.get(blacklist_request, []))}
+        if mac in blocked:
+            return
+        name = parse.quote(name or mac, safe="!~*'()")
+        self._send_instruction(f'advanced bm -add list:black name:{name} mac:{mac}')
+
+    def unblock_device(self, mac: str) -> None:
+        """Remove a device from the Access Control blacklist; Access Control itself stays as it is."""
+        self._send_instruction(f'advanced bm rule -del list:black mac:{self._format_mac(mac)}')
+
+    @staticmethod
+    def _format_mac(mac: str) -> str:
+        try:
+            return str(EUI48(mac))  # AA-BB-CC-DD-EE-FF, the form the web UI sends
+        except (ValueError, TypeError) as e:
+            raise ClientException(f'Invalid MAC address: {mac!r}') from e
+
+    def _send_instruction(self, text: str) -> None:
+        response = self._post_data(text, code=0, asyn=0)
+        error_code = (response or '').split('\r\n', 1)[0].strip()
+        if error_code != '00000':
+            raise ClientException(f'Router rejected "{text}": error {error_code or "empty response"}')
 
     def get_ipv4_status(self) -> IPv4Status:
         mac_info_request = "1|1,0,0"

@@ -310,6 +310,21 @@ class IPv4Reservation:
 
 
 @dataclass
+class BlockedDevice:
+    """A device on the router's Access Control blacklist."""
+    _macaddr: EUI48
+    hostname: str = ''
+
+    @property
+    def macaddr(self):
+        return str(self._macaddr)
+
+    @property
+    def macaddress(self):
+        return self._macaddr
+
+
+@dataclass
 class IPv4ReservationsInfo:
     """IPv4 reservation table plus the capacity the router reports for it.
 

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **C80 / C24:** `get_blocked_devices()`, `block_device(mac, name='')` and `unblock_device(mac)` manage the Access Control blacklist with the web UI's `advanced bm` instructions; blocking turns Access Control on and switches it to blacklist mode when needed.
 - Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).
 - **C6U / SG (EasyMesh):** `get_mesh_clients()` returns per-AP client lists (`MeshApClients` / `MeshClient`) from `mesh_sclient_detail`, so pollers can enrich clients outside `get_status()`. ([#270](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/270)).
 - **PGW2440:** `TplinkPGW2440Router` for the TP-Link PGW2440 v1.0 powerline Wi-Fi extender (firmware 1.0.4): Wi-Fi clients, 2.4 / 5 GHz state, firmware, LAN IP / netmask / MAC and `reboot`. The LuCI-style forms are served from the web root (no `/cgi-bin/luci/;stok=`), the session needs no `stok` or cookie, and the classic `sign` / `data` encryption signs with raw RSA (no padding, 64-character blocks, `EncryptionWrapperNoPadding`) and hashes the password alone. `supports()` reads only the unauthenticated `login?form=keys` and `admin/firmware?form=get_firmware_info`, so the provider tries it first without opening a session. `set_wifi` raises `NotImplementedError`.
