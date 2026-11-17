@@ -10,7 +10,9 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, IPv4Reservation
-from tplinkrouterc6u.common.dataclass import IPv4DHCPLease, Device, VPNStatus, BlockedDevice
+from tplinkrouterc6u.common.dataclass import (
+    IPv4DHCPLease, Device, VPNStatus, BlockedDevice, AccessControlStatus,
+)
 from macaddress import EUI48
 from tplinkrouterc6u.client_abstract import AbstractRouter
 
@@ -314,10 +316,50 @@ class TplinkC80Router(AbstractRouter):
         text = 'wan -linkUp' if enable else 'wan -linkDown'
         self._post_data(text, code=0, asyn=0)
 
+    def get_access_control(self) -> AccessControlStatus:
+        """Access Control enable flag and blacklist/whitelist mode (Archer C80 / C24)."""
+        request = RouterConstants.ACCESS_CONTROL_SWITCH_REQUEST
+        switch = self._parse_last_values_from_block(
+            self._return_data_block(request).get(request, []))
+        return AccessControlStatus(
+            enable=switch.get('ctrlEnable') == '1',
+            mode='whitelist' if switch.get('isWhiteList') == '1' else 'blacklist',
+        )
+
+    def set_access_control(self, enable: bool | None = None, mode: str | None = None) -> None:
+        """Set Access Control enable and/or mode without touching the blacklist.
+
+        ``mode`` is ``'blacklist'`` or ``'whitelist'``. Pass only the fields you want
+        to change. Enabling and switching to blacklist is explicit — ``block_device``
+        does not do this for you.
+        """
+        if enable is None and mode is None:
+            raise ClientException('set_access_control requires enable and/or mode')
+
+        mode_instruction = None
+        if mode is not None:
+            mode_key = mode.lower()
+            if mode_key not in ('blacklist', 'whitelist'):
+                raise ClientException(
+                    f"Access Control mode must be 'blacklist' or 'whitelist', got {mode!r}")
+            mode_instruction = (
+                'advanced bm -list black' if mode_key == 'blacklist'
+                else 'advanced bm -list white')
+
+        # Enable before mode so a newly turned-on switch lands in the requested list;
+        # disable after mode so restore can put whitelist back before turning off.
+        if enable is True:
+            self._send_instruction('advanced bm -enable')
+        if mode_instruction is not None:
+            self._send_instruction(mode_instruction)
+        if enable is False:
+            self._send_instruction('advanced bm -disable')
+
     def get_blocked_devices(self) -> list[BlockedDevice]:
         """Devices on the Access Control blacklist (kept even while Access Control is off or in whitelist mode)."""
         request = RouterConstants.ACCESS_CONTROL_BLACKLIST_REQUEST
-        entries = self._parse_response_to_dict(self._return_data_block(request).get(request, []))
+        entries = self._parse_access_control_entries(
+            self._return_data_block(request).get(request, []))
 
         devices: list[BlockedDevice] = []
         for entry in entries:
@@ -328,32 +370,20 @@ class TplinkC80Router(AbstractRouter):
         return devices
 
     def block_device(self, mac: str, name: str = '') -> None:
-        """Block a device by adding it to the Access Control blacklist.
+        """Add a device to the Access Control blacklist.
 
-        Same steps as the web UI's network map Block button: turns Access Control on
-        and switches it to blacklist mode when needed (a whitelist stops applying),
-        then adds the MAC unless it is already on the blacklist.
+        Does not enable Access Control or change blacklist/whitelist mode — call
+        ``set_access_control`` for that. Already listed MACs are left as they are.
         """
         mac = self._format_mac(mac)
-        switch_request = RouterConstants.ACCESS_CONTROL_SWITCH_REQUEST
-        blacklist_request = RouterConstants.ACCESS_CONTROL_BLACKLIST_REQUEST
-        data_blocks = self._return_data_block(f'{switch_request}#{blacklist_request}')
-
-        switch = self._parse_last_values_from_block(data_blocks.get(switch_request, []))
-        if switch.get('ctrlEnable') != '1':
-            self._send_instruction('advanced bm -enable')
-        if switch.get('isWhiteList') != '0':
-            self._send_instruction('advanced bm -list black')
-
-        blocked = {entry.get('mac', '').upper()
-                   for entry in self._parse_response_to_dict(data_blocks.get(blacklist_request, []))}
+        blocked = {device.macaddr for device in self.get_blocked_devices()}
         if mac in blocked:
             return
         name = parse.quote(name or mac, safe="!~*'()")
         self._send_instruction(f'advanced bm -add list:black name:{name} mac:{mac}')
 
     def unblock_device(self, mac: str) -> None:
-        """Remove a device from the Access Control blacklist; Access Control itself stays as it is."""
+        """Remove a device from the Access Control blacklist; enable/mode stay as they are."""
         self._send_instruction(f'advanced bm rule -del list:black mac:{self._format_mac(mac)}')
 
     @staticmethod
@@ -362,6 +392,21 @@ class TplinkC80Router(AbstractRouter):
             return str(EUI48(mac))  # AA-BB-CC-DD-EE-FF, the form the web UI sends
         except (ValueError, TypeError) as e:
             raise ClientException(f'Invalid MAC address: {mac!r}') from e
+
+    def _parse_access_control_entries(self, response_data: list[str]) -> list[dict]:
+        """Parse indexed Access Control rows (no IP filter — blacklist entries have no ip)."""
+        result_dict: dict[int, dict] = defaultdict(dict)
+        for entry in response_data:
+            parts = entry.split(' ', 2)
+            if len(parts) < 2:
+                continue
+            key, id_str = parts[0], parts[1]
+            value = parts[2] if len(parts) == 3 else ''
+            try:
+                result_dict[int(id_str)][key] = value
+            except ValueError:
+                continue
+        return list(result_dict.values())
 
     def _send_instruction(self, text: str) -> None:
         response = self._post_data(text, code=0, asyn=0)

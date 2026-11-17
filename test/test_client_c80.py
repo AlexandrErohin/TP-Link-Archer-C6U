@@ -919,6 +919,34 @@ class TestTplinkC80AccessControl(TestCase):
         client.set_encrypted_response(read_response)
         return client, sent
 
+    def test_get_access_control(self) -> None:
+        client, _ = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=1))
+        status = client.get_access_control()
+        self.assertTrue(status.enable)
+        self.assertEqual(status.mode, 'whitelist')
+
+    def test_set_access_control_enable_and_mode(self) -> None:
+        client, sent = self._client('')
+        client.set_access_control(enable=True, mode='blacklist')
+        self.assertEqual(sent, [
+            'advanced bm -enable',
+            'advanced bm -list black',
+        ])
+
+    def test_set_access_control_disable_after_mode(self) -> None:
+        client, sent = self._client('')
+        client.set_access_control(enable=False, mode='whitelist')
+        self.assertEqual(sent, [
+            'advanced bm -list white',
+            'advanced bm -disable',
+        ])
+
+    def test_set_access_control_invalid_mode_raises(self) -> None:
+        client, sent = self._client('')
+        with self.assertRaises(ClientException):
+            client.set_access_control(mode='graylist')
+        self.assertEqual(sent, [])
+
     def test_get_blocked_devices(self) -> None:
         client, _ = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=0))
         devices = client.get_blocked_devices()
@@ -926,17 +954,17 @@ class TestTplinkC80AccessControl(TestCase):
         self.assertEqual(devices[0].macaddr, 'AA-BB-CC-DD-EE-01')
         self.assertEqual(devices[0].hostname, 'My Phone')
 
-    def test_block_device_enables_access_control_and_blacklist(self) -> None:
+    def test_block_device_does_not_change_enable_or_mode(self) -> None:
+        # Whitelist + AC off: block_device must only add the MAC, never enable/mode.
         client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=0, white=1))
         client.block_device('aa:bb:cc:dd:ee:02', 'Kid Tablet')
         self.assertEqual(sent, [
-            'advanced bm -enable',
-            'advanced bm -list black',
             'advanced bm -add list:black name:Kid%20Tablet mac:AA-BB-CC-DD-EE-02',
         ])
 
     def test_block_device_already_blocked_sends_nothing(self) -> None:
-        client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=1, white=0))
+        # Even with AC off / whitelist, an already-listed MAC must not touch enable/mode.
+        client, sent = self._client(ACCESS_CONTROL_RESPONSE.format(enable=0, white=1))
         client.block_device('aa-bb-cc-dd-ee-01')
         self.assertEqual(sent, [])
 

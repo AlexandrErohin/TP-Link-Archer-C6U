@@ -325,6 +325,14 @@ class BlockedDevice:
 
 
 @dataclass
+class AccessControlStatus:
+    """Access Control switch for Archer C80 / C24."""
+    enable: bool
+    # 'blacklist' or 'whitelist'
+    mode: str
+
+
+@dataclass
 class IPv4ReservationsInfo:
     """IPv4 reservation table plus the capacity the router reports for it.
 
