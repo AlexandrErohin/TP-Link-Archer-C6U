@@ -24,6 +24,7 @@ from tplinkrouterc6u import (
     VpnClientDevice,
     AccessControlStatus,
     BlockedDevice,
+    RouterPortStatus,
 )
 from tplinkrouterc6u.common.exception import ClientError
 
@@ -2124,6 +2125,74 @@ class TestTPLinkClient(TestCase):
         with self.assertRaises(ClientException) as ctx:
             client.unblock_device('02-00-00-00-00-01')
         self.assertIn('kept it', str(ctx.exception))
+
+    # Port status from Archer BE230 v1.2 (TplinkRouterV1_11); see issue #274.
+    # lan1 is unconnected but the firmware still fills speed=10 / duplex=HALF.
+    BE230_PORT_STATUS = [
+        {'duplex': 'FULL', 'name': 'wan', 'speed': 1000, 'status': 'connected', 'is_wan': True},
+        {'status': 'unconnected', 'duplex': 'HALF', 'name': 'lan1', 'speed': 10},
+        {'status': 'connected', 'duplex': 'FULL', 'name': 'lan2', 'speed': 1000},
+        {'status': 'connected', 'duplex': 'FULL', 'name': 'lan3', 'speed': 1000},
+        {'status': 'connected', 'duplex': 'FULL', 'name': 'lan4', 'speed': 1000},
+    ]
+
+    def _port_status_client(self, response):
+        router_class = self.router_class
+        calls = []
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                calls.append((path, data))
+                return response
+
+        return TPLinkRouterTest('', ''), calls
+
+    def test_get_port_status_be230(self) -> None:
+        client, calls = self._port_status_client(self.BE230_PORT_STATUS)
+        ports = client.get_port_status()
+        self.assertEqual(calls, [('admin/status?form=router', 'operation=read')])
+        self.assertEqual([p.port for p in ports], [0, 1, 2, 3, 4])
+        self.assertTrue(all(isinstance(p, RouterPortStatus) for p in ports))
+        self.assertEqual((ports[0].link_up, ports[0].negotiated_speed, ports[0].negotiated_duplex),
+                         (True, 1000, 'full'))
+        # Placeholder speed on an empty LAN must not look like a link.
+        self.assertEqual((ports[1].link_up, ports[1].negotiated_speed, ports[1].negotiated_duplex),
+                         (False, None, None))
+        self.assertEqual((ports[2].link_up, ports[2].negotiated_speed, ports[2].negotiated_duplex),
+                         (True, 1000, 'full'))
+
+    def test_get_port_status_wan_disconnected_but_linked(self) -> None:
+        client, _ = self._port_status_client([
+            {'name': 'wan', 'status': 'disconnected', 'speed': 1000, 'duplex': 'FULL'},
+        ])
+        ports = client.get_port_status()
+        self.assertEqual((ports[0].port, ports[0].link_up, ports[0].negotiated_speed),
+                         (0, True, 1000))
+
+    def test_get_port_status_flat_keys(self) -> None:
+        client, _ = self._port_status_client([
+            {'wan_status': 'connected', 'wan_speed': 1000, 'wan_duplex': 'FULL'},
+            {'lan1_status': 'unconnected', 'lan1_speed': 0, 'lan1_duplex': ''},
+        ])
+        ports = client.get_port_status()
+        self.assertEqual([(p.port, p.link_up, p.negotiated_speed, p.negotiated_duplex) for p in ports],
+                         [(0, True, 1000, 'full'), (1, False, None, None)])
+
+    def test_get_port_status_empty_and_junk(self) -> None:
+        for empty in ([], {}, None):
+            client, _ = self._port_status_client(empty)
+            self.assertEqual(client.get_port_status(), [])
+
+        client, _ = self._port_status_client([
+            {'name': 'wan', 'status': 'connected', 'speed': 1000, 'duplex': 'FULL'},
+            {'other': 1},
+            'junk',
+            {'name': 'not-a-port', 'status': 'connected', 'speed': 100},
+        ])
+        ports = client.get_port_status()
+        self.assertEqual([(p.port, p.link_up, p.negotiated_speed) for p in ports],
+                         [(0, True, 1000)])
 
     def test_get_ipv4_port_forwards(self) -> None:
         """AX23 v2 fw 1.1.2 returns a bare row list from admin/nat?form=vs."""

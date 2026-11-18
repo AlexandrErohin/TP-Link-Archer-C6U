@@ -775,8 +775,8 @@ class PortStatus:
 
 @dataclass
 class RouterPortStatus:
-    # Link state of a router Internet/LAN port (e.g. C5400X Network Map). Unlike PortStatus
-    # (TL-SG108E), this has no admin enable, flow control, LAG or packet counters.
+    # Link state of a router Internet/LAN port (C5400X / C6U / SG / V1_11 Network Map).
+    # Unlike PortStatus (TL-SG108E), this has no admin enable, flow control, LAG or packet counters.
     port: int
     link_up: bool | None = None
     negotiated_speed: int | None = None

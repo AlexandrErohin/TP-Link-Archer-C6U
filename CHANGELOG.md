@@ -4,6 +4,7 @@
 
 ### Added
 
+- **C6U / SG / V1_11:** `get_port_status()` returns Internet/LAN link state as `RouterPortStatus` from `admin/status?form=router` (object rows with `name`/`status`/`speed`/`duplex`, as on Archer BE230 v1.2; flat `wan_*` / `lanN_*` keys also accepted). Port 0 is WAN; `unconnected` drops placeholder speeds. ([#274](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/274)).
 - **C80 / C24:** Access Control via `advanced bm` — `get_access_control()` / `set_access_control(enable=None, mode=None)` for the switch and blacklist/whitelist mode; `get_blocked_devices()`, `block_device(mac, name='')` and `unblock_device(mac)` manage only the blacklist and do not change enable/mode. ([#271](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/271), [#273](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/273)).
 - **C6U / SG:** the same Access Control API as C80 / C24 (`get_access_control()`, `set_access_control(enable=None, mode=None)`, `get_blocked_devices()`, `block_device(mac, name='')`, `unblock_device(mac)`) through `admin/access_control` (`form=enable`, `form=mode`, `form=black_list`). Blocking and unblocking change only the blacklist, never enable or mode, and reload the list to check the router stored the change. Tested on Archer C6 v6.0 (firmware 1.1.0 Build 20251110) ([#275](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/275)).
 - Added support for TP-Link XGB834v v1.1. ([#257](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/issues/257)).

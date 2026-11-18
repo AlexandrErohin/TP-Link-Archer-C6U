@@ -267,7 +267,7 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | get_repeater_status | | Get the wireless backhaul of a range extender in repeater mode: upstream RSSI, PHY rates, BSSID/SSID, internet and mesh state (RE813XE family; forms the firmware does not have are skipped) | [RepeaterStatus](#repeater_status) |
 | get_wifi | wifi: Connection | Get wifi info | [WifiStatus](#WifiStatus) |
 | backup_config | | Download router settings backup as bytes (VR1200v only; call `authorize()` first) | bytes |
-| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first) → [PortStatus](#port_status). Archer C5400X: link, speed and duplex of the Internet port (port 0) and LAN 1-8 → [RouterPortStatus](#router_port_status) | [PortStatus](#port_status) / [RouterPortStatus](#router_port_status) |
+| get_port_status | | Per-port link, speed, flow control, LAG and packet counters (TL-SG108E; call `authorize()` first) → [PortStatus](#port_status). Archer C5400X / C1200 and C6U / SG / V1_11 family (e.g. Archer BE230): link, speed and duplex of the Internet port (port 0) and LAN ports → [RouterPortStatus](#router_port_status) | [PortStatus](#port_status) / [RouterPortStatus](#router_port_status) |
 
 ## Dataclass
 ### <a id="firmware">Firmware</a>
@@ -659,10 +659,10 @@ Not all fields are filled by every client:
 | rx_bad_packets | Received bad packets | int, None |
 
 ### <a id="router_port_status">RouterPortStatus</a>
-Link state of a router Internet/LAN port (Archer C5400X Network Map). Separate from switch [PortStatus](#port_status) (no admin enable, flow control, LAG or counters).
+Link state of a router Internet/LAN port (Archer C5400X / C1200 Network Map; C6U / SG / V1_11 family such as Archer BE230). Separate from switch [PortStatus](#port_status) (no admin enable, flow control, LAG or counters).
 | Field | Description | Type |
 | --- |---|---|
-| port | Port number (0 = Internet, then LAN 1–8) | int |
+| port | Port number (0 = Internet, then LAN 1–N) | int |
 | link_up | Link is up | bool, None |
 | negotiated_speed | Negotiated speed in Mbps | int, None |
 | negotiated_duplex | Negotiated duplex (`half` / `full`) | str, None |

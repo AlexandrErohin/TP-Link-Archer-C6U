@@ -1,6 +1,6 @@
 from hashlib import md5
 from macaddress import EUI48
-from re import search
+from re import fullmatch, search
 from json import loads
 from urllib.parse import urlencode
 from requests import post, Response
@@ -30,6 +30,7 @@ from tplinkrouterc6u.common.dataclass import (
     VpnClientDevice,
     AccessControlStatus,
     BlockedDevice,
+    RouterPortStatus,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -1098,6 +1099,75 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         rows, _ = self._load_access_control_black_list()
         if self._find_mac_row(rows, mac)[1] is not None:
             raise ClientException('Router accepted unblocking {} but kept it'.format(mac))
+
+    def get_port_status(self) -> list[RouterPortStatus]:
+        """Link state of the Internet and LAN ports (Network Map).
+
+        Verified on Archer BE230 v1.2 (``TplinkRouterV1_11``), which answers
+        ``admin/status?form=router`` with a list of ``{name, status, speed, duplex}``
+        rows (``wan``, ``lan1``, …). Port 0 is the Internet port, then LAN 1–N —
+        the same numbering as C5400X ``RouterPortStatus``.
+
+        ``unconnected`` / ``unplugged`` mean no link even when the firmware fills
+        in a placeholder speed (BE230 reports ``speed: 10`` on an empty LAN). A
+        positive speed with ``disconnected`` still means the cable is linked
+        (WAN up, no internet), matching the C5400X Network Map.
+        """
+        data = self.request('admin/status?form=router', 'operation=read')
+        if data is None or data == {}:
+            return []
+        rows = data if isinstance(data, list) else [data]
+
+        fields: dict[int, dict] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get('name') or '').lower()
+            wan = fullmatch(r'wan(\d*)', name)
+            lan = fullmatch(r'lan(\d+)', name)
+            if wan or lan:
+                port = int((wan or lan).group(1) or 0)
+                entry = fields.setdefault(port, {})
+                for key in ('status', 'speed', 'duplex'):
+                    if key in row:
+                        entry[key] = row[key]
+                continue
+            # Flat keys as on C5400X (wan_status / lan1_speed / …).
+            for key, value in row.items():
+                match = fullmatch(r'(wan|lan(\d+))_(status|speed|duplex)', str(key))
+                if match:
+                    fields.setdefault(int(match.group(2) or 0), {})[match.group(3)] = value
+
+        ports = []
+        for port in sorted(fields):
+            item = fields[port]
+            status = str(item.get('status') or '').lower()
+            try:
+                speed = int(item.get('speed'))
+            except (TypeError, ValueError):
+                speed = None
+            if not speed or speed <= 0:
+                speed = None
+            duplex = str(item.get('duplex') or '').lower()
+            duplex = duplex if duplex in ('full', 'half') else None
+
+            if status in ('unconnected', 'unplugged'):
+                # Drop placeholder speed/duplex some firmwares leave on empty ports.
+                link_up = False
+                speed = None
+                duplex = None
+            elif speed is not None:
+                link_up = True
+            else:
+                link_up = {'connected': True, 'disconnected': False}.get(status)
+
+            ports.append(RouterPortStatus(
+                port=port,
+                link_up=link_up,
+                negotiated_speed=speed,
+                negotiated_duplex=duplex,
+            ))
+        return ports
 
     @classmethod
     def _as_port_forward_list(cls, data) -> list:
