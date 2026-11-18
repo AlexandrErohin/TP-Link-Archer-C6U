@@ -326,7 +326,7 @@ class BlockedDevice:
 
 @dataclass
 class AccessControlStatus:
-    """Access Control switch for Archer C80 / C24."""
+    """Access Control switch (Archer C80 / C24, C6U / SG family)."""
     enable: bool
     # 'blacklist' or 'whitelist'
     mode: str
