@@ -1,4 +1,5 @@
 from hashlib import md5
+from macaddress import EUI48
 from re import search
 from json import loads
 from urllib.parse import urlencode
@@ -27,6 +28,8 @@ from tplinkrouterc6u.common.dataclass import (
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,
+    AccessControlStatus,
+    BlockedDevice,
 )
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -293,6 +296,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_vpn_client_enable = 'admin/vpn?form=enable'
         self._url_vpn_client_server = 'admin/vpn?form=server'
         self._url_vpn_client_user_list = 'admin/vpn?form=vpn_user_list'
+        self._url_access_control_enable = 'admin/access_control?form=enable'
+        self._url_access_control_mode = 'admin/access_control?form=mode'
+        self._url_access_control_black_list = 'admin/access_control?form=black_list'
         referer = '{}/webpages/index.html'.format(self.host)
         self._headers_request = {'Referer': referer, 'Origin': self.host}
         self._headers_login = {'Referer': referer, 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -966,6 +972,118 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             items, _ = self._load_ipv4_reservation_rows()
             if self._find_reservation_row(items, macaddr)[1] is not None:
                 raise ClientException('Router accepted the removal of reservation {} but kept it'.format(macaddr))
+
+    def get_access_control(self) -> AccessControlStatus:
+        """Access Control enable flag and blacklist/whitelist mode."""
+        enable = self.request(self._url_access_control_enable, 'operation=read')
+        mode = self.request(self._url_access_control_mode, 'operation=read')
+        return AccessControlStatus(
+            enable=enable.get('enable') == 'on',
+            mode='whitelist' if mode.get('access_mode') == 'white' else 'blacklist',
+        )
+
+    def set_access_control(self, enable: bool | None = None, mode: str | None = None) -> None:
+        """Set Access Control enable and/or mode without touching the blacklist.
+
+        ``mode`` is ``'blacklist'`` or ``'whitelist'``. Pass only the fields you want
+        to change. Enabling and switching to blacklist is explicit: ``block_device``
+        does not do this for you.
+        """
+        if enable is None and mode is None:
+            raise ClientException('set_access_control requires enable and/or mode')
+
+        access_mode = None
+        if mode is not None:
+            access_mode = {'blacklist': 'black', 'whitelist': 'white'}.get(str(mode).lower())
+            if access_mode is None:
+                raise ClientException(
+                    "Access Control mode must be 'blacklist' or 'whitelist', got {!r}".format(mode))
+
+        # Enable before mode so a newly turned-on switch lands in the requested list;
+        # disable after mode so a restore can put whitelist back before turning off.
+        if enable is True:
+            self.request(self._url_access_control_enable, urlencode({'operation': 'write', 'enable': 'on'}))
+        if access_mode is not None:
+            self.request(self._url_access_control_mode,
+                         urlencode({'operation': 'write', 'access_mode': access_mode}))
+        if enable is False:
+            self.request(self._url_access_control_enable, urlencode({'operation': 'write', 'enable': 'off'}))
+
+    def _load_access_control_black_list(self) -> tuple[list, int | None]:
+        """Load the raw blacklist rows and the table capacity (if reported).
+
+        An empty blacklist comes back as ``{}`` (Archer C6 v6.0 fw 1.1.0).
+        """
+        self._last_response_others = None
+        data = self.request(self._url_access_control_black_list, 'operation=load')
+        rows = self._as_list(data, 'list', 'Access Control blacklist')
+        others = self._last_response_others or {}
+        try:
+            max_rules = int(others['max_rules']) if others.get('max_rules') not in (None, '') else None
+        except (TypeError, ValueError):
+            max_rules = None
+        return rows, max_rules
+
+    @staticmethod
+    def _parse_access_control_mac(mac: str) -> str:
+        try:
+            return str(EUI48(mac))  # AA-BB-CC-DD-EE-FF, the form the web UI stores
+        except (ValueError, TypeError) as e:
+            raise ClientException('Invalid MAC address: {!r}'.format(mac)) from e
+
+    def get_blocked_devices(self) -> list[BlockedDevice]:
+        """Devices on the Access Control blacklist (kept even while Access Control is off or in whitelist mode)."""
+        rows, _ = self._load_access_control_black_list()
+        return [BlockedDevice(get_mac(item['mac']), item.get('name') or '') for item in rows if item.get('mac')]
+
+    def block_device(self, mac: str, name: str = '') -> None:
+        """Add a device to the Access Control blacklist.
+
+        Does not enable Access Control or change blacklist/whitelist mode; call
+        ``set_access_control`` for that. An already listed MAC is left as it is.
+        The list is reloaded afterwards and ClientException is raised when the
+        router did not store the row, or before sending when the list is full.
+        """
+        mac = self._parse_access_control_mac(mac)
+        rows, max_rules = self._load_access_control_black_list()
+        if self._find_reservation_row(rows, mac)[1] is not None:
+            return
+        if max_rules is not None and len(rows) >= max_rules:
+            raise ClientException('Access Control blacklist is full ({}/{})'.format(len(rows), max_rules))
+
+        # Same payload as the web UI's "Add manually" form: insert at the top of the list.
+        self.request(self._url_access_control_black_list, urlencode({
+            'operation': 'insert',
+            'new': dumps({'name': name or mac, 'mac': mac}),
+            'index': 0,
+        }))
+
+        rows, _ = self._load_access_control_black_list()
+        if self._find_reservation_row(rows, mac)[1] is None:
+            raise ClientException('Router accepted blocking {} but did not store it'.format(mac))
+
+    def unblock_device(self, mac: str) -> None:
+        """Remove a device from the Access Control blacklist; enable/mode stay as they are.
+
+        A MAC that is not on the list is left alone. The router removes by list
+        index (the web UI sends a random ``key``), so the list is loaded first
+        and reloaded afterwards; ClientException is raised if the row is still there.
+        """
+        mac = self._parse_access_control_mac(mac)
+        rows, _ = self._load_access_control_black_list()
+        index, row = self._find_reservation_row(rows, mac)
+        if row is None:
+            return
+
+        self.request(self._url_access_control_black_list, urlencode({
+            'operation': 'remove',
+            'key': row['mac'],
+            'index': index,
+        }))
+
+        rows, _ = self._load_access_control_black_list()
+        if self._find_reservation_row(rows, mac)[1] is not None:
+            raise ClientException('Router accepted unblocking {} but kept it'.format(mac))
 
     @classmethod
     def _as_port_forward_list(cls, data) -> list:

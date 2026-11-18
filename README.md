@@ -202,11 +202,11 @@ Not every method is available on every client. Methods below `get_ipv6_status` t
 | add_ipv4_port_forward | name: str, external_port: str \| int, internal_port: str \| int, ipaddr: str, protocol: str = 'TCP', enable: bool = True | Adds an IPv4 port forwarding rule; `external_port` accepts a single port or a `start-end` range, `protocol` is TCP/UDP/ALL (Archer / LuCI clients) |   |
 | update_ipv4_port_forward | name: str, new_name: str = None, external_port: str \| int = None, internal_port: str \| int = None, ipaddr: str = None, protocol: str = None, enable: bool = None | Updates an IPv4 port forwarding rule identified by its name (Archer / LuCI clients) |   |
 | delete_ipv4_port_forward | name: str | Deletes an IPv4 port forwarding rule by name (Archer / LuCI clients) |   |
-| get_access_control |   | Access Control enable flag and mode (`blacklist` / `whitelist`) (Archer C80 / C24) | [[AccessControlStatus]](#access_control_status) |
-| set_access_control | enable: bool = None, mode: str = None | Turn Access Control on/off and/or set `blacklist` / `whitelist` mode; omit a field to leave it unchanged (Archer C80 / C24) |   |
-| get_blocked_devices |   | Devices on the Access Control blacklist (Archer C80 / C24); the list is kept even while Access Control is off or in whitelist mode | [[BlockedDevice]](#blocked_device) |
-| block_device | mac: str, name: str = '' | Add a device to the Access Control blacklist only; does not enable Access Control or change mode — use `set_access_control` for that (Archer C80 / C24). Already listed MACs are left as they are |   |
-| unblock_device | mac: str | Remove a device from the Access Control blacklist; enable/mode stay as they are (Archer C80 / C24) |   |
+| get_access_control |   | Access Control enable flag and mode (`blacklist` / `whitelist`) (Archer C80 / C24, C6U / SG family) | [[AccessControlStatus]](#access_control_status) |
+| set_access_control | enable: bool = None, mode: str = None | Turn Access Control on/off and/or set `blacklist` / `whitelist` mode; omit a field to leave it unchanged (Archer C80 / C24, C6U / SG family) |   |
+| get_blocked_devices |   | Devices on the Access Control blacklist (Archer C80 / C24, C6U / SG family); the list is kept even while Access Control is off or in whitelist mode | [[BlockedDevice]](#blocked_device) |
+| block_device | mac: str, name: str = '' | Add a device to the Access Control blacklist only; does not enable Access Control or change mode — use `set_access_control` for that (Archer C80 / C24, C6U / SG family). Already listed MACs are left as they are. On C6U / SG the list is reloaded afterwards and `ClientException` is raised if the router did not store the entry or the list is full |   |
+| unblock_device | mac: str | Remove a device from the Access Control blacklist; enable/mode stay as they are (Archer C80 / C24, C6U / SG family). On C6U / SG a MAC that is not listed is left alone, and `ClientException` is raised if the router kept the entry |   |
 | get_ipv4_dhcp_leases |   | Gets IPv4 addresses assigned via DHCP | [[IPv4DHCPLease]](#IPv4DHCPLease) |
 | set_ipv4_dhcps | enable: bool | Turn the LAN IPv4 DHCP server on or off |   |
 | set_wifi | wifi: [Connection](#connection), enable: bool | Turn on/off host, guest, or IoT wifi bands |   |

@@ -22,6 +22,8 @@ from tplinkrouterc6u import (
     VpnClientStatus,
     VpnClientServer,
     VpnClientDevice,
+    AccessControlStatus,
+    BlockedDevice,
 )
 from tplinkrouterc6u.common.exception import ClientError
 
@@ -1913,6 +1915,203 @@ class TestTPLinkClient(TestCase):
         client = TPLinkRouterTest('', '')
         with self.assertRaises(ClientException):
             client.delete_ipv4_reservation('00:11:22:33:44:55')
+
+    # Access Control fixtures captured from an Archer C6 v6.0 (fw 1.1.0 Build 20251110, TplinkRouterSG).
+    # Real device MACs are replaced with locally administered test MACs.
+    AC_ENABLE_READ = {'host_mac': '02-00-00-00-00-A0', 'enable': 'off'}
+    AC_MODE_READ = {'access_mode': 'black'}
+    AC_BLACK_LIST_EMPTY = {}  # with others {"max_rules": 64}
+    AC_BLACK_LIST_ROW = {'.type': 'black_list', 'host': 'NON_HOST', 'mac': '02-00-00-00-00-01',
+                         '.name': 'cfg025c3d', 'deviceType': 'other', '.anonymous': True, 'name': 'pr-test'}
+    AC_REMOVE_RESPONSE = [{'success': True, 'index': '0', 'key': '02-00-00-00-00-01'}]
+
+    @classmethod
+    def _ac_row(cls, mac: str, name: str = '') -> dict:
+        return dict(cls.AC_BLACK_LIST_ROW, mac=mac, name=name)
+
+    def _access_control_router(self, rows: list, enable: str = 'off', mode: str = 'black',
+                               max_rules: int | None = 64, drop_writes: bool = False):
+        """Return (client, calls) backed by an in-memory Access Control state.
+
+        Mimics admin/access_control: an empty black_list load answers ``{}``
+        (as the C6 v6 does) with ``others.max_rules``; insert puts the row at
+        ``index`` and remove deletes by ``index`` like the web UI expects.
+        """
+        calls = []
+        table = [dict(r) for r in rows]
+        state = {'enable': enable, 'mode': mode}
+        router_class = self.router_class
+        enable_read = self.AC_ENABLE_READ
+        empty = self.AC_BLACK_LIST_EMPTY
+        ac_row = self._ac_row
+        remove_response = self.AC_REMOVE_RESPONSE
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | list | None:
+                calls.append((path, data))
+                body = dict(parse_qsl(data))
+                op = body.get('operation')
+                if path == 'admin/access_control?form=enable':
+                    if op == 'read':
+                        return dict(enable_read, enable=state['enable'])
+                    if not drop_writes:
+                        state['enable'] = body['enable']
+                    return {}
+                if path == 'admin/access_control?form=mode':
+                    if op == 'read':
+                        return {'access_mode': state['mode']}
+                    if not drop_writes:
+                        state['mode'] = body['access_mode']
+                    return {}
+                if path != 'admin/access_control?form=black_list':
+                    raise AssertionError('unexpected path {}'.format(path))
+                if op == 'load':
+                    self._last_response_others = {'max_rules': max_rules} if max_rules is not None else None
+                    return [dict(r) for r in table] if table else dict(empty)
+                if op == 'insert':
+                    # The router answers with the row it was sent and stores it with UCI fields added.
+                    new = loads(body['new'])
+                    if not drop_writes:
+                        table.insert(int(body['index']), ac_row(new['mac'], new['name']))
+                    return new
+                if op == 'remove':
+                    if not drop_writes:
+                        del table[int(body['index'])]
+                    return [dict(remove_response[0], index=body['index'], key=body['key'])]
+                raise AssertionError('unexpected operation {}'.format(op))
+
+        return TPLinkRouterTest('', ''), calls, state
+
+    def test_get_access_control(self) -> None:
+        client, calls, _ = self._access_control_router([])
+        self.assertEqual(client.get_access_control(), AccessControlStatus(enable=False, mode='blacklist'))
+        self.assertEqual(calls, [('admin/access_control?form=enable', 'operation=read'),
+                                 ('admin/access_control?form=mode', 'operation=read')])
+
+        client, _, _ = self._access_control_router([], enable='on', mode='white')
+        self.assertEqual(client.get_access_control(), AccessControlStatus(enable=True, mode='whitelist'))
+
+    def test_set_access_control(self) -> None:
+        client, calls, state = self._access_control_router([])
+        client.set_access_control(enable=True, mode='blacklist')
+        # Enable first so the switch lands in the requested list.
+        self.assertEqual(calls, [('admin/access_control?form=enable', 'operation=write&enable=on'),
+                                 ('admin/access_control?form=mode', 'operation=write&access_mode=black')])
+        self.assertEqual(state, {'enable': 'on', 'mode': 'black'})
+
+        calls.clear()
+        client.set_access_control(enable=False, mode='Whitelist')
+        # Disable last so a restore can put whitelist back before turning off.
+        self.assertEqual(calls, [('admin/access_control?form=mode', 'operation=write&access_mode=white'),
+                                 ('admin/access_control?form=enable', 'operation=write&enable=off')])
+
+        calls.clear()
+        client.set_access_control(enable=True)
+        self.assertEqual(calls, [('admin/access_control?form=enable', 'operation=write&enable=on')])
+
+    def test_set_access_control_invalid(self) -> None:
+        client, calls, _ = self._access_control_router([])
+        with self.assertRaises(ClientException):
+            client.set_access_control()
+        with self.assertRaises(ClientException):
+            client.set_access_control(enable=True, mode='black')
+        self.assertEqual(calls, [])
+
+    def test_get_blocked_devices_empty(self) -> None:
+        client, calls, _ = self._access_control_router([])
+        self.assertEqual(client.get_blocked_devices(), [])
+        self.assertEqual(calls, [('admin/access_control?form=black_list', 'operation=load')])
+
+    def test_get_blocked_devices(self) -> None:
+        client, _, _ = self._access_control_router([
+            self.AC_BLACK_LIST_ROW,
+            self._ac_row('aa:bb:cc:dd:ee:ff'),
+        ])
+        devices = client.get_blocked_devices()
+        self.assertEqual(len(devices), 2)
+        self.assertIsInstance(devices[0], BlockedDevice)
+        self.assertEqual(devices[0].macaddr, '02-00-00-00-00-01')
+        self.assertEqual(devices[0].hostname, 'pr-test')
+        self.assertEqual(devices[1].macaddr, 'AA-BB-CC-DD-EE-FF')
+        self.assertEqual(devices[1].hostname, '')
+
+    def test_block_device(self) -> None:
+        client, calls, state = self._access_control_router([])
+        client.block_device('02:00:00:00:00:01', 'pr-test')
+
+        # load (pre-check) -> insert -> load (verify); never the enable or mode forms.
+        self.assertEqual([path for path, _ in calls], ['admin/access_control?form=black_list'] * 3)
+        body = dict(parse_qsl(calls[1][1]))
+        self.assertEqual(body['operation'], 'insert')
+        self.assertEqual(body['index'], '0')
+        self.assertEqual(loads(body['new']), {'name': 'pr-test', 'mac': '02-00-00-00-00-01'})
+        self.assertEqual(state, {'enable': 'off', 'mode': 'black'})
+        self.assertEqual([d.macaddr for d in client.get_blocked_devices()], ['02-00-00-00-00-01'])
+
+        # Without a name the MAC is used, like the C80 client.
+        client.block_device('aa-bb-cc-dd-ee-ff')
+        self.assertEqual(loads(dict(parse_qsl(calls[-2][1]))['new']),
+                         {'name': 'AA-BB-CC-DD-EE-FF', 'mac': 'AA-BB-CC-DD-EE-FF'})
+
+    def test_block_device_whitelist_mode_untouched(self) -> None:
+        client, calls, state = self._access_control_router([], enable='on', mode='white')
+        client.block_device('02:00:00:00:00:01')
+        self.assertEqual(state, {'enable': 'on', 'mode': 'white'})
+        self.assertNotIn('admin/access_control?form=enable', [path for path, _ in calls])
+        self.assertNotIn('admin/access_control?form=mode', [path for path, _ in calls])
+
+    def test_block_device_already_listed(self) -> None:
+        client, calls, _ = self._access_control_router([self.AC_BLACK_LIST_ROW])
+        client.block_device('02:00:00:00:00:01', 'other name')
+        self.assertEqual(len(calls), 1)  # only the load
+
+    def test_block_device_table_full(self) -> None:
+        rows = [self._ac_row('02-00-00-00-01-{:02X}'.format(i)) for i in range(2)]
+        client, calls, _ = self._access_control_router(rows, max_rules=2)
+        with self.assertRaises(ClientException) as ctx:
+            client.block_device('02:00:00:00:00:01')
+        self.assertIn('full', str(ctx.exception))
+        self.assertEqual(len(calls), 1)
+
+    def test_block_device_not_persisted(self) -> None:
+        client, _, _ = self._access_control_router([], drop_writes=True)
+        with self.assertRaises(ClientException) as ctx:
+            client.block_device('02:00:00:00:00:01')
+        self.assertIn('did not store', str(ctx.exception))
+
+    def test_block_device_invalid_mac(self) -> None:
+        client, calls, _ = self._access_control_router([])
+        with self.assertRaises(ClientException):
+            client.block_device('not-a-mac')
+        self.assertEqual(calls, [])
+
+    def test_unblock_device(self) -> None:
+        client, calls, state = self._access_control_router([
+            self._ac_row('02-00-00-00-00-02', 'tv'),
+            self.AC_BLACK_LIST_ROW,
+        ])
+        client.unblock_device('02:00:00:00:00:01')
+
+        # load -> remove -> load (verify); never the enable or mode forms.
+        self.assertEqual([path for path, _ in calls], ['admin/access_control?form=black_list'] * 3)
+        body = dict(parse_qsl(calls[1][1]))
+        self.assertEqual(body['operation'], 'remove')
+        self.assertEqual(body['index'], '1')
+        self.assertEqual(body['key'], '02-00-00-00-00-01')
+        self.assertEqual(state, {'enable': 'off', 'mode': 'black'})
+        self.assertEqual([d.macaddr for d in client.get_blocked_devices()], ['02-00-00-00-00-02'])
+
+    def test_unblock_device_not_listed(self) -> None:
+        client, calls, _ = self._access_control_router([self._ac_row('02-00-00-00-00-02', 'tv')])
+        client.unblock_device('02:00:00:00:00:01')
+        self.assertEqual(len(calls), 1)  # only the load
+
+    def test_unblock_device_not_persisted(self) -> None:
+        client, _, _ = self._access_control_router([self.AC_BLACK_LIST_ROW], drop_writes=True)
+        with self.assertRaises(ClientException) as ctx:
+            client.unblock_device('02-00-00-00-00-01')
+        self.assertIn('kept it', str(ctx.exception))
 
     def test_get_ipv4_port_forwards(self) -> None:
         """AX23 v2 fw 1.1.2 returns a bare row list from admin/nat?form=vs."""
