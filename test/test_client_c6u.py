@@ -1916,8 +1916,8 @@ class TestTPLinkClient(TestCase):
         with self.assertRaises(ClientException):
             client.delete_ipv4_reservation('00:11:22:33:44:55')
 
-    # Access Control fixtures captured from an Archer C6 v6.0 (fw 1.1.0 Build 20251110, TplinkRouterSG).
-    # Real device MACs are replaced with locally administered test MACs.
+    # Access Control responses captured from an Archer C6 v6.0 (fw 1.1.0 Build 20251110, TplinkRouterSG)
+    # while blocking and unblocking a test MAC. Real device MACs are replaced with test MACs.
     AC_ENABLE_READ = {'host_mac': '02-00-00-00-00-A0', 'enable': 'off'}
     AC_MODE_READ = {'access_mode': 'black'}
     AC_BLACK_LIST_EMPTY = {}  # with others {"max_rules": 64}
@@ -2036,6 +2036,14 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(devices[1].macaddr, 'AA-BB-CC-DD-EE-FF')
         self.assertEqual(devices[1].hostname, '')
 
+    def test_get_blocked_devices_skips_unreadable_mac(self) -> None:
+        client, _, _ = self._access_control_router([
+            self._ac_row('', 'no mac'),
+            self._ac_row('not-a-mac', 'garbage'),
+            self.AC_BLACK_LIST_ROW,
+        ])
+        self.assertEqual([d.macaddr for d in client.get_blocked_devices()], ['02-00-00-00-00-01'])
+
     def test_block_device(self) -> None:
         client, calls, state = self._access_control_router([])
         client.block_device('02:00:00:00:00:01', 'pr-test')
@@ -2053,6 +2061,10 @@ class TestTPLinkClient(TestCase):
         client.block_device('aa-bb-cc-dd-ee-ff')
         self.assertEqual(loads(dict(parse_qsl(calls[-2][1]))['new']),
                          {'name': 'AA-BB-CC-DD-EE-FF', 'mac': 'AA-BB-CC-DD-EE-FF'})
+
+        # The web UI limits the name to 64 characters.
+        client.block_device('02:00:00:00:00:03', 'x' * 70)
+        self.assertEqual(loads(dict(parse_qsl(calls[-2][1]))['new'])['name'], 'x' * 64)
 
     def test_block_device_whitelist_mode_untouched(self) -> None:
         client, calls, state = self._access_control_router([], enable='on', mode='white')

@@ -1034,7 +1034,13 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
     def get_blocked_devices(self) -> list[BlockedDevice]:
         """Devices on the Access Control blacklist (kept even while Access Control is off or in whitelist mode)."""
         rows, _ = self._load_access_control_black_list()
-        return [BlockedDevice(get_mac(item['mac']), item.get('name') or '') for item in rows if item.get('mac')]
+        devices = []
+        for item in rows:
+            mac = get_mac(item.get('mac', ''))
+            if str(mac) == '00-00-00-00-00-00':  # empty or unreadable MAC, as on C80
+                continue
+            devices.append(BlockedDevice(mac, item.get('name') or ''))
+        return devices
 
     def block_device(self, mac: str, name: str = '') -> None:
         """Add a device to the Access Control blacklist.
@@ -1051,10 +1057,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         if max_rules is not None and len(rows) >= max_rules:
             raise ClientException('Access Control blacklist is full ({}/{})'.format(len(rows), max_rules))
 
-        # Same payload as the web UI's "Add manually" form: insert at the top of the list.
+        # Same payload as the web UI's "Add manually" form (name up to 64 characters),
+        # inserted at the top of the list.
         self.request(self._url_access_control_black_list, urlencode({
             'operation': 'insert',
-            'new': dumps({'name': name or mac, 'mac': mac}),
+            'new': dumps({'name': (name or mac)[:64], 'mac': mac}),
             'index': 0,
         }))
 
