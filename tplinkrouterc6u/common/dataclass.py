@@ -311,7 +311,7 @@ class IPv4Reservation:
 
 @dataclass
 class BlockedDevice:
-    """A device on the router's Access Control blacklist."""
+    """A device on the Access Control blacklist (Archer C80 / C24, C6U / SG family)."""
     _macaddr: EUI48
     hostname: str = ''
 

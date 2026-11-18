@@ -810,7 +810,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         return IPv4ReservationsInfo([self._reservation_from_row(item) for item in rows], max_rules)
 
     @staticmethod
-    def _find_reservation_row(rows: list, macaddr: str) -> tuple[int | None, dict | None]:
+    def _find_mac_row(rows: list, macaddr: str) -> tuple[int | None, dict | None]:
+        """Find a table row by MAC (DHCP reservation, Access Control blacklist, …)."""
         normalized_mac = str(get_mac(macaddr))
         for i, item in enumerate(rows):
             mac = item.get('mac')
@@ -874,7 +875,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         if verify:
             rows, _ = self._load_ipv4_reservation_rows()
-            _, row = self._find_reservation_row(rows, mac)
+            _, row = self._find_mac_row(rows, mac)
             if row is None or str(get_ip(str(row.get('ip', '')).strip())) != ip:
                 raise ClientException(
                     'Router accepted the reservation {} -> {} but did not store it'.format(mac, ip))
@@ -898,7 +899,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         reservation is the row the router actually stored.
         """
         rows, _ = self._load_ipv4_reservation_rows()
-        _, target = self._find_reservation_row(rows, old_macaddr)
+        _, target = self._find_mac_row(rows, old_macaddr)
         if target is None:
             raise ClientException('Reservation not found for MAC: {}'.format(old_macaddr))
 
@@ -933,13 +934,13 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             return self._reservation_from_row(new)
 
         rows, _ = self._load_ipv4_reservation_rows()
-        _, row = self._find_reservation_row(rows, new_mac)
+        _, row = self._find_mac_row(rows, new_mac)
         if row is None or str(get_ip(str(row.get('ip', '')).strip())) != new_ip or (
                 enable is not None and self._str2bool(row.get('enable')) != enable) or (
                 comment is not None and self._reservation_name(row) != comment):
             raise ClientException('Router accepted the update of reservation {} but did not store it'
                                   .format(old_macaddr))
-        if new_mac != current_mac and self._find_reservation_row(rows, current_mac)[1] is not None:
+        if new_mac != current_mac and self._find_mac_row(rows, current_mac)[1] is not None:
             raise ClientException('Router kept the old reservation {} after the update'.format(current_mac))
         return self._reservation_from_row(row)
 
@@ -957,7 +958,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         raised if the reservation is still there.
         """
         items, _ = self._load_ipv4_reservation_rows()
-        target_idx, target = self._find_reservation_row(items, macaddr)
+        target_idx, target = self._find_mac_row(items, macaddr)
         if target is None:
             raise ClientException('Reservation not found for MAC: {}'.format(macaddr))
 
@@ -970,7 +971,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
         if verify:
             items, _ = self._load_ipv4_reservation_rows()
-            if self._find_reservation_row(items, macaddr)[1] is not None:
+            if self._find_mac_row(items, macaddr)[1] is not None:
                 raise ClientException('Router accepted the removal of reservation {} but kept it'.format(macaddr))
 
     def get_access_control(self) -> AccessControlStatus:
@@ -1018,8 +1019,10 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         data = self.request(self._url_access_control_black_list, 'operation=load')
         rows = self._as_list(data, 'list', 'Access Control blacklist')
         others = self._last_response_others or {}
+        max_rules = None
         try:
-            max_rules = int(others['max_rules']) if others.get('max_rules') not in (None, '') else None
+            if others.get('max_rules') not in (None, ''):
+                max_rules = int(others['max_rules'])
         except (TypeError, ValueError):
             max_rules = None
         return rows, max_rules
@@ -1052,7 +1055,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         """
         mac = self._parse_access_control_mac(mac)
         rows, max_rules = self._load_access_control_black_list()
-        if self._find_reservation_row(rows, mac)[1] is not None:
+        if self._find_mac_row(rows, mac)[1] is not None:
             return
         if max_rules is not None and len(rows) >= max_rules:
             raise ClientException('Access Control blacklist is full ({}/{})'.format(len(rows), max_rules))
@@ -1066,7 +1069,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         }))
 
         rows, _ = self._load_access_control_black_list()
-        if self._find_reservation_row(rows, mac)[1] is None:
+        if self._find_mac_row(rows, mac)[1] is None:
             raise ClientException('Router accepted blocking {} but did not store it'.format(mac))
 
     def unblock_device(self, mac: str) -> None:
@@ -1075,10 +1078,14 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         A MAC that is not on the list is left alone. The router removes by list
         index (the web UI sends a random ``key``), so the list is loaded first
         and reloaded afterwards; ClientException is raised if the row is still there.
+
+        The list is loaded then removed in two requests; if the blacklist changes
+        between them, the wrong row could be targeted. The post-remove reload
+        catches a failed removal, but not a mis-targeted one.
         """
         mac = self._parse_access_control_mac(mac)
         rows, _ = self._load_access_control_black_list()
-        index, row = self._find_reservation_row(rows, mac)
+        index, row = self._find_mac_row(rows, mac)
         if row is None:
             return
 
@@ -1089,7 +1096,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         }))
 
         rows, _ = self._load_access_control_black_list()
-        if self._find_reservation_row(rows, mac)[1] is not None:
+        if self._find_mac_row(rows, mac)[1] is not None:
             raise ClientException('Router accepted unblocking {} but kept it'.format(mac))
 
     @classmethod
