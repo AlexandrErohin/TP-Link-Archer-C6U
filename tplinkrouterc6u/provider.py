@@ -45,7 +45,8 @@ class TplinkRouterProvider:
         alternative that returns a logged-in session.
         """
         for client_name, client in TplinkRouterProvider.get_clients().items():
-            if isinstance(client, TplinkC1200Router):
+            # C1200 supports() only reads the RSA key; it is checked by a real login below
+            if client is TplinkC1200Router:
                 continue
             router = client(host, password, username, logger, verify_ssl, timeout)
             if router.supports():
