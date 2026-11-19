@@ -1,7 +1,9 @@
 from unittest import main, TestCase
-from json import loads
+from unittest.mock import patch, Mock
+from json import loads, dumps
 from macaddress import EUI48
 from ipaddress import IPv4Address
+from requests.exceptions import ConnectTimeout, ReadTimeout
 from tplinkrouterc6u import (
     TPLinkDecoClient,
     Connection,
@@ -12,6 +14,7 @@ from tplinkrouterc6u import (
     IPv4Status,
     LTEStatus,
     ClientException,
+    ClientError,
 )
 
 
@@ -914,6 +917,105 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(calls, ['admin/device?form=device_list'] * 2)
         self.assertEqual(first.signal_5g, -47)
         self.assertEqual(second.signal_5g, -49)
+
+    def test_default_timeout_is_60(self) -> None:
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        self.assertEqual(client.timeout, 60)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_retry_request_retries_read_timeout(self, mock_sleep: Mock) -> None:
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        attempts = {'count': 0}
+
+        def flaky():
+            attempts['count'] += 1
+            if attempts['count'] < 3:
+                raise ReadTimeout('read timed out')
+            return 'ok'
+
+        self.assertEqual(client._retry_request(flaky), 'ok')
+        self.assertEqual(attempts['count'], 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+        mock_sleep.assert_any_call(2)
+        mock_sleep.assert_any_call(4)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_retry_request_retries_connect_timeout(self, mock_sleep: Mock) -> None:
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        attempts = {'count': 0}
+
+        def flaky():
+            attempts['count'] += 1
+            if attempts['count'] < 2:
+                raise ConnectTimeout('connect timed out')
+            return 'ok'
+
+        self.assertEqual(client._retry_request(flaky), 'ok')
+        self.assertEqual(attempts['count'], 2)
+        mock_sleep.assert_called_once_with(2)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_authorize_timeout_hint_after_retries(self, mock_sleep: Mock) -> None:
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        with patch.object(client, '_authorize_fresh', side_effect=ReadTimeout('hung login')):
+            with self.assertRaises(ClientException) as ctx:
+                client.authorize()
+        self.assertIn('authorize timed out after retries', str(ctx.exception))
+        self.assertIn('reboot', str(ctx.exception).lower())
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_authorize_resets_session_each_attempt(self, mock_sleep: Mock) -> None:
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        client._logged = True
+        client._stok = 'stale'
+        client._sysauth = 'stale'
+        client._pwdNN = 'stale'
+        client._seq = 'stale'
+        resets = []
+
+        def authorize_fresh_tracking():
+            client._reset_session()
+            resets.append((client._logged, client._stok, client._pwdNN, client._seq))
+            raise ReadTimeout('hung login')
+
+        with patch.object(client, '_authorize_fresh', side_effect=authorize_fresh_tracking):
+            with self.assertRaises(ClientException):
+                client.authorize()
+
+        self.assertEqual(len(resets), 3)
+        for state in resets:
+            self.assertEqual(state, (False, '', '', ''))
+
+    def test_request_reauths_after_client_error(self) -> None:
+        from tplinkrouterc6u.client.c6u import TplinkRequest
+
+        calls = {'request': 0, 'authorize': 0}
+        client = TPLinkDecoClient('http://192.168.0.1', 'pwd')
+        client._logged = True
+        client._stok = 'old'
+        client._sysauth = 'old'
+
+        def fake_super_request(self, path, data, ignore_response=False, ignore_errors=False):
+            calls['request'] += 1
+            if calls['request'] == 1:
+                raise ClientError('session evicted')
+            return {'ok': True}
+
+        def fake_authorize():
+            calls['authorize'] += 1
+            client._logged = True
+            client._stok = 'new'
+            client._sysauth = 'new'
+
+        with patch.object(TplinkRequest, 'request', fake_super_request):
+            with patch.object(client, 'authorize', side_effect=fake_authorize):
+                result = client._request_with_reauth(
+                    'admin/network?form=performance', dumps({'operation': 'read'}))
+
+        self.assertEqual(result, {'ok': True})
+        self.assertEqual(calls['request'], 2)
+        self.assertEqual(calls['authorize'], 1)
 
 
 if __name__ == '__main__':

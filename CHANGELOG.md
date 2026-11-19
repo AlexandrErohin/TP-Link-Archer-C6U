@@ -1,5 +1,11 @@
 # Changelog
 
+## [UNRELEASED]
+
+### Fixed
+
+- **Deco:** `_retry_request()` now retries on any `requests.exceptions.Timeout` (connect *and* read), with exponential backoff, instead of only `ConnectTimeout`. `authorize()` refreshes RSA keys/session state on every attempt and, after exhausted retries, raises `ClientException` with a reboot hint (hung login while the web UI still works is a known Deco firmware stall). Default request timeout is 60s. After a `ClientError` (e.g. session evicted by another admin login), the next request re-authorizes once and retries. Same resilience applied to Deco E4R. ([HA #366](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/366)).
+
 ## [5.41.0] - 2026-11-18
 
 ### Added

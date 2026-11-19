@@ -987,7 +987,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Deco M9 Plus 1.0
 - Deco M9 Pro
 - Deco P7
-- Deco X20
+- Deco X20 v1.0
 - Deco X50 v1.3
 - Deco X50-5G (1.20, 2.0)
 - Deco X55 1.0

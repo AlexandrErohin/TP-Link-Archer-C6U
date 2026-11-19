@@ -6,9 +6,10 @@ from unittest.mock import patch
 from urllib import parse
 from ipaddress import IPv4Address
 from macaddress import EUI48
-from requests.exceptions import ConnectTimeout
+from requests.exceptions import ConnectTimeout, ReadTimeout
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device
 from tplinkrouterc6u import Connection, ClientException, ClientError
+from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client.deco_e4r import TplinkDecoE4RRouter
 from tplinkrouterc6u.provider import TplinkRouterProvider
 
@@ -212,7 +213,12 @@ class TestTplinkDecoE4RRouter(TestCase):
         with self.assertRaises(ClientException):
             client.authorize()
 
-    def test_request_retries_on_connect_timeout(self):
+    def test_default_timeout_is_60(self):
+        client = TplinkDecoE4RRouter('http://192.168.0.1', 'pwd')
+        self.assertEqual(client.timeout, TPLinkDecoClient._DEFAULT_TIMEOUT)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_request_retries_on_connect_timeout(self, mock_sleep):
         client = TplinkDecoE4RRouterTest('', 'pwd')
         client.authorize()
         client.use_fixtures({'form=performance': dumps({'error_code': 0, 'result': {'cpu_usage': 0.1}})})
@@ -231,6 +237,51 @@ class TestTplinkDecoE4RRouter(TestCase):
 
         self.assertEqual(attempts['count'], 3)
         self.assertEqual(result['cpu_usage'], 0.1)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch('tplinkrouterc6u.client.deco.sleep')
+    def test_request_retries_on_read_timeout(self, mock_sleep):
+        client = TplinkDecoE4RRouterTest('', 'pwd')
+        client.authorize()
+        client.use_fixtures({'form=performance': dumps({'error_code': 0, 'result': {'cpu_usage': 0.2}})})
+
+        attempts = {'count': 0}
+        original_post = client._session.post
+
+        def flaky_post(*args, **kwargs):
+            attempts['count'] += 1
+            if attempts['count'] < 2:
+                raise ReadTimeout('read timed out')
+            return original_post(*args, **kwargs)
+
+        with patch.object(client._session, 'post', side_effect=flaky_post):
+            result = client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+
+        self.assertEqual(attempts['count'], 2)
+        self.assertEqual(result['cpu_usage'], 0.2)
+
+    def test_request_reauths_after_client_error(self):
+        client = TplinkDecoE4RRouterTest('', 'pwd')
+        client.authorize()
+        client.use_fixtures({'form=performance': dumps({'error_code': 0, 'result': {'cpu_usage': 0.3}})})
+
+        attempts = {'count': 0}
+        original_do = client._do_request
+
+        def flaky_do(path, data, ignore_response=False, ignore_errors=False):
+            attempts['count'] += 1
+            if attempts['count'] == 1:
+                raise ClientError('session evicted')
+            return original_do(path, data, ignore_response, ignore_errors)
+
+        with patch.object(client, '_do_request', side_effect=flaky_do):
+            with patch.object(client, 'authorize') as mock_auth:
+                result = client._request_with_reauth(
+                    'admin/network?form=performance', dumps({'operation': 'read'}))
+
+        mock_auth.assert_called_once()
+        self.assertEqual(attempts['count'], 2)
+        self.assertEqual(result['cpu_usage'], 0.3)
 
     def test_request_error_includes_decrypted_body(self):
         client = TplinkDecoE4RRouterTest('', 'pwd')
@@ -247,7 +298,9 @@ class TestTplinkDecoE4RRouter(TestCase):
         client._session = _Session(client._encryption.aes_encrypt(decrypted))
 
         with self.assertRaises(ClientError) as ctx:
-            client.request('admin/network?form=performance', dumps({'operation': 'read'}))
+            # Call the transport directly: request() would re-authorize on ClientError
+            # and rotate the AES key, so the fixture ciphertext would no longer decrypt.
+            client._do_request('admin/network?form=performance', dumps({'operation': 'read'}))
 
         self.assertIn('Decrypted response', str(ctx.exception))
         self.assertIn('attempt to index global mode', str(ctx.exception))

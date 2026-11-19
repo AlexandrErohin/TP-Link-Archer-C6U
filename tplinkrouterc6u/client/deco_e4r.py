@@ -28,7 +28,7 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
     PAD_CHAR = chr(187)
 
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 30) -> None:
+                 verify_ssl: bool = True, timeout: int = TPLinkDecoClient._DEFAULT_TIMEOUT) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
         self.host = self.host.rstrip('/')
         self._session = Session()
@@ -56,10 +56,23 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
             return False
 
     def authorize(self) -> None:
+        try:
+            self._retry_request(self._authorize_fresh)
+        except requests.exceptions.Timeout as err:
+            raise ClientException(
+                'TplinkRouter - {} - authorize timed out after retries. '
+                'If the Deco web UI still works, reboot the main node '
+                '(power-cycle or Tether "Restart network").'
+                .format(self.__class__.__name__)
+            ) from err
+
+    def _authorize_fresh(self) -> None:
         if len(self.password.encode('utf-8')) > self._MAX_PASSWORD_BYTES:
             raise ClientException(
                 '{} - password exceeds the RSA-512 limit ({} bytes)'
                 .format(self.ROUTER_NAME, self._MAX_PASSWORD_BYTES))
+
+        self._reset_session()
 
         # 1) getTmpKey - unauthenticated challenge carrying the token key material.
         response = self._code_request('code=7&asyn=1')
@@ -99,14 +112,27 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
 
         self._logged = True
 
+    def _reset_session(self) -> None:
+        super()._reset_session()
+        self._token = ''
+        self._nn = ''
+        self._ee = ''
+
     def logout(self) -> None:
         self._code_request('code=11&asyn=0', use_token=True)
-        self._token = ''
-        self._logged = False
+        self._reset_session()
 
     def request(self, path: str, data: str, ignore_response: bool = False,
                 ignore_errors: bool = False) -> dict | None:
-        return self._retry_request(self._do_request, path, data, ignore_response, ignore_errors)
+        return self._retry_request(self._request_with_reauth, path, data, ignore_response, ignore_errors)
+
+    def _request_with_reauth(self, path: str, data: str, ignore_response: bool = False,
+                             ignore_errors: bool = False) -> dict | None:
+        try:
+            return self._do_request(path, data, ignore_response, ignore_errors)
+        except ClientError:
+            self.authorize()
+            return self._do_request(path, data, ignore_response, ignore_errors)
 
     def _do_request(self, path: str, data: str, ignore_response: bool = False,
                     ignore_errors: bool = False) -> dict | None:
@@ -172,6 +198,9 @@ class TplinkDecoE4RRouter(TPLinkDecoClient):
         try:
             return self._session.post(url, data=data, headers=self._headers,
                                       timeout=self.timeout, verify=self._verify_ssl)
+        except requests.exceptions.Timeout:
+            # Let _retry_request / authorize() handle connect and read timeouts.
+            raise
         except requests.exceptions.RequestException as e:
             if self._logger:
                 self._logger.error('{} - Network error: {}'.format(self.ROUTER_NAME, e))

@@ -1,6 +1,7 @@
 from base64 import b64decode
 from json import dumps
-from requests.exceptions import ConnectTimeout
+from time import sleep
+from requests.exceptions import Timeout
 from collections.abc import Callable
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
@@ -8,12 +9,18 @@ from tplinkrouterc6u.common.package_enum import Connection
 from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Status, LTEStatus, MeshNode
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.c6u import TplinkEncryption
-from tplinkrouterc6u.common.exception import ClientException
+from tplinkrouterc6u.common.exception import ClientException, ClientError
 
 
 class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
+    # Deco meshes with many clients routinely need >30s for a full get_status()
+    # poll when one endpoint (often client_list) is slow; 60s keeps that survivable.
+    _DEFAULT_TIMEOUT = 60
+    # Total attempts = _RETRY_MAX + 1 (initial try plus this many retries).
+    _RETRY_MAX = 2
+
     def __init__(self, host: str, password: str, username: str = 'admin', logger: Logger = None,
-                 verify_ssl: bool = True, timeout: int = 30) -> None:
+                 verify_ssl: bool = True, timeout: int = _DEFAULT_TIMEOUT) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
 
         self._headers_request = {'Content-Type': 'application/json'}
@@ -22,9 +29,7 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
 
     def logout(self) -> None:
         self.request('admin/system?form=logout', dumps({'operation': 'logout'}), True)
-        self._stok = ''
-        self._sysauth = ''
-        self._logged = False
+        self._reset_session()
 
     def set_wifi(self, wifi: Connection, enable: bool) -> None:
         bands = {
@@ -247,20 +252,54 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         return status
 
     def authorize(self) -> None:
-        self._retry_request(super().authorize)
+        try:
+            self._retry_request(self._authorize_fresh)
+        except Timeout as err:
+            # A hung login POST while keys/auth still answer is a known Deco
+            # firmware stall; retries will not un-stick it — reboot the main node.
+            raise ClientException(
+                'TplinkRouter - {} - authorize timed out after retries. '
+                'If the Deco web UI still works, reboot the main node '
+                '(power-cycle or Tether "Restart network").'
+                .format(self.__class__.__name__)
+            ) from err
+
+    def _authorize_fresh(self) -> None:
+        """Clear session/RSA material so each attempt starts a clean handshake."""
+        self._reset_session()
+        super().authorize()
+
+    def _reset_session(self) -> None:
+        self._logged = False
+        self._stok = ''
+        self._sysauth = ''
+        self._pwdNN = ''
+        self._seq = ''
 
     def request(self, path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
-        return self._retry_request(super().request, path, data, ignore_response, ignore_errors)
+        return self._retry_request(self._request_with_reauth, path, data, ignore_response, ignore_errors)
+
+    def _request_with_reauth(self, path: str, data: str, ignore_response: bool = False,
+                             ignore_errors: bool = False) -> dict | None:
+        try:
+            return super().request(path, data, ignore_response, ignore_errors)
+        except ClientError:
+            # Deco allows only one admin session; another login (app/UI/script)
+            # evicts ours and subsequent calls fail quickly with ClientError.
+            self.authorize()
+            return super().request(path, data, ignore_response, ignore_errors)
 
     def _retry_request(self, callback: Callable, *args):
         retries = 0
         while True:
             try:
                 return callback(*args)
-            except ConnectTimeout as err:
-                if retries > 2:
+            except Timeout as err:
+                if retries >= self._RETRY_MAX:
                     raise err
                 retries += 1
+                # Back off so a wedged login endpoint is not hammered immediately.
+                sleep(min(2 ** retries, 8))
 
     def _map_wire_type(self, data: dict) -> Connection:
         if data.get('wire_type') == 'wired':
