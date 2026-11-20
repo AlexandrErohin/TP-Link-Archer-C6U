@@ -1546,6 +1546,7 @@ class TplinkRouter(TplinkEncryption, TplinkRouterJson):
         self._url_ipv4_dhcp_leases = 'admin/dhcps?form=client'
         self._url_ipv4_port_forwards = 'admin/nat?form=vs'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator'
+        self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all'
         self._url_openvpn = 'admin/openvpn?form=config'
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
