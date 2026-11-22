@@ -2,9 +2,15 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- **Deco (SG):** `TplinkDecoSGRouter` for Deco / Mercusys Halo units that keep the Deco JSON API (`login?form=keys` / `result` envelopes) but sign requests with MD5(session) + PKCS#1 v1.5 and RSA-encrypted passwords like Deco LuCI. The provider tries it before `TPLinkDecoClient`, fixing empty `wan_ipv4` / failed login on Mercusys Halo H60XR (SG firmware). ([HA #437](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/437)).
+
 ### Fixed
 
 - **Deco:** `_retry_request()` now retries on any `requests.exceptions.Timeout` (connect *and* read), with exponential backoff, instead of only `ConnectTimeout`. `authorize()` refreshes RSA keys/session state on every attempt and, after exhausted retries, raises `ClientException` with a reboot hint (hung login while the web UI still works is a known Deco firmware stall). Default request timeout is 60s. After a `ClientError` (e.g. session evicted by another admin login), the next request re-authorizes once and retries. Same resilience applied to Deco E4R. ([HA #366](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/366)).
+
+## [5.42.0] - 2026-11-19
 
 ## [5.41.0] - 2026-11-18
 
