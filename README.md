@@ -42,6 +42,7 @@ from tplinkrouterc6u import (
     TPLinkRClient, # For routers like TL-R470GP-AC
     TPLinkXDRClient,
     TPLinkDecoClient,
+    TplinkDecoSGRouter,  # Mercusys Halo / Deco with SG encryption (e.g. H60XR)
     TplinkDecoE4RRouter,
     TPLinkEAP115Client,
     TPLinkCPE210Client,

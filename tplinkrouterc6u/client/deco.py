@@ -1,8 +1,7 @@
 from base64 import b64decode
 from json import dumps
 from time import sleep
-from requests import post
-from requests.exceptions import Timeout, RequestException
+from requests.exceptions import Timeout
 from collections.abc import Callable
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
@@ -28,55 +27,8 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         self._headers_login = {'Content-Type': 'application/json'}
         self._data_block = 'result'
 
-    def _uses_sg_auth_stack(self) -> bool:
-        url = '{}/cgi-bin/luci/;stok=/login?form=auth'.format(self.host)
-        try:
-            response = post(
-                url,
-                params={'operation': 'read'},
-                headers={'Referer': self.host + '/webpages/index.html'},
-                timeout=min(self.timeout, 5),
-                verify=self._verify_ssl,
-            )
-            data = response.json().get('data', {})
-            key = data.get('key', []) if isinstance(data, dict) else []
-            if (isinstance(key, list) and len(key) == 2
-                    and isinstance(key[0], str) and len(key[0]) == 128
-                    and all(c in '0123456789abcdefABCDEF' for c in key[0])):
-                return True
-        except (RequestException, ValueError, AttributeError, TypeError):
-            pass
-        return False
-
-    def supports(self) -> bool:
-        """Require a working ``wan_ipv4`` read, not only ``login?form=keys``.
-
-        SG-stack Deco firmware still answers ``form=keys`` for
-        :class:`~tplinkrouterc6u.client.deco_sg.TplinkDecoSGRouter`; a keys-only
-        probe would steal discovery from that client and break after login.
-        """
-        if type(self) is TPLinkDecoClient and self._uses_sg_auth_stack():
-            return False
-        if len(self.password) > 125:
-            return False
-        try:
-            self._request_pwd()
-        except ClientException:
-            return False
-        try:
-            self.authorize()
-            self.request(
-                'admin/network?form=wan_ipv4',
-                dumps({'operation': 'read'}),
-            )
-            try:
-                self.logout()
-            except (ClientException, ClientError):
-                pass
-            return True
-        except Exception:
-            self._reset_session()
-            return False
+    # supports() stays the cheap TplinkEncryption keys probe. SG-stack Halo units
+    # are claimed earlier by TplinkDecoSGRouter in TplinkRouterProvider.get_clients().
 
     def logout(self) -> None:
         self.request('admin/system?form=logout', dumps({'operation': 'logout'}), True)

@@ -3,11 +3,6 @@
 Issue: https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/437
 """
 
-MERCUSYS_SG_VENDOR_REV = 'har-result-json-8'
-
-# Match browser JSON.stringify (no spaces after ":" or ",").
-_MERCUSYS_JSON_SEP = (',', ':')
-
 from hashlib import md5
 from json import dumps, loads
 from re import search
@@ -20,6 +15,9 @@ from tplinkrouterc6u.client.deco import TPLinkDecoClient
 from tplinkrouterc6u.client.sg import TplinkRouterSG
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.exception import ClientException, ClientError
+
+# Match browser JSON.stringify (no spaces after ":" or ",").
+_MERCUSYS_JSON_SEP = (',', ':')
 
 
 class TplinkDecoSGRouter(TPLinkDecoClient):
@@ -105,22 +103,31 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
             'X-Requested-With': 'XMLHttpRequest',
         }
 
+    def _signed_form_headers(self) -> dict:
+        """Headers for ``sign`` / ``data`` posts (same body style as TplinkRouterSG)."""
+        headers = self._mercusys_json_headers()
+        headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        return headers
+
     def _read_login_envelope(self, form: str) -> dict:
         url = '{}/cgi-bin/luci/;stok=/login?form={}'.format(self.host, form)
-        response = post(
-            url,
-            data=dumps({'operation': 'read'}, separators=_MERCUSYS_JSON_SEP),
-            headers=self._headers_login,
-            timeout=self.timeout,
-            verify=self._verify_ssl,
-        )
+        response = None
         try:
+            response = post(
+                url,
+                data=dumps({'operation': 'read'}, separators=_MERCUSYS_JSON_SEP),
+                headers=self._headers_login,
+                timeout=self.timeout,
+                verify=self._verify_ssl,
+            )
             return self._envelope_block(response.json())
         except Exception as e:
+            body = ''
+            if response is not None and response.text:
+                body = response.text[:200]
             raise ClientException(
                 '{} - login?form={} read failed: {}; {}'.format(
-                    self.ROUTER_NAME, form, e,
-                    response.text[:200] if response.text else '',
+                    self.ROUTER_NAME, form, e, body,
                 )) from e
 
     def _request_pwd_keys(self) -> None:
@@ -230,7 +237,7 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
         body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
         response = post(
-            url, data=body, headers=self._headers_login,
+            url, data=body, headers=self._signed_form_headers(),
             timeout=self.timeout, verify=self._verify_ssl,
         )
         if not (response.text or '').strip():
@@ -271,7 +278,7 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
             self._request_with_reauth, path, data, ignore_response, ignore_errors)
 
     def _sg_request(self, path: str, data: str, ignore_response: bool = False,
-                  ignore_errors: bool = False) -> dict | None:
+                    ignore_errors: bool = False) -> dict | None:
         if not self._logged:
             raise ClientException('{} - not authorised'.format(self.ROUTER_NAME))
 
@@ -284,14 +291,13 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         cookies = {'sysauth': self._sysauth} if self._sysauth else None
 
         response = post(
-            url, data=body, headers=self._headers_request,
+            url, data=body, headers=self._signed_form_headers(),
             cookies=cookies, timeout=self.timeout, verify=self._verify_ssl,
         )
 
         if ignore_response:
             return None
 
-        resp = None
         decrypted_text = None
         try:
             resp = response.json()
