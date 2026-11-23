@@ -24,6 +24,7 @@ from tplinkrouterc6u.client.r import TPLinkRClient
 from tplinkrouterc6u.client.re330 import TplinkRE330Router
 from tplinkrouterc6u.client.re365 import TplinkRE365Router
 from tplinkrouterc6u.client.deco_e4r import TplinkDecoE4RRouter
+from tplinkrouterc6u.client.deco_sg import TplinkDecoSGRouter
 from tplinkrouterc6u.client.eap115 import TPLinkEAP115Client
 from tplinkrouterc6u.client.cpe210 import TPLinkCPE210Client
 from tplinkrouterc6u.client.vr1200v import TplinkVR1200vRouter

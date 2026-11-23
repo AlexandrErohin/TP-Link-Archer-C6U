@@ -192,6 +192,10 @@ class TplinkRouterSG(TplinkBaseRouter):
             sign += self._rsa_oaep_encrypt(chunk, self._nn, self._ee)
         return sign
 
+    def _get_login_payload(self, encrypted_pwd: str) -> str:
+        """Plain-text login body before AES encryption (subclasses may use JSON)."""
+        return 'operation=login&password={}&confirm=true'.format(encrypted_pwd)
+
     def _build_request_signature(self, data_len: int) -> str:
         """Build HMAC-SHA256 signature for non-login requests."""
         sign_str = 'h={}&s={}'.format(self._hash, self._seq + data_len)
@@ -218,7 +222,7 @@ class TplinkRouterSG(TplinkBaseRouter):
         encrypted_pwd = self._rsa_v15_encrypt(self.password, self._pwdNN, self._pwdEE)
 
         # Build and AES-encrypt the login payload
-        login_data = 'operation=login&password={}&confirm=true'.format(encrypted_pwd)
+        login_data = self._get_login_payload(encrypted_pwd)
         encrypted_data = self._aes_encrypt(login_data)
 
         # Build OAEP-encrypted signature
