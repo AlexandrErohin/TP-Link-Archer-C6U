@@ -33,7 +33,7 @@ class TestTPLinkClient(TestCase):
     router_class = TplinkRouter
     firmware_path = 'admin/firmware?form=upgrade'
     game_accelerator_path = 'admin/smart_network?form=game_accelerator'
-    easymesh_device_list_path = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
+    easymesh_device_list_path = 'admin/easymesh_network?form=get_mesh_device_list_all'
     openvpn_config_path = 'admin/openvpn?form=config'
     pptpd_config_path = 'admin/pptpd?form=config'
     vpn_uses_data_param = True

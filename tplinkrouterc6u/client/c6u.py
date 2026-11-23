@@ -290,6 +290,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         self._url_wan_ipv4_dynamic = 'admin/network?form=wan_ipv4_dynamic'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator&operation=loadDevice'
         self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all&operation=read'
+        self._url_easymesh_sclient_detail = 'admin/easymesh_network?form=mesh_sclient_detail&operation=read'
         self._url_openvpn = 'admin/openvpn?form=config&operation=read'
         self._url_pptpd = 'admin/pptpd?form=config&operation=read'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config&operation=list&vpntype=openvpn'
@@ -561,9 +562,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             for ap in easymesh_device_list:
                 try:
                     # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                    sclient_detail = self.request(
-                        'admin/easymesh_network?form=mesh_sclient_detail&operation=read&mac=' + ap['mac'],
-                        'operation=read&mac=' + ap['mac'])
+                    sclient_detail = self._request_easymesh_sclient_detail(ap['mac'])
                 except Exception:
                     continue
 
@@ -660,12 +659,7 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             if not ap_mac:
                 continue
             try:
-                # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                form_data = 'operation=read&mac=' + ap_mac
-                sclient_detail = self.request(
-                    'admin/easymesh_network?form=mesh_sclient_detail&' + form_data,
-                    form_data,
-                )
+                sclient_detail = self._request_easymesh_sclient_detail(ap_mac)
             except Exception:
                 continue
             if not sclient_detail:
@@ -705,6 +699,20 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             mesh_sclient_data.append(ap_entry)
 
         return mesh_sclient_data
+
+    def _request_easymesh_sclient_detail(self, mac: str) -> dict | None:
+        """Fetch mesh_sclient_detail for one AP MAC.
+
+        Base URLs embed ``operation=read`` and then also put ``mac`` on the query
+        string (SG / V1_11 style). Shortened ``TplinkRouter`` URLs leave both in
+        the request body; ``TplinkRouterJson.request`` merges them onto the wire
+        query when needed.
+        """
+        form_data = 'operation=read&mac=' + mac
+        path = self._url_easymesh_sclient_detail
+        if 'operation=read' in path:
+            path = path + '&mac=' + mac
+        return self.request(path, form_data)
 
     def get_ipv4_status(self) -> IPv4Status:
         ipv4_status = IPv4Status()
@@ -1547,6 +1555,7 @@ class TplinkRouter(TplinkEncryption, TplinkRouterJson):
         self._url_ipv4_port_forwards = 'admin/nat?form=vs'
         self._url_smart_network = 'admin/smart_network?form=game_accelerator'
         self._url_easymesh_device_list = 'admin/easymesh_network?form=get_mesh_device_list_all'
+        self._url_easymesh_sclient_detail = 'admin/easymesh_network?form=mesh_sclient_detail'
         self._url_openvpn = 'admin/openvpn?form=config'
         self._url_pptpd = 'admin/pptpd?form=config'
         self._url_vpnconn_openvpn = 'admin/vpnconn?form=config'
