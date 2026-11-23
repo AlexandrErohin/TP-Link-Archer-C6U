@@ -16,13 +16,15 @@ class TestProviderGetClient(TestCase):
 
     def test_c1200_is_not_chosen_by_supports(self, _get_clients) -> None:
         with patch.object(TplinkC1200Router, 'supports', return_value=True) as supports, \
-                patch.object(TplinkC1200Router, 'authorize', side_effect=ClientException('login failed')), \
+                patch.object(TplinkC1200Router, 'authorize',
+                             side_effect=ClientException('login failed')) as authorize, \
                 patch.object(TPLinkVRClient, 'authorize', side_effect=ClientException('login failed')), \
                 patch.object(TPLinkXDRClient, 'authorize', side_effect=ClientException('login failed')):
             with self.assertRaises(ClientException):
                 TplinkRouterProvider.get_client('http://192.168.0.1', 'secret')
 
         supports.assert_not_called()
+        authorize.assert_called_once()
 
     def test_c1200_is_chosen_after_successful_login(self, _get_clients) -> None:
         with patch.object(TplinkC1200Router, 'supports', return_value=True) as supports, \

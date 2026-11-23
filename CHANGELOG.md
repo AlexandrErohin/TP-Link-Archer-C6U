@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Provider:** `get_client()` no longer returns `TplinkC1200Router` just because its `supports()` could read the RSA key. The check meant to skip it in the auto-detection loop never matched, so any router not claimed by an earlier client got an unverified C1200 client, and the login-checked C1200 fallback and the VR / XDR hint were never reached.
+- **Provider:** `get_client()` no longer returns `TplinkC1200Router` just because its `supports()` could read the RSA key. The check meant to skip it in the auto-detection loop never matched, so any router not claimed by an earlier client got an unverified C1200 client, and the login-checked C1200 fallback and the VR / XDR hint were never reached. ([#276](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/276)).
 - **Deco:** `_retry_request()` now retries on any `requests.exceptions.Timeout` (connect *and* read), with exponential backoff, instead of only `ConnectTimeout`. `authorize()` refreshes RSA keys/session state on every attempt and, after exhausted retries, raises `ClientException` with a reboot hint (hung login while the web UI still works is a known Deco firmware stall). Default request timeout is 60s. After a `ClientError` (e.g. session evicted by another admin login), the next request re-authorizes once and retries. Same resilience applied to Deco E4R. ([HA #366](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/366)).
 
 ## [5.41.0] - 2026-11-18

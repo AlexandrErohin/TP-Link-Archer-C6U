@@ -40,9 +40,12 @@ class TplinkRouterProvider:
                    verify_ssl: bool = True, timeout: int = 30) -> AbstractRouter:
         """Auto-select a client by trying supports() in turn.
 
-        Note: the returned client is not yet authorized; call authorize()
-        before using it. See also get_client_safe() for a passive-first
-        alternative that returns a logged-in session.
+        Clients matched via supports() are not yet authorized; call authorize()
+        before using them. TplinkC1200Router is an exception: it is skipped in the
+        loop (its supports() only reads the RSA key) and returned only after a
+        successful login, so that session is already authorized. See also
+        get_client_safe() for a passive-first alternative that always returns a
+        logged-in session.
         """
         for client_name, client in TplinkRouterProvider.get_clients().items():
             # C1200 supports() only reads the RSA key; it is checked by a real login below
@@ -67,7 +70,7 @@ class TplinkRouterProvider:
             router.authorize()
             if logger is not None:
                 logger.info(
-                    'TplinkRouterProvider: supports() returned True for %s, client chosen: %s',
+                    'TplinkRouterProvider: authorize() succeeded for %s, client chosen: %s',
                     host, TplinkC1200Router.__name__,
                 )
             return router
