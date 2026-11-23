@@ -2,7 +2,10 @@ from unittest import main, TestCase
 from unittest.mock import patch, Mock
 
 from tplinkrouterc6u import TplinkRouterAX72, TplinkRouterProvider
-from .test_client_c6u import TestTPLinkClient
+try:
+    from .test_client_c6u import TestTPLinkClient
+except ImportError:
+    from test_client_c6u import TestTPLinkClient
 
 
 class TestTPLinkClientAX72(TestTPLinkClient):

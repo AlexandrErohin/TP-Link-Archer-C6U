@@ -38,6 +38,13 @@ class TestTPLinkClient(TestCase):
     pptpd_config_path = 'admin/pptpd?form=config'
     vpn_uses_data_param = True
 
+    @staticmethod
+    def _easymesh_sclient_mac(path: str, data: str) -> str | None:
+        """MAC for mesh_sclient_detail: on the path when operation= is embedded, else in data."""
+        if 'mac=' in path:
+            return path.rsplit('mac=', 1)[-1]
+        return dict(parse_qsl(data)).get('mac')
+
     def test_get_firmware(self) -> None:
         response = '''
         {
@@ -1078,7 +1085,7 @@ class TestTPLinkClient(TestCase):
                 elif path == easymesh_device_list_path:
                     return loads(response_easymesh_list)['data']
                 elif path.startswith('admin/easymesh_network?form=mesh_sclient_detail'):
-                    mac = path.rsplit('mac=', 1)[-1]
+                    mac = TestTPLinkClient._easymesh_sclient_mac(path, data)
                     return loads(sclient_by_mac[mac])['data']
                 raise ClientException()
 
@@ -1160,10 +1167,12 @@ class TestTPLinkClient(TestCase):
                     return loads(response_stats)['data']
                 if path == easymesh_device_list_path:
                     return loads(response_easymesh_list)['data']
-                if path.endswith('mac=24-00-00-00-00-18'):
-                    raise ClientException('detail failed')
-                if path.endswith('mac=60-00-00-00-00-F5'):
-                    return loads(response_sclient_ax23)['data']
+                if path.startswith('admin/easymesh_network?form=mesh_sclient_detail'):
+                    mac = TestTPLinkClient._easymesh_sclient_mac(path, data)
+                    if mac == '24-00-00-00-00-18':
+                        raise ClientException('detail failed')
+                    if mac == '60-00-00-00-00-F5':
+                        return loads(response_sclient_ax23)['data']
                 raise ClientException()
 
         client = TPLinkRouterTest('', '')
@@ -1516,7 +1525,7 @@ class TestTPLinkClient(TestCase):
                 if path == easymesh_device_list_path:
                     return loads(response_easymesh_list)['data']
                 if path.startswith('admin/easymesh_network?form=mesh_sclient_detail'):
-                    mac = path.rsplit('mac=', 1)[-1]
+                    mac = TestTPLinkClient._easymesh_sclient_mac(path, data)
                     return loads(sclient_by_mac[mac])['data']
                 raise ClientException()
 
