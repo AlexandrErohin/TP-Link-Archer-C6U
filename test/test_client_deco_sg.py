@@ -1,39 +1,16 @@
-from hashlib import md5
-from json import dumps
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
 
 from tplinkrouterc6u import TplinkDecoSGRouter, ClientException
-from tplinkrouterc6u.client.deco_sg import _MERCUSYS_JSON_SEP
 
 
 class TestTplinkDecoSGRouter(TestCase):
-    def test_supports_probes_wan_ipv4(self) -> None:
+    def test_supports_authorize_logout(self) -> None:
         client = TplinkDecoSGRouter('http://192.168.68.1', 'secret')
-        client._aes_key = '1234567890123456'
-        client._aes_iv = '6543210987654321'
-        client._hash = md5(b'adminsecret').hexdigest()
-        client._seq = 100
-        client._nn = 'ab' * 64
-        client._ee = '010001'
-        client._pwdNN = 'cd' * 64
-        client._pwdEE = '010001'
-        client._stok = '1234abcd'
-        client._logged = True
-        client._sysauth = 'cookie'
-
-        wan = {'wan': {'ip_info': {'ip': '10.0.0.2'}}, 'lan': {'ip_info': {'ip': '192.168.68.1'}}}
-
-        with patch.object(client, '_request_pwd_keys'), \
-                patch.object(client, '_request_auth_keys'), \
-                patch.object(client, 'authorize') as authorize, \
-                patch.object(client, 'logout') as logout, \
-                patch.object(client, 'request', return_value=wan) as request:
+        with patch.object(client, 'authorize') as authorize, \
+                patch.object(client, 'logout') as logout:
             self.assertTrue(client.supports())
             authorize.assert_called_once()
-            request.assert_called_once_with(
-                'admin/network?form=wan_ipv4',
-                dumps({'operation': 'read'}, separators=_MERCUSYS_JSON_SEP))
             logout.assert_called_once()
 
     def test_login_payload_uses_deco_json(self) -> None:
@@ -88,13 +65,12 @@ class TestTplinkDecoSGRouter(TestCase):
         self.assertEqual(path, 'admin/network?form=wan_ipv4')
         self.assertEqual(data, '{"operation": "read"}')
 
-    def test_supports_returns_false_when_wan_ipv4_fails(self) -> None:
+    def test_supports_returns_false_when_authorize_fails(self) -> None:
         client = TplinkDecoSGRouter('http://192.168.68.1', 'secret')
-        with patch.object(client, '_request_pwd_keys'), \
-                patch.object(client, '_request_auth_keys'), \
-                patch.object(client, 'authorize'), \
-                patch.object(client, 'request', side_effect=ClientException('bad')):
+        with patch.object(client, 'authorize', side_effect=ClientException('bad')), \
+                patch.object(client, '_reset_session') as reset:
             self.assertFalse(client.supports())
+            reset.assert_called_once()
 
     def test_signed_form_headers_use_urlencoded(self) -> None:
         client = TplinkDecoSGRouter('http://192.168.68.1', 'secret')

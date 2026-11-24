@@ -341,20 +341,8 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         if len(self.password) > 125:
             return False
         try:
-            self._request_pwd_keys()
-            self._request_auth_keys()
-        except Exception:
-            return False
-        try:
             self.authorize()
-            self.request(
-                'admin/network?form=wan_ipv4',
-                dumps({'operation': 'read'}, separators=_MERCUSYS_JSON_SEP),
-            )
-            try:
-                self.logout()
-            except (ClientException, ClientError):
-                pass
+            self.logout()
             return True
         except Exception:
             self._reset_session()
