@@ -26,5 +26,6 @@ setuptools.setup(
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
     install_requires=['requests', 'pycryptodome', 'macaddress'],
+    extras_require={'deco-tmp': ['paramiko>=3.5,<5']},
     python_requires='>=3.10',
 )
