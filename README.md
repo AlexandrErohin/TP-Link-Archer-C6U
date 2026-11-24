@@ -12,11 +12,13 @@ Python package for API access and management for TP-Link and Mercusys Routers. S
  - [requests](https://pypi.org/project/requests/)
  - [pycryptodome](https://pypi.org/project/pycryptodome/)
  - [macaddress](https://pypi.org/project/macaddress/)
+ - Optional local Deco app transport: [paramiko](https://pypi.org/project/paramiko/), installed with `pip install 'tplinkrouterc6u[deco-tmp]'`
 
 ## Usage
 - Enter the host & credentials used to log in to your router management page. Username is `admin` by default. But you may pass username as third parameter. Some routers have default username - `user`
 - EX series (and some password-only UIs such as EX920): use username `user` — `admin` is rejected even when the web UI does not ask for a username
-- Use Local Password which is for Log In with Local Password. Login with TP-LINK ID doesnt work
+- Use the password accepted by your router's management page. The HTTP clients do not perform a TP-Link cloud login.
+- Classic Deco guest Wi-Fi can optionally use the app's local authenticated transport; see [verified Deco Wi-Fi control](DECO_WIFI_VERIFICATION.md) for account identity, server verification, and readback requirements.
 - If you use `https` connection - You need to turn on "Local Management via HTTPS" (advanced->system->administration) in the router web UI
 
 ```python

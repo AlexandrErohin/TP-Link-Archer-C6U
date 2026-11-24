@@ -1,7 +1,8 @@
+# Modified 2026-11-24: export verified Deco Wi-Fi results and safe errors.
 from tplinkrouterc6u.client.c6u import TplinkRouter, TplinkRouterV1_11
 from tplinkrouterc6u.client.ax72 import TplinkRouterAX72
 from tplinkrouterc6u.client.sg import TplinkRouterSG
-from tplinkrouterc6u.client.deco import TPLinkDecoClient
+from tplinkrouterc6u.client.deco import TPLinkDecoClient, WifiWriteResult
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from tplinkrouterc6u.client.mr import TPLinkMRClient, TPLinkMRClientGCM, TPLinkMR600Client
 from tplinkrouterc6u.client.c50 import TPLinkC50Client
@@ -82,4 +83,8 @@ from tplinkrouterc6u.common.dataclass import (
     RouterTime,
     SystemLog,
 )
-from tplinkrouterc6u.common.exception import ClientException, ClientError, AuthorizeError
+# Modified 2026-11-24: expose the verified Deco Wi-Fi result and safe errors.
+from tplinkrouterc6u.common.exception import (
+    ClientException, ClientError, AuthorizeError, WifiVerificationError,
+    WifiWriteNotObserved, WifiVerificationUnavailable, WifiWriteRejected,
+)
