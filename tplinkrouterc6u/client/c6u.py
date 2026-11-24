@@ -428,7 +428,8 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
         status._wan_ipv4_addr = get_ip(data['wan_ipv4_ipaddr']) if 'wan_ipv4_ipaddr' in data else None
         status._lan_ipv4_addr = get_ip(data['lan_ipv4_ipaddr']) if 'lan_ipv4_ipaddr' in data else None
         status._wan_ipv4_gateway = get_ip(data['wan_ipv4_gateway']) if 'wan_ipv4_gateway' in data else None
-        status.wan_ipv4_uptime = data.get('wan_ipv4_uptime')
+        uptime = data.get('wan_ipv4_uptime')
+        status.wan_ipv4_uptime = int(uptime) if str(uptime if uptime is not None else '').isdigit() else None
         status.wan_ipv6_enabled = self._str2bool(data.get('wan_ipv6_enable', ''))
         status._wan_ipv6_addr = get_ipv6(data.get('wan_ipv6_ip6addr', '::').split('/')[0])
         status.lan_ipv4_dhcp_enable = self._str2bool(data.get('lan_ipv4_dhcp_enable'))

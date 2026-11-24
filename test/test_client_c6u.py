@@ -484,6 +484,27 @@ class TestTPLinkClient(TestCase):
         for device in status.devices:
             self.assertIsNone(device.ap_name)
 
+    def test_get_status_wan_uptime(self) -> None:
+        router_class = self.router_class
+
+        for raw, expected in (('', None), ('86400', 86400), (3600, 3600), (None, None), ('-', None)):
+            data = {'lan_macaddr': '06:e6:97:9e:23:f5'}
+            if raw is not None:
+                data['wan_ipv4_uptime'] = raw
+
+            class TPLinkRouterTest(router_class):
+                def request(self, path: str, data_: str,
+                            ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                    if path == 'admin/status?form=all&operation=read':
+                        return data
+                    if path == 'admin/wireless?form=statistics':
+                        return []
+                    raise ClientException()
+
+            with self.subTest(raw=raw):
+                status = TPLinkRouterTest('', '').get_status()
+                self.assertEqual(status.wan_ipv4_uptime, expected)
+
     def test_get_status_with_game_accelerator(self) -> None:
         response_status = '''
 {
