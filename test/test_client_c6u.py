@@ -487,7 +487,9 @@ class TestTPLinkClient(TestCase):
     def test_get_status_wan_uptime(self) -> None:
         router_class = self.router_class
 
-        for raw, expected in (('', None), ('86400', 86400), (3600, 3600), (None, None), ('-', None)):
+        for raw, expected in (
+            ('', None), ('86400', 86400), (3600, 3600), (None, None), ('-', None), (0, 0), ('0', 0),
+        ):
             data = {'lan_macaddr': '06:e6:97:9e:23:f5'}
             if raw is not None:
                 data['wan_ipv4_uptime'] = raw
