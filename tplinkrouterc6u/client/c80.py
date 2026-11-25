@@ -1,6 +1,7 @@
 from logging import Logger
 from urllib import parse
 from collections import defaultdict
+from decimal import Decimal
 import re
 import requests
 from urllib.parse import urlparse
@@ -11,7 +12,7 @@ from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import (
-    IPv4DHCPLease, Device, VPNStatus, BlockedDevice, AccessControlStatus,
+    IPv4DHCPLease, Device, VPNStatus, BlockedDevice, AccessControlStatus, LTEStatus,
 )
 from macaddress import EUI48
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -660,3 +661,28 @@ class TplinkC80Router(AbstractRouter):
         except requests.exceptions.RequestException as e:
             self._logger.error(f"Network error: {e}")
             raise ClientException(f"Network error: {str(e)}") from e
+
+
+class TplinkMR515Router(TplinkC80Router):
+    """TP-Link Archer MR515 4G/LTE router."""
+
+    def supports(self) -> bool:
+        """Match the MR515 specifically before the generic C80 protocol client."""
+        try:
+            response = self.request(2, 1, data='0|1,0,0')
+            return (
+                response.status_code == 200
+                and response.text.startswith('00000')
+                and 'modelName Archer MR515' in response.text
+            )
+        except Exception:
+            return False
+
+    def get_lte_status(self) -> LTEStatus:
+        """Read the MR515 LTE traffic counter (bytes) from block 139."""
+        request = '139|1,0,0'
+        data_blocks = self._return_data_block(request)
+        values = self._parse_last_values_from_block(data_blocks[request])
+        return LTEStatus(
+            total_statistics=int(Decimal(values['totalStatistics']))
+        )
