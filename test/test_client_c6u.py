@@ -48,12 +48,16 @@ class TestTPLinkClient(TestCase):
     def test_init_preserves_luci_headers(self) -> None:
         """TplinkEncryption must not wipe headers set by TplinkBaseRouter (HA #460)."""
         client = self.router_class('http://192.168.1.1', 'password')
+        self.assertTrue(client._headers_request)
+        self.assertTrue(client._headers_login)
         self.assertEqual(
             client._headers_request.get('Referer'),
             'http://192.168.1.1/webpages/index.html',
         )
         self.assertEqual(client._headers_request.get('Origin'), 'http://192.168.1.1')
-        self.assertEqual(client._headers_request.get('Content-Type'), 'application/json')
+        # TplinkRouterJson sets JSON Content-Type; SG / form clients leave it unset.
+        if 'Content-Type' in client._headers_request:
+            self.assertEqual(client._headers_request['Content-Type'], 'application/json')
         self.assertEqual(
             client._headers_login.get('Referer'),
             'http://192.168.1.1/webpages/index.html',

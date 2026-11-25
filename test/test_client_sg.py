@@ -604,8 +604,11 @@ class TestTPLinkPresenceStale(TestCase):
             with self.subTest(uptime=uptime):
                 self.assertEqual(self.status(uptime).devices, [])
 
-    def test_primary_client_zero_uptime_stays_connected(self) -> None:
-        self.assertTrue(self.status(0, primary=True).devices[0].active)
+    def test_primary_client_zero_uptime_is_inactive(self) -> None:
+        # Primary-list clients with onlineTime 0 are offline (HA #449 / AX53 via AP).
+        device = self.status(0, primary=True).devices[0]
+        self.assertEqual(device.online_time, 0)
+        self.assertFalse(device.active)
 
     def test_positive_or_missing_uptime_preserves_smart_only_clients(self) -> None:
         for uptime in (45, None):
