@@ -1,7 +1,7 @@
 from base64 import b64decode
 from json import dumps
 from time import sleep
-from requests.exceptions import Timeout
+from requests.exceptions import ConnectionError, Timeout
 from collections.abc import Callable
 from logging import Logger
 from tplinkrouterc6u.common.helper import get_ip, get_mac, get_value
@@ -135,17 +135,33 @@ class TPLinkDecoClient(TplinkEncryption, AbstractRouter):
         status._wan_ipv4_gateway = get_ip(element) if element else None
         status.conn_type = get_value(data, ['wan', 'dial_type'])
 
-        data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
-        status.mem_usage = data.get('mem_usage')
-        status.cpu_usage = data.get('cpu_usage')
+        try:
+            data = self.request('admin/network?form=performance', dumps({"operation": "read"}))
+            status.mem_usage = data.get('mem_usage')
+            status.cpu_usage = data.get('cpu_usage')
+        except (ClientError, ConnectionError, Timeout) as e:
+            if self._logger:
+                self._logger.warning(
+                    'TplinkRouter - %s - optional performance read failed; continuing without '
+                    'CPU/mem metrics. Error - %s',
+                    self.__class__.__name__, e)
 
-        data = self.request('admin/wireless?form=wlan', dumps({'operation': 'read'}))
-        status.wifi_2g_enable = get_value(data, ['band2_4', 'host', 'enable'])
-        status.guest_2g_enable = get_value(data, ['band2_4', 'guest', 'enable'])
-        status.wifi_5g_enable = get_value(data, ['band5_1', 'host', 'enable'])
-        status.guest_5g_enable = get_value(data, ['band5_1', 'guest', 'enable'])
-        status.wifi_6g_enable = get_value(data, ['band6', 'host', 'enable'])
-        status.guest_6g_enable = get_value(data, ['band6', 'guest', 'enable'])
+        try:
+            data = self.request('admin/wireless?form=wlan', dumps({'operation': 'read'}))
+            status.wifi_2g_enable = get_value(data, ['band2_4', 'host', 'enable'])
+            status.guest_2g_enable = get_value(data, ['band2_4', 'guest', 'enable'])
+            status.wifi_5g_enable = get_value(data, ['band5_1', 'host', 'enable'])
+            status.guest_5g_enable = get_value(data, ['band5_1', 'guest', 'enable'])
+            status.wifi_6g_enable = get_value(data, ['band6', 'host', 'enable'])
+            status.guest_6g_enable = get_value(data, ['band6', 'guest', 'enable'])
+        except (ClientError, ConnectionError, Timeout) as e:
+            # Intermittent X50-5G Lua dispatcher faults / connection resets (HA #458)
+            # must not fail the whole poll — clients and mesh stay available.
+            if self._logger:
+                self._logger.warning(
+                    'TplinkRouter - %s - optional wlan read failed; continuing without Wi-Fi '
+                    'enable flags. Error - %s',
+                    self.__class__.__name__, e)
 
         devices = []
         data = self.request('admin/client?form=client_list', dumps(

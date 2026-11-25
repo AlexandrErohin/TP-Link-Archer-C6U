@@ -3,7 +3,7 @@ from unittest.mock import patch, Mock
 from json import loads, dumps
 from macaddress import EUI48
 from ipaddress import IPv4Address
-from requests.exceptions import ConnectTimeout, ReadTimeout
+from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
 from tplinkrouterc6u import (
     TPLinkDecoClient,
     Connection,
@@ -160,6 +160,62 @@ class TestTPLinkDecoClient(TestCase):
         self.assertEqual(status.devices[4].hostname, 'wireless5')
         self.assertEqual(status.devices[4].packets_sent, None)
         self.assertEqual(status.devices[4].packets_received, None)
+
+    def test_get_status_optional_wlan_and_performance_failures(self) -> None:
+        # X50-5G intermittently fails form=wlan with a Lua dispatcher fault or a
+        # connection reset (HA #458); performance is the same soft-optional class.
+        # Clients and LAN identity must still come back so HA does not flip all
+        # entities to unavailable for that poll.
+        response_network = {
+            'wan': {'ip_info': {'mac': '44:e1:52:8c:40:36', 'ip': '192.168.1.11',
+                                'gateway': '192.168.1.1'}, 'dial_type': 'dynamic_ip'},
+            'lan': {'ip_info': {'mac': '44:e1:52:8c:40:37', 'ip': '192.168.68.1'}},
+        }
+        response_clients = {'client_list': [
+            {'mac': 'cf:51:c9:04:e1:02', 'up_speed': 1, 'down_speed': 1, 'wire_type': 'wired',
+             'connection_type': 'wired', 'ip': '192.168.68.100', 'online': True,
+             'name': 'd2lyZWQx', 'interface': 'main'},
+        ]}
+        cases = (
+            (ClientError(
+                "TplinkRouter - TPLinkDecoClient - An unknown response - Expecting value; "
+                "Request admin/wireless?form=wlan - Response ... Decrypted response - "
+                "Failed to execute call dispatcher target for entry '/admin/wireless'. "
+                "The called action terminated with an exception: ?:0: attempt to index a nil value"),
+             ClientError('performance failed')),
+            (ConnectionError('Connection aborted.',
+                             ConnectionResetError(104, 'Connection reset by peer')),
+             ConnectionError('Connection reset')),
+        )
+
+        for wlan_error, perf_error in cases:
+            with self.subTest(wlan=type(wlan_error).__name__):
+                logger = Mock()
+
+                class TPLinkRouterTest(TPLinkDecoClient):
+                    def request(self, path: str, data: str,
+                                ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                        if path == 'admin/network?form=wan_ipv4':
+                            return response_network
+                        if path == 'admin/network?form=performance':
+                            raise perf_error
+                        if path == 'admin/wireless?form=wlan':
+                            raise wlan_error
+                        if path == 'admin/client?form=client_list':
+                            return response_clients
+                        raise AssertionError(path)
+
+                client = TPLinkRouterTest('', '', logger=logger)
+                status = client.get_status()
+
+                self.assertEqual(status.lan_macaddr, '44-E1-52-8C-40-37')
+                self.assertEqual(status.wired_total, 1)
+                self.assertEqual(len(status.devices), 1)
+                self.assertIsNone(status.wifi_2g_enable)
+                self.assertIsNone(status.guest_5g_enable)
+                self.assertIsNone(status.cpu_usage)
+                self.assertIsNone(status.mem_usage)
+                self.assertEqual(logger.warning.call_count, 2)
 
     def test_get_status_iot(self) -> None:
         response_network = '''
