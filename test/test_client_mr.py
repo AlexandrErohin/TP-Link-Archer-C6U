@@ -46,6 +46,13 @@ class TestTPLinkMRClient(TestCase):
 
         self.assertEqual(client._req_rsa_key(), (self._FAKE_NN, self._FAKE_EE, 382829019))
 
+    def test_req_rsa_key_json_embedded_in_wrapper(self) -> None:
+        response = ('[cgi]0\n{{"ee":"{}","nn":"{}","seq":"382829019","ret":0}}[error]0\n'
+                    .format(self._FAKE_EE, self._FAKE_NN))
+        client = self._client_with_rsa_response(response)
+
+        self.assertEqual(client._req_rsa_key(), (self._FAKE_NN, self._FAKE_EE, 382829019))
+
     def test_req_rsa_key_json_error_ret(self) -> None:
         response = '{{"ee":"{}","nn":"{}","seq":"1","ret":1}}'.format(self._FAKE_EE, self._FAKE_NN)
         client = self._client_with_rsa_response(response)
@@ -58,11 +65,38 @@ class TestTPLinkMRClient(TestCase):
 
         self.assertEqual(client._parse_ret_val('$.ret=0;'), 0)
         self.assertEqual(client._parse_ret_val('{"ret":0}'), 0)
+        self.assertEqual(client._parse_ret_val('{"ret":"0"}'), 0)
         self.assertEqual(client._parse_ret_val('{"ret":71233}'), 71233)
         # /cgi/logout answer of Archer MR600 v5 fw 1.7.0
         self.assertEqual(client._parse_ret_val('[cgi]0\n{"ret":0}[error]0\n'), 0)
         with self.assertRaises(AssertionError):
             client._parse_ret_val('garbage')
+
+    def test_req_login_wrong_password_js_and_json(self) -> None:
+        client = TPLinkMRClient('', 'bad')
+        client._nn = self._FAKE_NN
+        client._ee = self._FAKE_EE
+        client._seq = 1
+        client._prepare_data = lambda data, is_login: ('s' * 256, 'cipher')  # type: ignore[method-assign]
+
+        client._request = (  # type: ignore[method-assign]
+            lambda url, *args, **kwargs: (
+                200,
+                '$.ret=71233;\nvar currAuthTimes=2;\nvar currForbidTime=0;',
+            )
+        )
+        with self.assertRaises(ClientException) as js_err:
+            client._req_login()
+        self.assertIn('wrong password', str(js_err.exception))
+        self.assertIn('Auth times: 2/5', str(js_err.exception))
+
+        client._request = (  # type: ignore[method-assign]
+            lambda url, *args, **kwargs: (200, '{"ret":71233}')
+        )
+        with self.assertRaises(ClientException) as json_err:
+            client._req_login()
+        self.assertIn('wrong password', str(json_err.exception))
+        self.assertNotIn('Auth times', str(json_err.exception))
 
     def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0

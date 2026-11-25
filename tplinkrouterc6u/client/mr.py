@@ -679,7 +679,8 @@ class TPLinkMRClientBase(AbstractRouter):
                 nn = nn.group(1)
                 seq = seq.group(1)
             else:
-                parsed = json_loads(response)
+                # Plain JSON, or JSON embedded in an act-style wrapper.
+                parsed = self._loads_json_payload(response)
                 ee = parsed['ee']
                 nn = parsed['nn']
                 seq = str(parsed['seq'])
@@ -695,6 +696,18 @@ class TPLinkMRClientBase(AbstractRouter):
             raise ClientException(error)
 
         return nn, ee, int(seq)
+
+    @staticmethod
+    def _loads_json_payload(response_text: str) -> dict:
+        """Parse a JSON object, including when it sits inside an act wrapper."""
+        try:
+            return json_loads(response_text)
+        except Exception:
+            start = response_text.find('{')
+            end = response_text.rfind('}')
+            if start < 0 or end <= start:
+                raise
+            return json_loads(response_text[start:end + 1])
 
     def _req_login(self) -> None:
         """
@@ -727,11 +740,15 @@ class TPLinkMRClientBase(AbstractRouter):
         ret_code = self._parse_ret_val(response)
         error = ''
         if ret_code == self.HTTP_ERR_USER_PWD_NOT_CORRECT:
+            # Classic firmwares include auth-times JS vars; JSON firmwares (MR600 v5
+            # 1.7.0) may only return {"ret":71233} — still raise a clear ClientException.
             info = search('var currAuthTimes=(.*);\nvar currForbidTime=(.*);', response)
-            assert info is not None
-
-            error = self.ROUTER_NAME + ' - Login failed, wrong password. Auth times: {}/5, Forbid time: {}'.format(
-                info.group(1), info.group(2))
+            if info is not None:
+                error = (self.ROUTER_NAME
+                         + ' - Login failed, wrong password. Auth times: {}/5, Forbid time: {}'
+                         .format(info.group(1), info.group(2)))
+            else:
+                error = self.ROUTER_NAME + ' - Login failed, wrong password'
         elif ret_code == self.HTTP_ERR_USER_BAD_REQUEST:
             error = self.ROUTER_NAME + ' - Login failed. Generic error code: {}'.format(ret_code)
         elif ret_code != self.HTTP_RET_OK:
@@ -808,7 +825,7 @@ class TPLinkMRClientBase(AbstractRouter):
             # some firmwares (e.g. Archer MR600 v5 fw 1.7.0) answer with JSON instead,
             # either plain ('{"ret":0}', the JSON RSA key) or embedded in an act
             # response ('[cgi]0\n{"ret":0}[error]0\n' for /cgi/logout)
-            result = search(r'"ret"\s*:\s*"?(\d+)', response_text)
+            result = search(r'"ret"\s*:\s*"?(\d+)"?', response_text)
         assert result is not None
         assert result.group(1).isnumeric()
 
