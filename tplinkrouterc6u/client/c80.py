@@ -630,6 +630,7 @@ class TplinkC80Router(AbstractRouter):
             if line == '00000' or line.startswith('id '):
                 continue
             key, _, value = line.rpartition(' ')
+            key = key.strip()
             if key:
                 values[key] = value.strip()
         return values
@@ -659,12 +660,13 @@ class TplinkC80Router(AbstractRouter):
 
     @staticmethod
     def _lte_cell_value(values: dict[str, str], field: str) -> int | None:
-        """Read the first (serving-cell) value, ignoring later secondary-cell entries."""
+        """Read the serving-cell value, including firmware-flattened nested keys."""
         direct = values.get(field)
         if direct is not None:
             return TplinkC80Router._lte_int(direct)
         for key, value in values.items():
-            if key == field or re.fullmatch(rf'{re.escape(field)}\s+0', key):
+            if key.endswith(f' {field}') or re.fullmatch(
+                    rf'(?:.*\\s)?{re.escape(field)}\\s+0', key):
                 return TplinkC80Router._lte_int(value)
         return None
 
@@ -691,14 +693,19 @@ class TplinkC80Router(AbstractRouter):
         cell = block('cell')
         mobile = block('mobile')
 
-        network_mode = wan.get('networkMode 4G')
-        if network_mode is None:
-            network_mode = wan.get('networkMode')
+        def field_value(values: dict[str, str], field: str) -> str | None:
+            """Find a field even when the firmware prefixes its nested model path."""
+            if field in values:
+                return values[field]
+            return next((value for key, value in values.items()
+                         if key.endswith(f' {field}')), None)
+
+        network_mode = field_value(wan, 'networkMode 4G') or field_value(wan, '4G')
         lte_enabled = None
         if network_mode is not None:
             lte_enabled = int(network_mode.strip().lower() in ('1', 'true', 'on', 'enabled'))
 
-        mobile_status = mobile.get('mobileStatus', '').strip().lower()
+        mobile_status = (field_value(mobile, 'mobileStatus') or '').strip().lower()
         connect_status = None
         if mobile_status:
             if mobile_status in ('connesso', 'connected', 'up'):
@@ -709,16 +716,16 @@ class TplinkC80Router(AbstractRouter):
         return LTEStatus(
             enable=lte_enabled,
             connect_status=connect_status,
-            network_type=self._lte_int(link.get('networkType')),
-            sim_status=self._lte_int(link.get('simStatus')),
-            total_statistics=self._lte_int(traffic.get('totalStatistics')),
-            cur_rx_speed=self._lte_speed(traffic.get('curRxSpeed')),
-            cur_tx_speed=self._lte_speed(traffic.get('curTxSpeed')),
-            sig_level=self._lte_int(link.get('signalStrength')),
+            network_type=self._lte_int(field_value(link, 'networkType')),
+            sim_status=self._lte_int(field_value(link, 'simStatus')),
+            total_statistics=self._lte_int(field_value(traffic, 'totalStatistics')),
+            cur_rx_speed=self._lte_speed(field_value(traffic, 'curRxSpeed')),
+            cur_tx_speed=self._lte_speed(field_value(traffic, 'curTxSpeed')),
+            sig_level=self._lte_int(field_value(link, 'signalStrength')),
             rsrp=self._lte_cell_value(cell, 'RSRP'),
             rsrq=self._lte_cell_value(cell, 'RSRQ'),
             snr=self._lte_cell_value(cell, 'SNR'),
-            isp_name=profile.get('ispName'),
+            isp_name=field_value(profile, 'ispName'),
         )
 
     def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
