@@ -649,7 +649,7 @@ class TplinkC80Router(AbstractRouter):
         """Convert the router's human-readable rate (e.g. 3.065KB/s) to B/s."""
         if not value:
             return None
-        match = re.fullmatch(r'\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(B|KB|MB)/s\\s*', value, re.IGNORECASE)
+        match = re.fullmatch(r'\s*([0-9]+(?:\.[0-9]+)?)\s*(B|KB|MB)/s\s*', value, re.IGNORECASE)
         if not match:
             return None
         amount = Decimal(match.group(1))
@@ -664,7 +664,7 @@ class TplinkC80Router(AbstractRouter):
         if direct is not None:
             return TplinkC80Router._lte_int(direct)
         for key, value in values.items():
-            if key == field or re.fullmatch(rf'{re.escape(field)}\\s+0', key):
+            if key == field or re.fullmatch(rf'{re.escape(field)}\s+0', key):
                 return TplinkC80Router._lte_int(value)
         return None
 
