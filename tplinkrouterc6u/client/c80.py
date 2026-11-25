@@ -651,6 +651,12 @@ class TplinkC80Router(AbstractRouter):
         return TplinkC80Router._lte_int(value)
 
     @staticmethod
+    def _lte_bool(value: str | None) -> bool | None:
+        """Convert an optional 0/1 LTE setting to a boolean."""
+        parsed = TplinkC80Router._lte_int(value)
+        return bool(parsed) if parsed in (0, 1) else None
+
+    @staticmethod
     def _lte_cell_value(values: dict[str, str], field: str, index: int = 1) -> int | None:
         """Read a field from the primary serving cell (servingCellList index 1)."""
         indexed = values.get(f'{field} {index}')
@@ -713,6 +719,12 @@ class TplinkC80Router(AbstractRouter):
             total_statistics=self._lte_int(field_value(traffic, 'totalStatistics')),
             cur_rx_speed=self._lte_speed(field_value(traffic, 'curRxSpeed')),
             cur_tx_speed=self._lte_speed(field_value(traffic, 'curTxSpeed')),
+            data_limit=self._lte_int(field_value(traffic, 'limitation')),
+            enable_data_limit=self._lte_bool(field_value(traffic, 'enableDataLimit')),
+            warning_percent=self._lte_int(field_value(traffic, 'warningPercent')),
+            enable_payment_day=self._lte_bool(field_value(traffic, 'enablePaymentDay')),
+            payment_day=self._lte_int(field_value(traffic, 'paymentDay')),
+            adjust_statistics=self._lte_int(field_value(traffic, 'adjustStatistics')),
             sig_level=self._lte_int(field_value(link, 'signalStrength')),
             rsrp=self._lte_cell_value(cell, 'RSRP', index=1),
             rsrq=self._lte_cell_value(cell, 'RSRQ', index=1),
