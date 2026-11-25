@@ -634,13 +634,91 @@ class TplinkC80Router(AbstractRouter):
                 values[key] = value.strip()
         return values
 
+    @staticmethod
+    def _lte_int(value: str | None) -> int | None:
+        """Convert an optional LTE field to an integer."""
+        if value is None:
+            return None
+        try:
+            return int(Decimal(value))
+        except (ValueError, ArithmeticError):
+            return None
+
+    @staticmethod
+    def _lte_speed(value: str | None) -> int | None:
+        """Convert the router's human-readable rate (e.g. 3.065KB/s) to B/s."""
+        if not value:
+            return None
+        match = re.fullmatch(r'\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(B|KB|MB)/s\\s*', value, re.IGNORECASE)
+        if not match:
+            return None
+        amount = Decimal(match.group(1))
+        unit = match.group(2).upper()
+        multiplier = {'B': 1, 'KB': 1024, 'MB': 1024 * 1024}[unit]
+        return int(amount * multiplier)
+
+    @staticmethod
+    def _lte_cell_value(values: dict[str, str], field: str) -> int | None:
+        """Read the first (serving-cell) value, ignoring later secondary-cell entries."""
+        direct = values.get(field)
+        if direct is not None:
+            return TplinkC80Router._lte_int(direct)
+        for key, value in values.items():
+            if key == field or re.fullmatch(rf'{re.escape(field)}\\s+0', key):
+                return TplinkC80Router._lte_int(value)
+        return None
+
     def get_lte_status(self) -> LTEStatus:
-        """Read LTE traffic statistics when this firmware exposes block 139."""
-        request = '139|1,0,0'
-        data_blocks = self._return_data_block(request)
-        values = self._parse_last_values_from_block(data_blocks[request])
+        """Read LTE status and traffic counters from the Archer MR515 data blocks."""
+        requests = {
+            'traffic': '139|1,0,0',
+            'link': '140|1,0,0',
+            'network': '141|1,0,0',
+            'wan': '143|1,0,0',
+            'profile': '144|1,0,0',
+            'cell': '151|1,0,0',
+            'mobile': '153|1,0,0',
+        }
+        data_blocks = self._return_data_block('#'.join(requests.values()))
+
+        def block(name: str) -> dict[str, str]:
+            return self._parse_last_values_from_block(data_blocks.get(requests[name], []))
+
+        traffic = block('traffic')
+        link = block('link')
+        wan = block('wan')
+        profile = block('profile')
+        cell = block('cell')
+        mobile = block('mobile')
+
+        network_mode = wan.get('networkMode 4G')
+        if network_mode is None:
+            network_mode = wan.get('networkMode')
+        lte_enabled = None
+        if network_mode is not None:
+            lte_enabled = int(network_mode.strip().lower() in ('1', 'true', 'on', 'enabled'))
+
+        mobile_status = mobile.get('mobileStatus', '').strip().lower()
+        connect_status = None
+        if mobile_status:
+            if mobile_status in ('connesso', 'connected', 'up'):
+                connect_status = 1
+            elif mobile_status in ('disconnesso', 'disconnected', 'down', 'non connesso'):
+                connect_status = 0
+
         return LTEStatus(
-            total_statistics=int(Decimal(values['totalStatistics']))
+            enable=lte_enabled,
+            connect_status=connect_status,
+            network_type=self._lte_int(link.get('networkType')),
+            sim_status=self._lte_int(link.get('simStatus')),
+            total_statistics=self._lte_int(traffic.get('totalStatistics')),
+            cur_rx_speed=self._lte_speed(traffic.get('curRxSpeed')),
+            cur_tx_speed=self._lte_speed(traffic.get('curTxSpeed')),
+            sig_level=self._lte_int(link.get('signalStrength')),
+            rsrp=self._lte_cell_value(cell, 'RSRP'),
+            rsrq=self._lte_cell_value(cell, 'RSRQ'),
+            snr=self._lte_cell_value(cell, 'SNR'),
+            isp_name=profile.get('ispName'),
         )
 
     def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
