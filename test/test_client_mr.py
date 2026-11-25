@@ -23,6 +23,47 @@ from tplinkrouterc6u import (
 
 
 class TestTPLinkMRClient(TestCase):
+    _FAKE_NN = 'AB' * 64
+    _FAKE_EE = '010001'
+
+    def _client_with_rsa_response(self, response: str) -> TPLinkMRClient:
+        client = TPLinkMRClient('', '')
+        client._request = lambda url, *args, **kwargs: (200, response)
+        return client
+
+    def test_req_rsa_key_js_vars(self) -> None:
+        response = ('var ee="{}";\nvar nn="{}";\nvar seq="382829019";\n$.ret=0;'
+                    .format(self._FAKE_EE, self._FAKE_NN))
+        client = self._client_with_rsa_response(response)
+
+        self.assertEqual(client._req_rsa_key(), (self._FAKE_NN, self._FAKE_EE, 382829019))
+
+    def test_req_rsa_key_json(self) -> None:
+        # Archer MR600 v5 fw 1.7.0 returns the RSA key as JSON
+        response = ('{{"ee":"{}","nn":"{}","userSetting":1,"seq":"382829019","ret":0}}'
+                    .format(self._FAKE_EE, self._FAKE_NN))
+        client = self._client_with_rsa_response(response)
+
+        self.assertEqual(client._req_rsa_key(), (self._FAKE_NN, self._FAKE_EE, 382829019))
+
+    def test_req_rsa_key_json_error_ret(self) -> None:
+        response = '{{"ee":"{}","nn":"{}","seq":"1","ret":1}}'.format(self._FAKE_EE, self._FAKE_NN)
+        client = self._client_with_rsa_response(response)
+
+        with self.assertRaises(ClientException):
+            client._req_rsa_key()
+
+    def test_parse_ret_val_js_and_json(self) -> None:
+        client = TPLinkMRClient('', '')
+
+        self.assertEqual(client._parse_ret_val('$.ret=0;'), 0)
+        self.assertEqual(client._parse_ret_val('{"ret":0}'), 0)
+        self.assertEqual(client._parse_ret_val('{"ret":71233}'), 71233)
+        # /cgi/logout answer of Archer MR600 v5 fw 1.7.0
+        self.assertEqual(client._parse_ret_val('[cgi]0\n{"ret":0}[error]0\n'), 0)
+        with self.assertRaises(AssertionError):
+            client._parse_ret_val('garbage')
+
     def test_merge_response(self) -> None:
         response = '''[1,1,0,0,0,0]0
 X_TP_MACAddress=mac1
