@@ -33,7 +33,9 @@ class TplinkRE813XERouter(AbstractRouter):
     RE813XE-oriented host Wi-Fi writes use ``disabled_all`` (packet-captured).
     RE700X-style guest status uses ``admin/status?form=guest`` and
     ``admin/extend?form=guest_settings`` when present; missing endpoints are
-    ignored so one client covers both firmwares.
+    ignored so one client covers both firmwares. A form answered with
+    ``no such callback`` (guest or otherwise) is not asked again on later
+    polls; other optional errors are swallowed for that poll only.
 
     In repeater mode, ``get_repeater_status()`` reads the wireless backhaul.
     A form the firmware answers with "no such callback" is not asked again;
@@ -78,8 +80,9 @@ class TplinkRE813XERouter(AbstractRouter):
         # the firmware likely lacks the endpoint — stop asking every poll.
         self._perf_status = True
         self._perf_ok = False
-        # Optional repeater forms the firmware answered with "no such callback".
-        # Only that explicit reply marks a form unsupported; any other error is raised.
+        # Forms the firmware answered with "no such callback" (repeater and
+        # optional get_status paths such as guest). Only that explicit reply
+        # marks a form unsupported; other errors are not latched.
         self._unsupported_forms: set[str] = set()
 
     @staticmethod
@@ -132,9 +135,17 @@ class TplinkRE813XERouter(AbstractRouter):
         return data if isinstance(data, dict) else {}
 
     def _request_optional(self, path: str, data: str = 'operation=read'):
+        # Soft-optional: any ClientError is ignored for this poll. Forms the
+        # firmware answers with "no such callback" are remembered so later
+        # get_status() cycles do not re-hit them (HA #459: RE505X / RE705X
+        # guest endpoints blocked the HA sync worker on every poll / shutdown).
+        if path in self._unsupported_forms:
+            return None
         try:
             return self.request(path, data)
-        except ClientError:
+        except ClientError as e:
+            if 'no such callback' in str(e):
+                self._unsupported_forms.add(path)
             return None
 
     @staticmethod

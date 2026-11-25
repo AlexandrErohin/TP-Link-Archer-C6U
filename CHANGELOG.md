@@ -5,6 +5,7 @@
 ### Fixed
 
 - **C6U (`TplinkRouter`):** `TplinkEncryption.__init__` no longer clears `_headers_request` / `_headers_login` already set by `TplinkBaseRouter` / `TplinkRouterJson` through the MRO. Missing `Referer` / `Origin` / `Content-Type` caused HTTP 403 with an empty body (JSON decode error on `admin/firmware`) on Mercusys MR60X v2.0 and similar classic LuCI firmwares. ([HA #460](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/460), [HA #410](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/410)).
+- **RE813XE / RE700X / RE505X / RE705X:** `_request_optional()` latches forms answered with `no such callback` into `_unsupported_forms` (same as repeater status), so `get_status()` stops re-polling missing guest endpoints every cycle. Transient optional errors are still retried. ([HA #459](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/459)).
 
 ## [5.42.0] - 2026-11-24
 

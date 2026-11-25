@@ -346,6 +346,66 @@ class TestTplinkRE813XERouter(TestCase):
         client.get_status()
         self.assertEqual(performance.call_count, 1)
 
+    def test_get_status_no_such_callback_guest_forms_are_skipped_after_first_reply(self) -> None:
+        # RE505X / RE705X answer missing guest forms with no such callback (HA #459).
+        # Latch them so later polls (and HA shutdown) do not re-hit those endpoints.
+        client = self._client()
+        calls: list[str] = []
+        no_callback = (
+            'TplinkRouter - TplinkRE813XERouter - Response with error; Request {path}'
+            ' - Response {{"errorcode":"no such callback","success":false}}'
+        )
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            calls.append(path)
+            if path == 'admin/status?form=ap_status':
+                return {'wireless_2g_enable': 'on', 'wirelessCount': 0, 'wirelessGrid': []}
+            if path in (
+                'admin/status?form=guest',
+                'admin/extend?form=guest_settings',
+            ):
+                raise ClientError(no_callback.format(path=path))
+            if path == 'admin/status?form=perf':
+                raise ClientError('perf missing')
+            return {}
+
+        client.request = request  # type: ignore[method-assign]
+        first = client.get_status()
+        second = client.get_status()
+
+        self.assertEqual(first.guest_clients_total, 0)
+        self.assertIsNone(first.guest_2g_enable)
+        self.assertEqual(second.guest_clients_total, 0)
+        self.assertEqual(calls.count('admin/status?form=guest'), 1)
+        self.assertEqual(calls.count('admin/extend?form=guest_settings'), 1)
+        self.assertEqual(calls.count('admin/status?form=ap_status'), 2)
+        self.assertEqual(
+            client._unsupported_forms,
+            {'admin/status?form=guest', 'admin/extend?form=guest_settings'},
+        )
+
+    def test_get_status_other_optional_errors_are_not_latched(self) -> None:
+        # Transient optional failures must still be retried on the next poll.
+        client = self._client()
+        calls: list[str] = []
+
+        def request(path: str, data: str, ignore_response: bool = False, ignore_errors: bool = False):
+            calls.append(path)
+            if path == 'admin/status?form=ap_status':
+                return {'wireless_2g_enable': 'on', 'wirelessCount': 0, 'wirelessGrid': []}
+            if path == 'admin/status?form=guest':
+                raise ClientError('Response with error; Request admin/status?form=guest - Response 500')
+            if path == 'admin/status?form=perf':
+                raise ClientError('perf missing')
+            return {}
+
+        client.request = request  # type: ignore[method-assign]
+        client.get_status()
+        client.get_status()
+
+        self.assertEqual(calls.count('admin/status?form=guest'), 2)
+        self.assertEqual(client._unsupported_forms, set())
+
     def test_get_status_re700x_fixtures(self) -> None:
         client = self._client()
 
