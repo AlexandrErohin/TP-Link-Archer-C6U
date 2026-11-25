@@ -1,5 +1,11 @@
 # Changelog
 
+## [UNRELEASED]
+
+### Fixed
+
+- **C6U (`TplinkRouter`):** `TplinkEncryption.__init__` no longer clears `_headers_request` / `_headers_login` already set by `TplinkBaseRouter` / `TplinkRouterJson` through the MRO. Missing `Referer` / `Origin` / `Content-Type` caused HTTP 403 with an empty body (JSON decode error on `admin/firmware`) on Mercusys MR60X v2.0 and similar classic LuCI firmwares. ([HA #460](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/460), [HA #410](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/410)).
+
 ## [5.42.0] - 2026-11-24
 
 ### Fixed

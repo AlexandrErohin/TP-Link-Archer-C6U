@@ -112,8 +112,15 @@ class TplinkEncryption(TplinkRequest):
         self._logged = False
         self._sysauth = None
         self._data_block = 'data'
-        self._headers_request = {}
-        self._headers_login = {}
+        # Do not replace headers already set by a cooperative base in the MRO
+        # (e.g. TplinkBaseRouter via TplinkRouterJson). Clearing them dropped
+        # Referer / Origin / Content-Type and caused HTTP 403 with an empty body
+        # on Mercusys MR60X and similar classic LuCI firmwares
+        # (HA #460 / #410).
+        if not getattr(self, '_headers_request', None):
+            self._headers_request = {}
+        if not getattr(self, '_headers_login', None):
+            self._headers_login = {}
         self.nn = ''
         self.ee = ''
         self._seq = ''

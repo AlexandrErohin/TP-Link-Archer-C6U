@@ -27,8 +27,8 @@ class TplinkRE235BERouter(TplinkEncryption, TplinkRE813XERouter):
     def __init__(self, host: str, password: str, username: str = 'admin', logger=None,
                  verify_ssl: bool = True, timeout: int = 30) -> None:
         super().__init__(host, password, username, logger, verify_ssl, timeout)
-        # TplinkEncryption.__init__ runs after TplinkRE813XERouter.__init__ and
-        # clears the headers, so set them again.
+        # Override RE813XE headers: this firmware requires login.html as the
+        # login Referer (index.html for authenticated requests).
         self._headers_request = {
             'Referer': '{}/webpages/index.html'.format(self.host),
             'Origin': self.host,

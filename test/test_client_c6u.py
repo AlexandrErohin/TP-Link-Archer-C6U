@@ -45,6 +45,24 @@ class TestTPLinkClient(TestCase):
             return path.rsplit('mac=', 1)[-1]
         return dict(parse_qsl(data)).get('mac')
 
+    def test_init_preserves_luci_headers(self) -> None:
+        """TplinkEncryption must not wipe headers set by TplinkBaseRouter (HA #460)."""
+        client = self.router_class('http://192.168.1.1', 'password')
+        self.assertEqual(
+            client._headers_request.get('Referer'),
+            'http://192.168.1.1/webpages/index.html',
+        )
+        self.assertEqual(client._headers_request.get('Origin'), 'http://192.168.1.1')
+        self.assertEqual(client._headers_request.get('Content-Type'), 'application/json')
+        self.assertEqual(
+            client._headers_login.get('Referer'),
+            'http://192.168.1.1/webpages/index.html',
+        )
+        self.assertEqual(
+            client._headers_login.get('Content-Type'),
+            'application/x-www-form-urlencoded',
+        )
+
     def test_get_firmware(self) -> None:
         response = '''
         {
