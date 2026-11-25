@@ -942,10 +942,73 @@ class TestTPLinkClient(TestCase):
         self.assertEqual(device.tx_rate, 300)
         self.assertEqual(device.rx_rate, 400)
         self.assertEqual(device.online_time, 123.45)
+        self.assertTrue(device.active)
         self.assertEqual(device.traffic_usage, 987654321)
         self.assertEqual(device.signal, -55)
         self.assertFalse(client._easymesh)
         self.assertIsNone(device.ap_name)
+
+    def test_get_status_primary_list_inactive_when_smart_network_online_time_zero(self) -> None:
+        # AX53: wired client via AP stays in access_devices_* after shutdown while
+        # game_accelerator already reports onlineTime 0 (HA #449).
+        response_status = '''
+    {
+        "success": true,
+        "data": {
+            "lan_macaddr": "06:e6:97:9e:23:f5",
+            "access_devices_wired": [
+                {
+                    "wire_type": "wired",
+                    "macaddr": "aa:bb:cc:dd:ee:01",
+                    "ipaddr": "192.168.1.50",
+                    "hostname": "Tony-PC"
+                }
+            ]
+        }
+    }
+'''
+        response_game_accelerator = '''
+  {
+      "data": [
+          {"mac": "aa:bb:cc:dd:ee:01", "deviceTag":"wired", "isGuest":false, "ip":"192.168.1.50",
+          "deviceName":"Tony-PC", "downloadSpeed":0, "uploadSpeed":0,
+          "txRate":0, "rxRate":0, "onlineTime":0, "trafficUsage":0}
+      ],
+      "timeout": false,
+      "success": true
+  }
+'''
+        response_stats = '''
+  {
+      "data": [],
+      "timeout": false,
+      "success": true,
+      "operator": "load"
+  }
+'''
+
+        router_class = self.router_class
+        game_accelerator_path = self.game_accelerator_path
+
+        class TPLinkRouterTest(router_class):
+            def request(self, path: str, data: str,
+                        ignore_response: bool = False, ignore_errors: bool = False) -> dict | None:
+                if path == 'admin/status?form=all&operation=read':
+                    return loads(response_status)['data']
+                elif path == game_accelerator_path:
+                    return loads(response_game_accelerator)['data']
+                elif path == 'admin/wireless?form=statistics':
+                    return loads(response_stats)['data']
+                raise ClientException()
+
+        client = TPLinkRouterTest('', '')
+        status = client.get_status()
+
+        self.assertEqual(len(status.devices), 1)
+        device = status.devices[0]
+        self.assertEqual(device.hostname, 'Tony-PC')
+        self.assertEqual(device.online_time, 0)
+        self.assertFalse(device.active)
 
     def test_get_status_with_easymesh(self) -> None:
         """EasyMesh AX55 sample: main node gets '*name', satellites set ap_name + signal."""

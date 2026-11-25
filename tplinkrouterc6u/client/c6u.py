@@ -528,6 +528,11 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
                 device.tx_rate = item.get('txrate', item.get('txRate'))
                 device.rx_rate = item.get('rxrate', item.get('rxRate'))
                 device.online_time = item.get('onlineTime', item.get('online_time'))
+                # Primary-list clients can linger after disconnect (e.g. wired via AP on
+                # AX53) while game_accelerator already reports onlineTime 0. Mark them
+                # inactive so HA device trackers go not_home (HA #449).
+                if device.online_time in (0, 0.0, '0', '0.0'):
+                    device.active = False
                 device.traffic_usage = item.get('trafficUsage', item.get('trafficUsed'))
                 device.signal = int(item.get('signal')) if item.get('signal') else None
 
