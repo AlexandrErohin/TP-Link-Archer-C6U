@@ -667,13 +667,13 @@ class TplinkMR515Router(TplinkC80Router):
     """TP-Link Archer MR515 4G/LTE router."""
 
     def supports(self) -> bool:
-        """Match the MR515 specifically before the generic C80 protocol client."""
+        """Match the MR515 by its LTE data-statistics block (block 139)."""
         try:
-            response = self.request(2, 1, data='0|1,0,0')
+            response = self.request(2, 1, data='139|1,0,0')
             return (
                 response.status_code == 200
                 and response.text.startswith('00000')
-                and 'modelName Archer MR515' in response.text
+                and 'id 139|1,0,0' in response.text
             )
         except Exception:
             return False
