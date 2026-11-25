@@ -56,8 +56,8 @@ class TestTplinkDecoSGRouter(TestCase):
         self.assertEqual(client._stok, 'tok1')
         self.assertEqual(client._sysauth, 'abc123')
         login_headers = mock_post.call_args_list[-1].kwargs.get('headers') or {}
-        self.assertEqual(login_headers.get('Content-Type'),
-                         'application/x-www-form-urlencoded')
+        self.assertEqual(login_headers.get('Content-Type'), 'application/json')
+        self.assertIn('Referer', login_headers)
 
     def test_merge_keeps_json_request_body(self) -> None:
         path, data = TplinkDecoSGRouter._merge_path_and_body_params(
