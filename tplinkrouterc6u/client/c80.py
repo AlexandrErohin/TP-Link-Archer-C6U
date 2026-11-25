@@ -666,7 +666,7 @@ class TplinkC80Router(AbstractRouter):
             return TplinkC80Router._lte_int(direct)
         for key, value in values.items():
             if key.endswith(f' {field}') or re.fullmatch(
-                    rf'(?:.*\\s)?{re.escape(field)}\\s+0', key):
+                    rf'(?:.*\s)?{re.escape(field)}\s+0', key):
                 return TplinkC80Router._lte_int(value)
         return None
 
