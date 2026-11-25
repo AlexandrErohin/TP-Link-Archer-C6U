@@ -716,7 +716,7 @@ class TplinkC80Router(AbstractRouter):
             sig_level=self._lte_int(field_value(link, 'signalStrength')),
             rsrp=self._lte_cell_value(cell, 'RSRP', index=1),
             rsrq=self._lte_cell_value(cell, 'RSRQ', index=1),
-            snr=raw_snr // 10 if raw_snr is not None else None,
+            snr=raw_snr,
             isp_name=field_value(profile, 'ispName'),
         )
 
