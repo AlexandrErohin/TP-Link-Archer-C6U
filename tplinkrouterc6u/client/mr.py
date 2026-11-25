@@ -666,15 +666,23 @@ class TPLinkMRClientBase(AbstractRouter):
             # assert return code
             assert self._parse_ret_val(response) == self.HTTP_RET_OK
 
-            # parse public key
+            # parse public key - classic firmwares return inline JS vars
+            # (var ee="..."; var nn="..."; var seq="...";), newer ones
+            # (e.g. Archer MR600 v5 fw 1.7.0) return the same RSA key as JSON:
+            # {"ee":"010001","nn":"...","userSetting":1,"seq":"...","ret":0}
             ee = search('var ee="(.*)";', response)
             nn = search('var nn="(.*)";', response)
             seq = search('var seq="(.*)";', response)
 
-            assert ee and nn and seq
-            ee = ee.group(1)
-            nn = nn.group(1)
-            seq = seq.group(1)
+            if ee and nn and seq:
+                ee = ee.group(1)
+                nn = nn.group(1)
+                seq = seq.group(1)
+            else:
+                parsed = json_loads(response)
+                ee = parsed['ee']
+                nn = parsed['nn']
+                seq = str(parsed['seq'])
             assert len(ee) == 6
             assert len(nn) == 128
             assert seq.isnumeric()
@@ -796,6 +804,11 @@ class TPLinkMRClientBase(AbstractRouter):
             return code (int)
         """
         result = search(r'\$\.ret=(.*);', response_text)
+        if result is None:
+            # some firmwares (e.g. Archer MR600 v5 fw 1.7.0) answer with JSON instead,
+            # either plain ('{"ret":0}', the JSON RSA key) or embedded in an act
+            # response ('[cgi]0\n{"ret":0}[error]0\n' for /cgi/logout)
+            result = search(r'"ret"\s*:\s*"?(\d+)', response_text)
         assert result is not None
         assert result.group(1).isnumeric()
 

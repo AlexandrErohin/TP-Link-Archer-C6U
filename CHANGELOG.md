@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **MR (`TPLinkMRClient`):** accept the RSA login key as JSON (`{"ee":...,"nn":...,"seq":...,"ret":0}`) in addition to the inline `var ee="...";` JS vars, and parse `"ret":N` (plain or embedded, e.g. the `/cgi/logout` answer `[cgi]0\n{"ret":0}[error]0`) when `$.ret=N;` is absent. Archer MR600 v5 firmware 1.7.0 Build 260518 uses RSA (not ECC like `TPLinkMR600Client`) but answers in JSON, so no existing client could log in; auto-detection now picks `TPLinkMRClient` for it.
 - **C6U (`TplinkRouter`):** `TplinkEncryption.__init__` no longer clears `_headers_request` / `_headers_login` already set by `TplinkBaseRouter` / `TplinkRouterJson` through the MRO. Missing `Referer` / `Origin` / `Content-Type` caused HTTP 403 with an empty body (JSON decode error on `admin/firmware`) on Mercusys MR60X v2.0 and similar classic LuCI firmwares. ([HA #460](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/460), [HA #410](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/410)).
 
 ## [5.42.0] - 2026-11-24
