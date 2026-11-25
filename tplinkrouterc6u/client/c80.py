@@ -634,6 +634,15 @@ class TplinkC80Router(AbstractRouter):
                 values[key] = value.strip()
         return values
 
+    def get_lte_status(self) -> LTEStatus:
+        """Read LTE traffic statistics when this firmware exposes block 139."""
+        request = '139|1,0,0'
+        data_blocks = self._return_data_block(request)
+        values = self._parse_last_values_from_block(data_blocks[request])
+        return LTEStatus(
+            total_statistics=int(Decimal(values['totalStatistics']))
+        )
+
     def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
         devices: list[Device] = []
         for item in self._parse_response_to_dict(response_data):
@@ -678,11 +687,3 @@ class TplinkMR515Router(TplinkC80Router):
         except Exception:
             return False
 
-    def get_lte_status(self) -> LTEStatus:
-        """Read the MR515 LTE traffic counter (bytes) from block 139."""
-        request = '139|1,0,0'
-        data_blocks = self._return_data_block(request)
-        values = self._parse_last_values_from_block(data_blocks[request])
-        return LTEStatus(
-            total_statistics=int(Decimal(values['totalStatistics']))
-        )
