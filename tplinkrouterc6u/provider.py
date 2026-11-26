@@ -20,7 +20,8 @@ from tplinkrouterc6u.client.re235be import TplinkRE235BERouter
 from tplinkrouterc6u.client.pgw2440 import TplinkPGW2440Router
 from tplinkrouterc6u.client.c3200 import TplinkC3200Router
 from tplinkrouterc6u.client.c1200 import TplinkC1200Router
-from tplinkrouterc6u.client.c80 import TplinkC80Router, TplinkMR515Router
+from tplinkrouterc6u.client.c80 import TplinkC80Router
+from tplinkrouterc6u.client.mr515 import TplinkMR515Router
 from tplinkrouterc6u.client.vr import TPLinkVRClient
 from tplinkrouterc6u.client.vr400v2 import TPLinkVR400v2Client
 from tplinkrouterc6u.client.r import TPLinkRClient

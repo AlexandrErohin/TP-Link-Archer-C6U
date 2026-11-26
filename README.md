@@ -48,6 +48,7 @@ from tplinkrouterc6u import (
     TPLinkCPE210Client,
     TPLinkSG108EClient,
     TplinkC80Router,
+    TplinkMR515Router,  # Archer MR515 (C80 protocol + LTE)
     TplinkWDRRouter,
     TPLinkC50Client,
     TPLinkWR841NClient,
@@ -562,7 +563,7 @@ Not all fields are filled by every client:
 | Field | Description | Type |
 | --- |---|---|
 | enable | is enabled | int |
-| connect_status | connect status | int |
+| connect_status | connect status (`1` = connected on Deco/MR515; MR/EX pass the firmware value) | int |
 | network_type | network type | int |
 | network_type_info | Example: 4G LTE  | str |
 | sim_status | sim status | int |
@@ -570,6 +571,12 @@ Not all fields are filled by every client:
 | total_statistics | total statistics in bytes | int |
 | cur_rx_speed | current download speed in bytes per second  | int |
 | cur_tx_speed | current upload speed in bytes per second  | int |
+| data_limit | data limit in bytes (MR515; `None` on other clients) | int, None |
+| enable_data_limit | whether the data limit is enabled (MR515) | bool, None |
+| warning_percent | warning threshold percent for the data limit (MR515) | int, None |
+| enable_payment_day | whether billing-day reset is enabled (MR515) | bool, None |
+| payment_day | day of month for traffic reset, 1–31 (MR515) | int, None |
+| adjust_statistics | manual traffic adjustment in bytes (MR515) | int, None |
 | sms_unread_count | sms unread amount  | int |
 | sig_level | signal level  | int |
 | rsrp | RSRP  | int |
@@ -965,6 +972,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer GX90 v1.0
 - Archer MR200 (v2, v5, v5.3, v6.0)
 - Archer MR400 V.4.3
+- Archer MR515 1.0
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3, v5.0)
 - Archer NX200 (v1.0, v2.0)

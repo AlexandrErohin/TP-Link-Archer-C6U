@@ -4,7 +4,8 @@ The best way would be great if you create Pull Request with a new class for your
 
 For example
  - [Class for routers XDR series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/xdr.py#L18)
- - [Class for routers C80|C6V4 series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/c80.py#L73)
+ - [Class for routers C80|C6V4 series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/c80.py#L87)
+ - [Class for Archer MR515 (C80 protocol + LTE)](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/mr515.py#L8)
  - [Class for routers DECO series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/deco.py#L15)
  - [Class for routers AX series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/c6u.py#L478)
  - [Class for routers MR and VR series](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/blob/main/tplinkrouterc6u/client/mr.py#L590)

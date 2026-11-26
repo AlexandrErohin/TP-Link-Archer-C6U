@@ -2,6 +2,10 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- **MR515:** `TplinkMR515Router` for Archer MR515 (C80-style protocol + `get_lte_status()`). Detects via an unauthenticated echo of LTE traffic block 139; registered before `TplinkC80Router`. `LTEStatus` gains optional data-limit / billing fields (`data_limit`, `enable_data_limit`, `warning_percent`, `enable_payment_day`, `payment_day`, `adjust_statistics`). ([#283](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/283), [HA #457]((https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/457))).
+
 ### Fixed
 
 - **MR (`TPLinkMRClient`):** accept the RSA login key as JSON (`{"ee":...,"nn":...,"seq":...,"ret":0}`) in addition to the inline `var ee="...";` JS vars, and parse `"ret":N` (plain or embedded, e.g. the `/cgi/logout` answer `[cgi]0\n{"ret":0}[error]0`) when `$.ret=N;` is absent. Archer MR600 v5 firmware 1.7.0 Build 260518 uses RSA (not ECC like `TPLinkMR600Client`) but answers in JSON, so no existing client could log in; auto-detection now picks `TPLinkMRClient` for it. ([#281](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/281)). Follow-up: JSON key parse tolerates an act-style wrapper; wrong-password (`ret` 71233) without classic `currAuthTimes` JS vars raises a clear `ClientException` instead of `AssertionError`; README lists MR600 v5.0.
