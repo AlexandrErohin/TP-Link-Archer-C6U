@@ -975,6 +975,7 @@ Guest networks only fill `enable`, `ssid`, `hidden` and `encryption`. There is n
 - Archer MR515 1.0
 - Archer MR550 v1
 - Archer MR600 (v1, v2, v3, v5.0)
+- Archer NX500 v2.0
 - Archer NX200 (v1.0, v2.0)
 - Archer VR1200v (v1, v2)
 - Archer VR1600v v1
