@@ -661,4 +661,3 @@ class TplinkC80Router(AbstractRouter):
         except requests.exceptions.RequestException as e:
             self._logger.error(f"Network error: {e}")
             raise ClientException(f"Network error: {str(e)}") from e
-
