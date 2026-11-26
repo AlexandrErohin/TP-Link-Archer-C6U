@@ -9,12 +9,7 @@
 - **RE813XE / RE700X / RE505X / RE705X:** `_request_optional()` latches forms answered with `no such callback` into `_unsupported_forms` (same as repeater status), so `get_status()` stops re-polling missing guest endpoints every cycle. Transient optional errors are still retried. ([HA #459](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/459)).
 - **Deco:** `get_status()` treats `admin/wireless?form=wlan` and `admin/network?form=performance` as soft-optional (`ClientError` / connection reset / timeout). A transient X50-5G Lua dispatcher fault on wlan no longer fails the whole poll — clients and LAN identity are still returned, band enables / CPU-mem stay unknown for that cycle, and a warning is logged. ([HA #458](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/458)).
 - **C6U / SG:** when merging `smart_network` / `game_accelerator` onto a client already present in the primary access-device lists, `onlineTime` / `online_time` of `0` sets `Device.active = False` (stale wired rows after disconnect via AP, e.g. Archer AX53). ([HA #449](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/449)).
-
-## [5.42.1] - 2026-11-25
-
-### Fixed
-
-- **Deco (SG):** Mercusys Halo H60XR rejects `sign`/`data` login when `Content-Type` is `application/x-www-form-urlencoded`; use LuCI JSON headers (`application/json`, `Referer`) for login and encrypted requests, like the web UI. Fixes `error_code=1` with correct passwords after [#278](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/278) / PyPI 5.42.0 ([HA #437](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/437)).
+- **Deco (SG):** Mercusys Halo H60XR rejects `sign`/`data` login when `Content-Type` is `application/x-www-form-urlencoded`; use LuCI JSON headers (`application/json`, `Referer`) for login and encrypted requests, like the web UI. Fixes `error_code=1` with correct passwords after [#278](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/278) / PyPI 5.42.0 ([#282](https://github.com/AlexandrErohin/TP-Link-Archer-C6U/pull/282), [HA #437](https://github.com/AlexandrErohin/home-assistant-tplink-router/issues/437)).
 
 ## [5.42.0] - 2026-11-24
 

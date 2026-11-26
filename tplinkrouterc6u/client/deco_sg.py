@@ -95,6 +95,12 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         raise ClientException('response missing result/data block')
 
     def _mercusys_json_headers(self) -> dict:
+        """LuCI headers matching the Halo web UI (keys/auth and signed posts).
+
+        Halo rejects ``sign``/``data`` posts when Content-Type is
+        ``application/x-www-form-urlencoded``; keep ``application/json`` even
+        though the body stays the form-encoded ``sign=…&data=…`` string.
+        """
         referer = self.host.rstrip('/') + '/webpages/index.html'
         return {
             'Content-Type': 'application/json',
@@ -102,12 +108,6 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'X-Requested-With': 'XMLHttpRequest',
         }
-
-    def _signed_form_headers(self) -> dict:
-        """Headers for ``sign`` / ``data`` posts (same body style as TplinkRouterSG)."""
-        headers = self._mercusys_json_headers()
-        headers['Content-Type'] = 'application/x-www-form-urlencoded'
-        return headers
 
     def _read_login_envelope(self, form: str) -> dict:
         url = '{}/cgi-bin/luci/;stok=/login?form={}'.format(self.host, form)

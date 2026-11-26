@@ -72,11 +72,33 @@ class TestTplinkDecoSGRouter(TestCase):
             self.assertFalse(client.supports())
             reset.assert_called_once()
 
-    def test_signed_form_headers_use_urlencoded(self) -> None:
+    @patch('tplinkrouterc6u.client.deco_sg.post')
+    def test_sg_request_uses_json_headers_with_sign_body(self, mock_post: Mock) -> None:
         client = TplinkDecoSGRouter('http://192.168.68.1', 'secret')
-        headers = client._signed_form_headers()
-        self.assertEqual(headers['Content-Type'], 'application/x-www-form-urlencoded')
+        client._logged = True
+        client._stok = 'tok1'
+        client._sysauth = 'abc123'
+        client._hash = 'hash'
+        client._seq = 1
+
+        response = Mock()
+        response.text = '{"data":"cipher"}'
+        response.json.return_value = {'data': 'cipher'}
+        mock_post.return_value = response
+
+        with patch.object(client, '_aes_encrypt', return_value='enc'), \
+                patch.object(client, '_build_request_signature', return_value='sig'), \
+                patch.object(client, '_aes_decrypt',
+                             return_value='{"error_code":0,"result":{"ok":true}}'):
+            result = client._sg_request(
+                'admin/network?form=wan_ipv4', '{"operation":"read"}')
+
+        self.assertEqual(result, {'ok': True})
+        call_kwargs = mock_post.call_args.kwargs
+        headers = call_kwargs.get('headers') or {}
+        self.assertEqual(headers.get('Content-Type'), 'application/json')
         self.assertIn('Referer', headers)
+        self.assertTrue(str(call_kwargs.get('data', '')).startswith('sign='))
 
 
 if __name__ == '__main__':
