@@ -237,7 +237,7 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         url = '{}/cgi-bin/luci/;stok=/login?form=login'.format(self.host)
         body = 'sign={}&data={}'.format(sign, quote(encrypted_data))
         response = post(
-            url, data=body, headers=self._signed_form_headers(),
+            url, data=body, headers=self._headers_login,
             timeout=self.timeout, verify=self._verify_ssl,
         )
         if not (response.text or '').strip():
@@ -291,7 +291,7 @@ class TplinkDecoSGRouter(TPLinkDecoClient):
         cookies = {'sysauth': self._sysauth} if self._sysauth else None
 
         response = post(
-            url, data=body, headers=self._signed_form_headers(),
+            url, data=body, headers=self._headers_request,
             cookies=cookies, timeout=self.timeout, verify=self._verify_ssl,
         )
 
