@@ -577,6 +577,12 @@ class LTEStatus:
     total_statistics: int | None = None
     cur_rx_speed: int | None = None
     cur_tx_speed: int | None = None
+    data_limit: int | None = None
+    enable_data_limit: bool | None = None
+    warning_percent: int | None = None
+    enable_payment_day: bool | None = None
+    payment_day: int | None = None
+    adjust_statistics: int | None = None
     sms_unread_count: int | None = None
     sig_level: int | None = None
     rsrp: int | None = None

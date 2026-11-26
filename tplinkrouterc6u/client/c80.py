@@ -1,6 +1,7 @@
 from logging import Logger
 from urllib import parse
 from collections import defaultdict
+from decimal import Decimal
 import re
 import requests
 from urllib.parse import urlparse
@@ -11,7 +12,7 @@ from tplinkrouterc6u.common.exception import ClientException
 from tplinkrouterc6u.common.encryption import EncryptionWrapper
 from tplinkrouterc6u.common.dataclass import Firmware, Status, IPv4Status, IPv6Status, IPv4Reservation
 from tplinkrouterc6u.common.dataclass import (
-    IPv4DHCPLease, Device, VPNStatus, BlockedDevice, AccessControlStatus,
+    IPv4DHCPLease, Device, VPNStatus, BlockedDevice, AccessControlStatus, LTEStatus,
 )
 from macaddress import EUI48
 from tplinkrouterc6u.client_abstract import AbstractRouter
@@ -629,9 +630,107 @@ class TplinkC80Router(AbstractRouter):
             if line == '00000' or line.startswith('id '):
                 continue
             key, _, value = line.rpartition(' ')
+            key = key.strip()
             if key:
                 values[key] = value.strip()
         return values
+
+    @staticmethod
+    def _lte_int(value: str | None) -> int | None:
+        """Convert an optional LTE field to an integer."""
+        if value is None:
+            return None
+        try:
+            return int(Decimal(value))
+        except (ValueError, ArithmeticError):
+            return None
+
+    @staticmethod
+    def _lte_speed(value: str | None) -> int | None:
+        """Convert the MR515's raw live rate (bytes per second) to an integer."""
+        return TplinkC80Router._lte_int(value)
+
+    @staticmethod
+    def _lte_bool(value: str | None) -> bool | None:
+        """Convert an optional 0/1 LTE setting to a boolean."""
+        parsed = TplinkC80Router._lte_int(value)
+        return bool(parsed) if parsed in (0, 1) else None
+
+    @staticmethod
+    def _lte_cell_value(values: dict[str, str], field: str, index: int = 1) -> int | None:
+        """Read a field from the primary serving cell (servingCellList index 1)."""
+        indexed = values.get(f'{field} {index}')
+        if indexed is not None:
+            return TplinkC80Router._lte_int(indexed)
+        # Some firmware revisions flatten the same indexed field with a prefix.
+        for key, value in values.items():
+            if key.endswith(f' {field} {index}'):
+                return TplinkC80Router._lte_int(value)
+        # Retain compatibility with firmwares returning a non-indexed cell block.
+        direct = values.get(field)
+        return TplinkC80Router._lte_int(direct)
+
+    def get_lte_status(self) -> LTEStatus:
+        """Read LTE status and traffic counters from the Archer MR515 data blocks."""
+        requests = {
+            'traffic': '139|1,0,0',
+            'link': '140|1,0,0',
+            'network': '141|1,0,0',
+            'wan': '143|1,0,0',
+            'profile': '144|1,0,0',
+            'cell': '151|1,0,0',
+            'mobile': '153|1,0,0',
+        }
+        data_blocks = self._return_data_block('#'.join(requests.values()))
+
+        def block(name: str) -> dict[str, str]:
+            return self._parse_last_values_from_block(data_blocks.get(requests[name], []))
+
+        traffic = block('traffic')
+        link = block('link')
+        wan = block('wan')
+        profile = block('profile')
+        cell = block('cell')
+        mobile = block('mobile')
+
+        def field_value(values: dict[str, str], field: str) -> str | None:
+            """Find a field even when the firmware prefixes its nested model path."""
+            if field in values:
+                return values[field]
+            return next((value for key, value in values.items()
+                         if key.endswith(f' {field}')), None)
+
+        data_switch = field_value(wan, 'dataSwitchStatus')
+        lte_enabled = self._lte_int(data_switch)
+
+        # MOBILE_LINK_STATUS block 153: status 2 is the router UI's "Connesso".
+        mobile_status = self._lte_int(field_value(mobile, 'status'))
+        connect_status = 1 if mobile_status == 2 else (
+            0 if mobile_status is not None else None
+        )
+
+        raw_snr = self._lte_cell_value(cell, 'SNR', index=1)
+
+        return LTEStatus(
+            enable=lte_enabled,
+            connect_status=connect_status,
+            network_type=self._lte_int(field_value(link, 'networkType')),
+            sim_status=self._lte_int(field_value(link, 'simStatus')),
+            total_statistics=self._lte_int(field_value(traffic, 'totalStatistics')),
+            cur_rx_speed=self._lte_speed(field_value(traffic, 'curRxSpeed')),
+            cur_tx_speed=self._lte_speed(field_value(traffic, 'curTxSpeed')),
+            data_limit=self._lte_int(field_value(traffic, 'limitation')),
+            enable_data_limit=self._lte_bool(field_value(traffic, 'enableDataLimit')),
+            warning_percent=self._lte_int(field_value(traffic, 'warningPercent')),
+            enable_payment_day=self._lte_bool(field_value(traffic, 'enablePaymentDay')),
+            payment_day=self._lte_int(field_value(traffic, 'paymentDay')),
+            adjust_statistics=self._lte_int(field_value(traffic, 'adjustStatistics')),
+            sig_level=self._lte_int(field_value(link, 'signalStrength')),
+            rsrp=self._lte_cell_value(cell, 'RSRP', index=1),
+            rsrq=self._lte_cell_value(cell, 'RSRQ', index=1),
+            snr=raw_snr,
+            isp_name=field_value(profile, 'ispName'),
+        )
 
     def _parse_dhcp_devices(self, response_data: list[str]) -> list[Device]:
         devices: list[Device] = []
@@ -660,3 +759,20 @@ class TplinkC80Router(AbstractRouter):
         except requests.exceptions.RequestException as e:
             self._logger.error(f"Network error: {e}")
             raise ClientException(f"Network error: {str(e)}") from e
+
+
+class TplinkMR515Router(TplinkC80Router):
+    """TP-Link Archer MR515 4G/LTE router."""
+
+    def supports(self) -> bool:
+        """Match the MR515 by its LTE data-statistics block (block 139)."""
+        try:
+            response = self.request(2, 1, data='139|1,0,0')
+            return (
+                response.status_code == 200
+                and response.text.startswith('00000')
+                and 'id 139|1,0,0' in response.text
+            )
+        except Exception:
+            return False
+
