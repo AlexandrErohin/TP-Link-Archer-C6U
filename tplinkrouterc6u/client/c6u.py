@@ -562,42 +562,6 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
             except Exception:
                 self._wan_ipv4_dynamic = False
 
-        easymesh_device_list = None
-        if self._easymesh:
-            try:
-                easymesh_device_list = self.request(self._url_easymesh_device_list, 'operation=read')
-            except Exception:
-                self._easymesh = False
-
-        if easymesh_device_list:
-            # Match EasyMesh MACs (often dash-uppercase) to devices keyed by other API formats
-            devices_by_mac = {device.macaddr: device for device in devices.values()}
-            for ap in easymesh_device_list:
-                try:
-                    # 'sclient' is mesh main or satellite, 'nclient' is a network device
-                    sclient_detail = self._request_easymesh_sclient_detail(ap['mac'])
-                except Exception:
-                    continue
-
-                if not sclient_detail:
-                    continue
-
-                for nclient in sclient_detail.get('mesh_nclient_list') or []:
-                    nclient_mac = nclient.get('mac')
-                    if not nclient_mac:
-                        continue
-                    device = devices_by_mac.get(str(get_mac(nclient_mac)))
-                    if device is None:
-                        continue
-                    if ap.get('role') == 'satellite_router':
-                        # Last satellite wins if the same client appears under multiple APs
-                        device.ap_name = ap.get('name')
-                        if nclient.get('signal_strength') is not None:
-                            device.signal = nclient['signal_strength']
-                    elif device.ap_name is None:
-                        # prefix * helps identify and sort main node devices for display
-                        device.ap_name = '*' + (ap.get('name') or '')
-
         status.devices = list(devices.values())
         status.clients_total = (status.wired_total + status.wifi_clients_total + status.guest_clients_total
                                 + (status.iot_clients_total or 0))
